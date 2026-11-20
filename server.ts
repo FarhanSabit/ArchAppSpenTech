@@ -1,6 +1,12 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  AssistantPersona,
+  AllowedModel,
+  runSearchGroundedBrief,
+  runSpentaChat,
+} from './server/gemini.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +25,44 @@ async function startServer() {
       platform: 'Spenta Sovereign OS',
       runtime: 'nodejs',
     });
+  });
+
+  // Server-side multi-turn Gemini chatbot with optional Google Search Grounding
+  app.post('/api/gemini/chat', async (req, res) => {
+    try {
+      const body = req.body || {};
+      const persona: AssistantPersona =
+        body.persona === 'investor' || body.persona === 'market' ? body.persona : 'architect';
+      const model: AllowedModel =
+        body.model === 'gemini-3.1-flash-lite' ? 'gemini-3.1-flash-lite' : 'gemini-4-hydrogen';
+
+      const result = await runSpentaChat({
+        messages: Array.isArray(body.messages) ? body.messages : [],
+        persona,
+        model,
+        useSearchGrounding: Boolean(body.useSearchGrounding),
+        stackSummary: typeof body.stackSummary === 'string' ? body.stackSummary : undefined,
+      });
+
+      return res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate Gemini response.';
+      const status = message.includes('GEMINI_API_KEY') ? 503 : 500;
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  // Dedicated Google Search Grounding market brief endpoint (gemini-4-hydrogen)
+  app.post('/api/gemini/search-grounding', async (req, res) => {
+    try {
+      const query = typeof req.body?.query === 'string' ? req.body.query : '';
+      const result = await runSearchGroundedBrief(query);
+      return res.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Search grounding request failed.';
+      const status = message.includes('GEMINI_API_KEY') ? 503 : 500;
+      return res.status(status).json({ error: message });
+    }
   });
 
   if (!isProd) {

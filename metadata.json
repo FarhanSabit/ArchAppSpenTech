@@ -1,5 +1,6 @@
 {
   "name": "Odoo Invoicing & Accounting",
   "description": "Open source invoicing, accounting, journal dashboard, payments, chart of accounts, UBL e-invoicing, and customer portal running on Node.js.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
