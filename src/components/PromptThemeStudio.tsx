@@ -264,11 +264,44 @@ export function PromptThemeStudio() {
     }
   };
 
+  const withActiveDeploymentBanner = (markdown: string): string => {
+    const header = [
+      '<!-- Active Studio Infrastructure Target Metadata -->',
+      `> **Infrastructure Target**: ${deploymentProfile.switcherLabel} — ${deploymentProfile.title}`,
+      `> **Transport**: ${deploymentProfile.transport} | **Latency Budget**: ${deploymentProfile.latencyBudget}`,
+      `> **Enclave Boundary**: ${deploymentProfile.enclaveBoundary}`,
+      `> **Egress & Compliance**: ${deploymentProfile.egressPolicy} | ${deploymentProfile.compliancePosture}`,
+      `> **Active L1–L6 Core Posture**: ${coreMetadataSummary.teeCount}/6 Hardware TEE · ${coreMetadataSummary.strictOpaCount}/6 Strict OPA · ${activeServerTier.code} (${selectedApps.length} Apps)`,
+      '',
+      '---',
+      '',
+    ].join('\n');
+    return `${header}${markdown}`;
+  };
+
   const handleDownloadMd = (key: string, filename: string, content: string) => {
-    downloadMarkdownFile(filename, content);
+    downloadMarkdownFile(filename, withActiveDeploymentBanner(content));
     setDownloadedKey(key);
     window.setTimeout(() => {
       setDownloadedKey((prev) => (prev === key ? null : prev));
+    }, 1800);
+  };
+
+  const handleDownloadArchitectureMetaJson = () => {
+    const blob = new Blob([liveArchitectureMetadataJson], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `spenta-architecture-meta-${deploymentProfile.id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setDownloadedKey('studio-arch-meta-json');
+    window.setTimeout(() => {
+      setDownloadedKey((prev) => (prev === 'studio-arch-meta-json' ? null : prev));
     }, 1800);
   };
 
@@ -571,11 +604,27 @@ export function PromptThemeStudio() {
               <span aria-hidden="true">·</span>
               <span>Live L1–L6 isolation, Hardware TEE &amp; OPA metadata synced across project</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleDownloadArchitectureMetaJson}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap shrink-0"
+              >
+                {downloadedKey === 'studio-arch-meta-json' ? (
+                  <Check className="w-3 h-3 text-emerald-500" />
+                ) : (
+                  <Download className="w-3 h-3" strokeWidth={1.6} />
+                )}
+                <span>
+                  {downloadedKey === 'studio-arch-meta-json'
+                    ? 'Saved Metadata JSON'
+                    : 'Download Metadata JSON'}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleCopy('studio-arch-meta', liveArchitectureMetadataJson)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap shrink-0"
               >
                 {copiedKey === 'studio-arch-meta' ? (
                   <Check className="w-3 h-3 text-emerald-500" />
@@ -588,7 +637,7 @@ export function PromptThemeStudio() {
                 type="button"
                 onClick={() => setShowArchMetadata((v) => !v)}
                 aria-expanded={showArchMetadata}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap shrink-0"
               >
                 {showArchMetadata ? (
                   <>

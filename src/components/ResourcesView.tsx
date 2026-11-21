@@ -54,8 +54,13 @@ export function ResourcesView() {
   const [organization, setOrganization] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
-  const [deployment, setDeployment] = useState<'On-Prem' | 'Private VPC' | 'SaaS'>(() =>
-    deploymentTarget === 'private-vpc' ? 'Private VPC' : 'On-Prem',
+  const [deployment, setDeployment] = useState<'On-Prem' | 'Private VPC' | 'Air-Gap' | 'SaaS'>(
+    () =>
+      deploymentTarget === 'private-vpc'
+        ? 'Private VPC'
+        : deploymentTarget === 'air-gapped'
+          ? 'Air-Gap'
+          : 'On-Prem',
   );
   const [timeline, setTimeline] = useState('Q2–Q3 Pilot (60–90 Days)');
   const [notes, setNotes] = useState('');
@@ -63,7 +68,13 @@ export function ResourcesView() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setDeployment(deploymentTarget === 'private-vpc' ? 'Private VPC' : 'On-Prem');
+    setDeployment(
+      deploymentTarget === 'private-vpc'
+        ? 'Private VPC'
+        : deploymentTarget === 'air-gapped'
+          ? 'Air-Gap'
+          : 'On-Prem',
+    );
   }, [deploymentTarget]);
 
   useEffect(() => {
@@ -460,11 +471,16 @@ export function ResourcesView() {
                   </label>
                   <select
                     value={deployment}
-                    onChange={(e) => setDeployment(e.target.value as 'On-Prem' | 'Private VPC' | 'SaaS')}
+                    onChange={(e) =>
+                      setDeployment(
+                        e.target.value as 'On-Prem' | 'Private VPC' | 'Air-Gap' | 'SaaS',
+                      )
+                    }
                     className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
                   >
-                    <option value="On-Prem">On-Prem Server PC (Air-Gapped)</option>
+                    <option value="On-Prem">On-Prem Server PC (Tier 1–4)</option>
                     <option value="Private VPC">Private Sovereign VPC</option>
+                    <option value="Air-Gap">Air-Gapped Enclave (Zero-Internet)</option>
                     <option value="SaaS">Managed Sovereign SaaS</option>
                   </select>
                 </div>

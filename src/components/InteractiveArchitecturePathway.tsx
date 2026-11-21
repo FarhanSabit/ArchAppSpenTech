@@ -1302,10 +1302,73 @@ export function InteractiveArchitecturePathway({
                 strokeWidth="1.5"
               />
 
-              {/* Directed Hop-by-Hop Transition Arcs Above Spine */}
+              {/* Directed Hop-by-Hop Transition Arcs Above Spine (Including Hop 1 Ingress) */}
               {activeHopIdx >= 0 &&
                 activeTrace.hops.map((hop, idx) => {
-                  if (idx === 0 || idx > activeHopIdx) return null;
+                  if (idx > activeHopIdx) return null;
+
+                  // Hop 1 Ingress entry transition arc into the first activated pillar
+                  if (idx === 0) {
+                    const firstIdx = tree.findIndex((t) => t.id === hop.trunkId);
+                    if (firstIdx < 0) return null;
+                    const xTarget = 10 + firstIdx * 174 + 79;
+                    const xStart = Math.max(12, xTarget - 64);
+                    const isCurrentTransition = activeHopIdx === 0;
+                    const strokeCol = isCurrentTransition ? hopAmber : activeGreen;
+                    const ingressPathD = `M ${xStart} 18 Q ${xStart + 28} 18 ${xTarget} 46`;
+
+                    return (
+                      <g key={`arc-ingress-${activeTrace.id}`}>
+                        <circle cx={xStart} cy="18" r="3" fill={strokeCol} />
+                        <path
+                          d={ingressPathD}
+                          fill="none"
+                          stroke={strokeCol}
+                          strokeWidth={isCurrentTransition ? 2.4 : 1.5}
+                          strokeDasharray={isCurrentTransition ? '5 3' : undefined}
+                          opacity={isCurrentTransition ? 1 : 0.72}
+                          markerEnd={
+                            isCurrentTransition
+                              ? 'url(#spenta-arrow-active)'
+                              : 'url(#spenta-arrow-passed)'
+                          }
+                        />
+                        {isCurrentTransition && (
+                          <>
+                            <rect
+                              x={Math.max(4, xTarget - 42)}
+                              y="2"
+                              width="84"
+                              height="16"
+                              rx="4"
+                              fill={hopAmber}
+                            />
+                            <text
+                              x={Math.max(46, xTarget)}
+                              y="13"
+                              textAnchor="middle"
+                              fill={isDark ? '#0B1020' : '#FFFFFF'}
+                              fontSize="8.5"
+                              fontWeight="800"
+                              fontFamily="IBM Plex Mono, JetBrains Mono, monospace"
+                            >
+                              {`H1 · ${hop.transitionLabel}`}
+                            </text>
+                            {isPlaying && (
+                              <circle r="3.6" fill={hopAmber}>
+                                <animateMotion
+                                  dur="1.1s"
+                                  repeatCount="indefinite"
+                                  path={ingressPathD}
+                                />
+                              </circle>
+                            )}
+                          </>
+                        )}
+                      </g>
+                    );
+                  }
+
                   const fromHop = activeTrace.hops[idx - 1];
                   const fromIdx = tree.findIndex((t) => t.id === fromHop.trunkId);
                   const toIdx = tree.findIndex((t) => t.id === hop.trunkId);
@@ -1642,7 +1705,9 @@ export function InteractiveArchitecturePathway({
                             <div key={branch.id} className="relative space-y-2">
                               <span
                                 aria-hidden="true"
-                                className="hidden md:block absolute -left-5 top-5 w-5 h-[1.5px] transition-colors duration-200"
+                                className={`hidden md:block absolute -left-5 top-5 w-5 transition-all duration-200 ${
+                                  isHopBranch ? 'h-[2.5px]' : 'h-[1.5px]'
+                                }`}
                                 style={{
                                   backgroundColor: isHopBranch
                                     ? hopAmber
@@ -1653,6 +1718,17 @@ export function InteractiveArchitecturePathway({
                                         : inactiveStroke,
                                 }}
                               />
+                              {(isHopBranch || isPassedBranch) && (
+                                <span
+                                  aria-hidden="true"
+                                  className={`hidden md:block absolute -left-[5px] top-[16.5px] w-2 h-2 rounded-full transition-colors duration-200 ${
+                                    isHopBranch && isPlaying ? 'animate-pulse' : ''
+                                  }`}
+                                  style={{
+                                    backgroundColor: isHopBranch ? hopAmber : activeGreen,
+                                  }}
+                                />
+                              )}
 
                               <div
                                 className={`rounded-[10px] border transition-all duration-150 ${

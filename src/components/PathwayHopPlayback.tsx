@@ -173,9 +173,22 @@ export function PathwayHopPlayback({
           </div>
         </div>
 
-        {/* Playback Transport Buttons (Play / Pause / Step / Speed / Reset) */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {/* Playback Transport Buttons (Play / Pause / Step Back & Forward / History / Speed / Reset) */}
+        <div
+          className="flex flex-wrap items-center gap-2 shrink-0"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' && activeHopIdx > 0) {
+              e.preventDefault();
+              onStepPrev();
+            } else if (e.key === 'ArrowRight' && activeHopIdx < totalHops - 1) {
+              e.preventDefault();
+              onStepNext();
+            }
+          }}
+        >
           <div
+            role="group"
+            aria-label="Hop-by-hop step playback"
             className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
               isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#FFFFFF] border-[#E4DFD6]'
             }`}
@@ -210,14 +223,21 @@ export function PathwayHopPlayback({
               type="button"
               onClick={onStepPrev}
               disabled={activeHopIdx <= 0}
-              aria-label="Previous hop"
-              title="Previous hop"
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${secondaryText}`}
+              aria-label="Step back to previous hop"
+              title="Step back to previous hop (Left Arrow)"
+              className={`inline-flex items-center gap-0.5 px-2 py-1.5 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${
+                activeHopIdx > 0
+                  ? isDark
+                    ? 'text-[#E7EBF5] hover:bg-[#161D3A]'
+                    : 'text-[#16213A] hover:bg-[#EEF3FB]'
+                  : secondaryText
+              }`}
             >
               <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Prev</span>
             </button>
 
-            <span className="font-mono text-[11px] font-bold px-1.5 tabular-nums">
+            <span className="font-mono text-[11px] font-bold px-1 tabular-nums">
               {activeHopIdx >= 0 ? `${activeHopIdx + 1}/${totalHops}` : `0/${totalHops}`}
             </span>
 
@@ -225,10 +245,17 @@ export function PathwayHopPlayback({
               type="button"
               onClick={onStepNext}
               disabled={activeHopIdx >= totalHops - 1}
-              aria-label="Next hop"
-              title="Next hop"
-              className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${secondaryText}`}
+              aria-label="Step forward to next hop"
+              title="Step forward to next hop (Right Arrow)"
+              className={`inline-flex items-center gap-0.5 px-2 py-1.5 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${
+                activeHopIdx < totalHops - 1
+                  ? isDark
+                    ? 'text-[#E7EBF5] hover:bg-[#161D3A]'
+                    : 'text-[#16213A] hover:bg-[#EEF3FB]'
+                  : secondaryText
+              }`}
             >
+              <span>Next</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
 
@@ -252,6 +279,12 @@ export function PathwayHopPlayback({
               isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#FFFFFF] border-[#E4DFD6]'
             }`}
           >
+            <span
+              className={`hidden sm:inline-flex items-center gap-1 pl-1.5 pr-0.5 font-mono text-[10px] font-semibold ${mutedText}`}
+              title="Chronological activation history"
+            >
+              <History className="w-3 h-3" strokeWidth={1.75} />
+            </span>
             <button
               type="button"
               onClick={onHistoryBack}

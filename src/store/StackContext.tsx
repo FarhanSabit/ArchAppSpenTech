@@ -134,7 +134,7 @@ export interface SavedProposal {
   organization: string;
   contactName: string;
   email: string;
-  deployment: 'On-Prem' | 'Private VPC' | 'SaaS';
+  deployment: 'On-Prem' | 'Private VPC' | 'Air-Gap' | 'SaaS';
   timeline: string;
   notes: string;
   appIds: string[];
