@@ -1,10 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Download, ImageOff, Maximize2, Printer, X, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  Download,
+  GitBranch,
+  ImageOff,
+  Layers,
+  Maximize2,
+  Printer,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import aiBrainPlate from '../assets/images/spenta_ai_brain_plate_1795170757868.jpg';
 import l1L6Plate from '../assets/images/spenta_l1_l6_stack_plate_1795170758646.jpg';
 import captivePlate from '../assets/images/spenta_captive_ecosystem_plate_1795170758530.jpg';
 import financialsPlate from '../assets/images/spenta_financials_plate_1795170783795.jpg';
 import { useStack } from '../store/StackContext';
+import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
 
 interface InfographicPlate {
   id: 'ai-brain' | 'l1-l6-stack' | 'captive-ecosystem' | 'financial-edge';
@@ -71,6 +82,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
 
 export function InfographicsView() {
   const { pendingNavFocus, clearPendingNavFocus } = useStack();
+  const [viewMode, setViewMode] = useState<'all' | 'pathway' | 'plates'>('all');
   const [lightboxItem, setLightboxItem] = useState<InfographicPlate | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
@@ -109,30 +121,81 @@ export function InfographicsView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
-            BOARDROOM &amp; TECHNICAL PRESENTATION PLATES
+            CODE-DRAWN INTERACTIVE PATHWAY &amp; BOARDROOM VISUAL PLATES
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
-            Infographics — High-Resolution Architecture Gallery
+            Infographics — Interactive Architecture Pathway &amp; Visual Gallery
           </h1>
           <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-            Click any 16:9 presentation plate to open full-screen zoom inspection, download high-resolution artwork, or print for executive investor briefings.
+            Explore the code-drawn OITS Dhaka × roadmap.sh branching architecture diagram with live Stack Composer sync, or inspect and download high-resolution 16:9 investor presentation plates.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 self-start sm:self-auto px-4 py-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-semibold transition-colors cursor-pointer shrink-0 no-print"
-        >
-          <Printer className="w-4 h-4" strokeWidth={1.5} />
-          <span>Print Gallery</span>
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0 no-print">
+          <div
+            role="group"
+            aria-label="Infographics display mode"
+            className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('all')}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                viewMode === 'all'
+                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+              }`}
+            >
+              All Views
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('pathway')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                viewMode === 'pathway'
+                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+              }`}
+            >
+              <GitBranch className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Interactive Pathway</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('plates')}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                viewMode === 'plates'
+                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>4 Visual Plates</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <Printer className="w-4 h-4" strokeWidth={1.5} />
+            <span>Print Gallery</span>
+          </button>
+        </div>
       </section>
 
-      {/* 2x2 Responsive Plate Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Live Code-Drawn OITS Dhaka × roadmap.sh Interactive Architecture Pathway */}
+      {(viewMode === 'all' || viewMode === 'pathway') && (
+        <InteractiveArchitecturePathway defaultExpandedTrunks={['trunk-core', 'trunk-ops']} />
+      )}
+
+      {/* 2x2 Responsive Static 16:9 Plate Grid */}
+      {(viewMode === 'all' || viewMode === 'plates') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {INFOGRAPHIC_PLATES.map((plate) => {
           const isBroken = Boolean(failedImages[plate.id]);
           return (
@@ -226,7 +289,8 @@ export function InfographicsView() {
             </article>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Full-Screen Zoom Lightbox */}
       {lightboxItem && (
