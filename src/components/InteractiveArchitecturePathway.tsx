@@ -27,6 +27,7 @@ import {
   DeploymentProviderId,
 } from '../data/deploymentProfiles';
 import { downloadMarkdownFile } from '../data/promptThemeStudioData';
+import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import {
   ActivationHistoryEntry,
@@ -664,7 +665,6 @@ export function InteractiveArchitecturePathway({
   onPolarityChange,
 }: InteractiveArchitecturePathwayProps) {
   const {
-    theme,
     selectedIds,
     toggleApp,
     hitlConfidence,
@@ -721,14 +721,11 @@ export function InteractiveArchitecturePathway({
     });
   }, []);
 
-  // Scoped OITS Dhaka polarity synced to portal theme or parent
-  const [localPolarity, setLocalPolarity] = useState<'light' | 'dark'>(syncedPolarity ?? theme);
-  useEffect(() => {
-    setLocalPolarity(syncedPolarity ?? theme);
-  }, [syncedPolarity, theme]);
+  const { theme: globalTheme, setTheme: setGlobalTheme } = useTheme();
+  const effectivePolarity = syncedPolarity ?? globalTheme;
 
   const setPolarity = (next: 'light' | 'dark') => {
-    setLocalPolarity(next);
+    setGlobalTheme(next);
     onPolarityChange?.(next);
   };
 
@@ -875,7 +872,7 @@ export function InteractiveArchitecturePathway({
     applyHistoryAtIndex(navHistory.cursor + 1);
   };
 
-  const isDark = localPolarity === 'dark';
+  const isDark = effectivePolarity === 'dark';
 
   const inspectedContext = useMemo(() => {
     if (!inspectedBranchId) return null;
@@ -1807,6 +1804,34 @@ export function InteractiveArchitecturePathway({
                                     <div className={`text-[11px] font-mono mt-1 tabular-nums ${mutedText}`}>
                                       {branch.metric}
                                     </div>
+                                    {(isHopBranch || isPassedBranch) && branchHop && (
+                                      <div
+                                        className={`mt-1.5 pt-1.5 border-t font-mono text-[10px] leading-snug space-y-0.5 ${
+                                          isHopBranch
+                                            ? isDark
+                                              ? 'border-[#E0B063]/30 text-[#E7EBF5]'
+                                              : 'border-[#8A5C10]/25 text-[#16213A]'
+                                            : isDark
+                                              ? 'border-[#6FCB9F]/25 text-[#C3CCE4]'
+                                              : 'border-[#1C6E46]/20 text-[#4A5163]'
+                                        }`}
+                                      >
+                                        <div className="truncate">
+                                          <span className={mutedText}>State: </span>
+                                          <strong
+                                            style={{
+                                              color: isHopBranch ? hopAmber : activeGreen,
+                                            }}
+                                          >
+                                            {branchHop.metadataState.stage}
+                                          </strong>
+                                        </div>
+                                        <div className="truncate">
+                                          <span className={mutedText}>Policy: </span>
+                                          <span>{branchHop.metadataState.policyDecision}</span>
+                                        </div>
+                                      </div>
+                                    )}
                                   </button>
 
                                   <div className="flex items-center gap-1 shrink-0">

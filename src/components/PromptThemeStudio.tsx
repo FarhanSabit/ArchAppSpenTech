@@ -51,6 +51,7 @@ import {
   DEPLOYMENT_TARGET_ORDER,
 } from '../data/deploymentProfiles';
 import { SERVER_TIERS } from '../data/spentaManifest';
+import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import { DesignComparisonTable } from './DesignComparisonTable';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
@@ -83,9 +84,11 @@ type ViewportSize = 'desktop' | 'tablet' | 'mobile';
 type WorkbenchMode = 'preview' | 'split' | 'code';
 
 export function PromptThemeStudio() {
+  const { paletteMode, setPaletteMode, theme } = useTheme();
   const {
     deploymentTarget,
     deploymentProfile,
+    projectArchitectureMetadata,
     setDeploymentTarget,
     coreLayerConfigs,
     stackMetrics,
@@ -102,10 +105,22 @@ export function PromptThemeStudio() {
   // Live Preview Toggle: 2x2 Virtual Iframes Grid vs Single Focus v0 Workbench
   const [previewLayout, setPreviewLayout] = useState<'iframes' | 'single'>('iframes');
   const [activeThemeId, setActiveThemeId] = useState<ThemeRefId>('oitsdhaka');
-  const [previewPolarity, setPreviewPolarity] = useState<'dark' | 'light'>('light');
+  const [previewPolarity, setPreviewPolarity] = useState<'dark' | 'light'>(theme);
   const [iframePolarities, setIframePolarities] = useState<Record<ThemeRefId, 'light' | 'dark'>>(
     INITIAL_IFRAME_POLARITIES,
   );
+
+  const handleToggleGlobalPalette = (next: 'stone' | 'nocturnal') => {
+    setPaletteMode(next);
+    const nextPolarity: 'light' | 'dark' = next === 'stone' ? 'light' : 'dark';
+    setPreviewPolarity(nextPolarity);
+    setIframePolarities({
+      'oits-web-v2': nextPolarity,
+      'mmis-v2': nextPolarity,
+      oitsdhaka: nextPolarity,
+      'spenta-os': nextPolarity,
+    });
+  };
 
   // v0 Workbench Controls (Viewport Switcher, Preview/Split/Code, Visual Design Mode Token Tweaker)
   const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
@@ -203,39 +218,19 @@ export function PromptThemeStudio() {
     [iframePolarities, themeOverrides, deploymentProfile],
   );
 
-  const coreMetadataSummary = useMemo(() => {
-    const layers = Object.values(coreLayerConfigs);
-    const airGappedCount = layers.filter((l) => l.isolationMode === 'Air-Gapped On-Prem').length;
-    const vpcCount = layers.filter((l) => l.isolationMode === 'Private Sovereign VPC').length;
-    const teeCount = layers.filter((l) => l.teeEnabled).length;
-    const strictOpaCount = layers.filter((l) => l.policyMode === 'Strict OPA (>= 0.88 HITL)').length;
-    return { airGappedCount, vpcCount, teeCount, strictOpaCount };
-  }, [coreLayerConfigs]);
+  const coreMetadataSummary = {
+    airGappedCount: projectArchitectureMetadata.governanceSummary.airGappedLayers,
+    vpcCount: projectArchitectureMetadata.governanceSummary.vpcLayers,
+    teeCount: projectArchitectureMetadata.governanceSummary.teeEnabledLayers,
+    strictOpaCount: projectArchitectureMetadata.governanceSummary.strictOpaLayers,
+  };
 
   const activeServerTier = SERVER_TIERS[stackMetrics.tier];
 
-  const liveArchitectureMetadataJson = useMemo(() => {
-    const metadata = {
-      project: 'Spenta Sovereign OS',
-      infrastructureTarget: {
-        id: deploymentProfile.id,
-        environment: deploymentProfile.switcherLabel,
-        topology: deploymentProfile.title,
-        transport: deploymentProfile.transport,
-        enclaveBoundary: deploymentProfile.enclaveBoundary,
-        latencyBudget: deploymentProfile.latencyBudget,
-        egressPolicy: deploymentProfile.egressPolicy,
-        compliancePosture: deploymentProfile.compliancePosture,
-      },
-      stackSizing: {
-        activeModules: selectedApps.length,
-        recommendedTier: `${activeServerTier.code} (${activeServerTier.name})`,
-        estimatedBuildUsd: stackMetrics.totalSetupUsd,
-      },
-      coreLayers: coreLayerConfigs,
-    };
-    return JSON.stringify(metadata, null, 2);
-  }, [deploymentProfile, selectedApps.length, activeServerTier, stackMetrics.totalSetupUsd, coreLayerConfigs]);
+  const liveArchitectureMetadataJson = useMemo(
+    () => JSON.stringify(projectArchitectureMetadata, null, 2),
+    [projectArchitectureMetadata],
+  );
 
   const filteredPrompts = useMemo(() => {
     const q = promptQuery.trim().toLowerCase();
@@ -395,6 +390,41 @@ export function PromptThemeStudio() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Persistent Global Stone / Nocturnal Theme Toggler (Synced via ThemeProvider + localStorage) */}
+            <div
+              role="group"
+              aria-label="Global Stone and Nocturnal theme switcher"
+              title="Persists Stone (Light) / Nocturnal (Dark) across all views via localStorage"
+              className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.1]"
+            >
+              <button
+                type="button"
+                onClick={() => handleToggleGlobalPalette('stone')}
+                aria-pressed={paletteMode === 'stone'}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  paletteMode === 'stone'
+                    ? 'bg-[#1F3863] text-white shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" strokeWidth={1.7} />
+                <span>Stone</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleGlobalPalette('nocturnal')}
+                aria-pressed={paletteMode === 'nocturnal'}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  paletteMode === 'nocturnal'
+                    ? 'bg-[#8FA6E8] text-[#0B1020] shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5" strokeWidth={1.7} />
+                <span>Nocturnal</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() =>

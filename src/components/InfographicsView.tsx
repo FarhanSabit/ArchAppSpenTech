@@ -19,6 +19,7 @@ import aiBrainPlate from '../assets/images/spenta_ai_brain_plate_1795170757868.j
 import l1L6Plate from '../assets/images/spenta_l1_l6_stack_plate_1795170758646.jpg';
 import captivePlate from '../assets/images/spenta_captive_ecosystem_plate_1795170758530.jpg';
 import financialsPlate from '../assets/images/spenta_financials_plate_1795170783795.jpg';
+import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
 import {
@@ -96,9 +97,9 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
 ];
 
 export function InfographicsView() {
-  const { theme, pendingNavFocus, clearPendingNavFocus } = useStack();
+  const { theme: platePolarity, setTheme: setPlatePolarity } = useTheme();
+  const { pendingNavFocus, clearPendingNavFocus } = useStack();
   const [viewMode, setViewMode] = useState<'all' | 'pathway' | 'plates'>('all');
-  const [platePolarity, setPlatePolarity] = useState<'light' | 'dark'>(theme);
   const [globalRenderMode, setGlobalRenderMode] = useState<'code' | 'static'>('code');
   const [plateModeOverrides, setPlateModeOverrides] = useState<
     Partial<Record<OitsPlateId, 'code' | 'static'>>
@@ -116,11 +117,6 @@ export function InfographicsView() {
     'financial-edge': useRef<SVGSVGElement | null>(null),
   };
   const lightboxSvgRef = useRef<SVGSVGElement | null>(null);
-
-  // Sync local OITS Dhaka polarity whenever the user flips the global portal theme
-  useEffect(() => {
-    setPlatePolarity(theme);
-  }, [theme]);
 
   useEffect(() => {
     return () => {
@@ -628,7 +624,7 @@ export function InfographicsView() {
 
               <button
                 type="button"
-                onClick={() => setPlatePolarity((v) => (v === 'light' ? 'dark' : 'light'))}
+                onClick={() => setPlatePolarity(platePolarity === 'light' ? 'dark' : 'light')}
                 className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg bg-[#141A32] border border-[#2E3862] hover:border-[#8FA6E8] text-xs font-semibold text-[#E7EBF5] cursor-pointer whitespace-nowrap"
               >
                 {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { SPENTA_CONTACT_EMAIL } from './data/spentaManifest';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StackProvider, useStack } from './store/StackContext';
 import { Navbar } from './components/Navbar';
 import { StackComposerDrawer } from './components/StackComposerDrawer';
@@ -15,7 +16,8 @@ import { SpentaAiAssistant } from './components/SpentaAiAssistant';
 import { GlobalSearchBar } from './components/GlobalSearchBar';
 
 function PortalShell() {
-  const { activeTab, setActiveTab, theme } = useStack();
+  const { activeTab, setActiveTab } = useStack();
+  const { theme } = useTheme();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#09090B] text-zinc-900 dark:text-zinc-100 print:bg-white print:text-zinc-950 print:min-h-0 flex flex-col overflow-x-hidden print:overflow-visible transition-colors duration-150">
@@ -72,8 +74,10 @@ function PortalShell() {
 
 export default function App() {
   return (
-    <StackProvider>
-      <PortalShell />
-    </StackProvider>
+    <ThemeProvider>
+      <StackProvider>
+        <PortalShell />
+      </StackProvider>
+    </ThemeProvider>
   );
 }

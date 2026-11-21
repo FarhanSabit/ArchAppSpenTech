@@ -14,16 +14,16 @@ import {
   DeploymentProfileSpec,
   DeploymentTargetId,
 } from '../data/deploymentProfiles';
+import { PaletteMode, ThemeMode, useTheme } from '../context/ThemeContext';
 
 const STACK_STORAGE_KEY = 'spenta_sovereign_stack_v1';
 const PROPOSALS_STORAGE_KEY = 'spenta_saved_proposals_v1';
 const CORE_CONFIG_STORAGE_KEY = 'spenta_core_layer_configs_v1';
 const CORE_AUDIT_STORAGE_KEY = 'spenta_core_audit_log_v1';
-const THEME_STORAGE_KEY = 'spenta_theme_v1';
 const DEPLOYMENT_TARGET_STORAGE_KEY = 'spenta_deployment_target_v1';
 const DEFAULT_SELECTED_IDS = ['icr_ops', 'genai_bi', 'mis_erp', 'cyber_sla'];
 
-export type ThemeMode = 'dark' | 'light';
+export type { PaletteMode, ThemeMode };
 export type CoreLayerId = 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6';
 export type CoreAuditScope = CoreLayerId | 'Hardware';
 export type CoreIsolationMode =
@@ -159,9 +159,39 @@ export interface PendingNavFocus {
   ts: number;
 }
 
+export interface ProjectArchitectureMetadata {
+  project: string;
+  updatedAt: string;
+  infrastructureTarget: {
+    id: DeploymentTargetId;
+    environment: string;
+    topology: string;
+    transport: string;
+    enclaveBoundary: string;
+    latencyBudget: string;
+    egressPolicy: string;
+    compliancePosture: string;
+    costPosture: string;
+  };
+  stackSizing: {
+    activeModules: number;
+    recommendedTier: string;
+    estimatedBuildUsd: number;
+  };
+  governanceSummary: {
+    teeEnabledLayers: number;
+    strictOpaLayers: number;
+    airGappedLayers: number;
+    vpcLayers: number;
+  };
+  coreLayers: Record<CoreLayerId, LayerConfig>;
+}
+
 interface StackContextValue {
   theme: ThemeMode;
+  paletteMode: PaletteMode;
   setTheme: (theme: ThemeMode) => void;
+  setPaletteMode: (palette: PaletteMode) => void;
   toggleTheme: () => void;
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
@@ -193,6 +223,7 @@ interface StackContextValue {
   buildMailtoHref: (subject?: string, bodyExtra?: string) => string;
   deploymentTarget: DeploymentTargetId;
   deploymentProfile: DeploymentProfileSpec;
+  projectArchitectureMetadata: ProjectArchitectureMetadata;
   setDeploymentTarget: (target: DeploymentTargetId, actor?: string) => void;
   coreLayerConfigs: Record<CoreLayerId, LayerConfig>;
   coreAuditLog: CoreAuditEntry[];
@@ -267,16 +298,6 @@ function loadStoredAuditLog(): CoreAuditEntry[] {
   return buildInitialAuditLog();
 }
 
-function loadStoredTheme(): ThemeMode {
-  try {
-    const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (raw === 'light' || raw === 'dark') return raw;
-  } catch {
-    // ignore storage errors
-  }
-  return 'dark';
-}
-
 function loadStoredDeploymentTarget(): DeploymentTargetId {
   try {
     const raw = window.localStorage.getItem(DEPLOYMENT_TARGET_STORAGE_KEY);
@@ -288,7 +309,7 @@ function loadStoredDeploymentTarget(): DeploymentTargetId {
 }
 
 export function StackProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<ThemeMode>(() => loadStoredTheme());
+  const { theme, paletteMode, setTheme, setPaletteMode, toggleTheme } = useTheme();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<NavTab>('App Vault');
   const [pendingNavFocus, setPendingNavFocus] = useState<PendingNavFocus | null>(null);
@@ -304,20 +325,12 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   const [coreLayerConfigs, setCoreLayerConfigs] = useState<Record<CoreLayerId, LayerConfig>>(() =>
     loadStoredCoreConfigs(),
   );
+  const [architectureUpdatedAt, setArchitectureUpdatedAt] = useState<string>(() =>
+    new Date().toISOString(),
+  );
   const [coreAuditLog, setCoreAuditLog] = useState<CoreAuditEntry[]>(() => loadStoredAuditLog());
 
   const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
-
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // ignore storage quota errors
-    }
-  }, [theme]);
 
   const navigateToItem = (tab: NavTab, focus?: Omit<PendingNavFocus, 'ts'>) => {
     setActiveTab(tab);
@@ -478,6 +491,45 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       escalatedByCount,
     };
   }, [selectedApps, selectedIds, appMap]);
+
+  const projectArchitectureMetadata = useMemo<ProjectArchitectureMetadata>(() => {
+    const tierSpec = SERVER_TIERS[stackMetrics.tier];
+    const layers = Object.values(coreLayerConfigs);
+    return {
+      project: 'Spenta Sovereign OS',
+      updatedAt: architectureUpdatedAt,
+      infrastructureTarget: {
+        id: deploymentProfile.id,
+        environment: deploymentProfile.switcherLabel,
+        topology: deploymentProfile.title,
+        transport: deploymentProfile.transport,
+        enclaveBoundary: deploymentProfile.enclaveBoundary,
+        latencyBudget: deploymentProfile.latencyBudget,
+        egressPolicy: deploymentProfile.egressPolicy,
+        compliancePosture: deploymentProfile.compliancePosture,
+        costPosture: deploymentProfile.costPosture,
+      },
+      stackSizing: {
+        activeModules: selectedApps.length,
+        recommendedTier: `${tierSpec.code} (${tierSpec.name})`,
+        estimatedBuildUsd: stackMetrics.totalSetupUsd,
+      },
+      governanceSummary: {
+        teeEnabledLayers: layers.filter((l) => l.teeEnabled).length,
+        strictOpaLayers: layers.filter((l) => l.policyMode === 'Strict OPA (>= 0.88 HITL)').length,
+        airGappedLayers: layers.filter((l) => l.isolationMode === 'Air-Gapped On-Prem').length,
+        vpcLayers: layers.filter((l) => l.isolationMode === 'Private Sovereign VPC').length,
+      },
+      coreLayers: coreLayerConfigs,
+    };
+  }, [
+    architectureUpdatedAt,
+    coreLayerConfigs,
+    deploymentProfile,
+    selectedApps.length,
+    stackMetrics.tier,
+    stackMetrics.totalSetupUsd,
+  ]);
 
   const buildExecutiveBrief = () => {
     const tierSpec = SERVER_TIERS[stackMetrics.tier];
@@ -650,6 +702,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       [layerId]: { ...prev[layerId], ...patch },
     }));
+    setArchitectureUpdatedAt(nowIso);
     setCoreAuditLog((prev) => [...newEntries, ...prev].slice(0, 200));
   };
 
@@ -677,6 +730,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       L5: { ...nextProfile.layerPresets.L5 },
       L6: { ...nextProfile.layerPresets.L6 },
     });
+    setArchitectureUpdatedAt(new Date().toISOString());
     logCoreAuditEvent({
       actor,
       layer: 'Hardware',
@@ -698,7 +752,9 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     <StackContext.Provider
       value={{
         theme,
+        paletteMode,
         setTheme,
+        setPaletteMode,
         toggleTheme,
         commandPaletteOpen,
         setCommandPaletteOpen,
@@ -730,6 +786,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         buildMailtoHref,
         deploymentTarget,
         deploymentProfile,
+        projectArchitectureMetadata,
         setDeploymentTarget,
         coreLayerConfigs,
         coreAuditLog,

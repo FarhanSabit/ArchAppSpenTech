@@ -26,6 +26,7 @@ import {
   HITL_SAMPLE_EVENTS,
   SPENTA_APPS,
 } from '../data/spentaManifest';
+import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import { SovereignBrain3D } from './three/SovereignBrain3D';
 
@@ -89,8 +90,8 @@ function polarCoords(angleDeg: number, radius: number): { cx: number; cy: number
 }
 
 export function TheBrainView() {
+  const { theme: brainPolarity, setTheme: setBrainPolarity } = useTheme();
   const {
-    theme,
     hitlConfidence,
     setHitlConfidence,
     selectedIds,
@@ -101,7 +102,6 @@ export function TheBrainView() {
     setAiAssistantOpen,
   } = useStack();
 
-  const [brainPolarity, setBrainPolarity] = useState<'light' | 'dark'>(theme);
   const [visualMode, setVisualMode] = useState<'radar' | '3d'>('radar');
   const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
   const [selectedHubId, setSelectedHubId] = useState<string | null>('fintech');
@@ -113,11 +113,6 @@ export function TheBrainView() {
   const [groundLoading, setGroundLoading] = useState(false);
   const [groundError, setGroundError] = useState<string | null>(null);
   const [groundResult, setGroundResult] = useState<GroundedBriefState | null>(null);
-
-  // Sync local OITS Dhaka polarity whenever the global portal theme changes
-  useEffect(() => {
-    setBrainPolarity(theme);
-  }, [theme]);
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'blueprint') {

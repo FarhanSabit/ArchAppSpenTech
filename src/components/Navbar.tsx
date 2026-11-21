@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Layers, Menu, Moon, Search, Sparkles, Sun, X } from 'lucide-react';
 import { NAV_TABS, NavTab } from '../data/spentaManifest';
+import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import { SpentaLogo } from './SpentaLogo';
 
 export function Navbar() {
+  const { theme, paletteMode, toggleTheme } = useTheme();
   const {
-    theme,
-    toggleTheme,
     activeTab,
     setActiveTab,
     selectedIds,
@@ -68,7 +68,7 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Zone 3: Command Palette + Theme Toggle + Primary Stack Composer CTA */}
+        {/* Zone 3: Command Palette + Stone/Nocturnal Theme Toggle + Primary Stack Composer CTA */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
@@ -87,15 +87,24 @@ export function Navbar() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/20 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={theme === 'dark' ? 'Light mode' : 'Dark obsidian mode'}
+            className="inline-flex items-center justify-center gap-1.5 h-8 px-2 rounded-md bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/20 text-zinc-700 dark:text-zinc-300 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            aria-label={
+              paletteMode === 'nocturnal' ? 'Switch to Stone light theme' : 'Switch to Nocturnal dark theme'
+            }
+            title={
+              paletteMode === 'nocturnal'
+                ? 'Active: Nocturnal (Click for Stone)'
+                : 'Active: Stone (Click for Nocturnal)'
+            }
           >
-            {theme === 'dark' ? (
+            {paletteMode === 'nocturnal' ? (
               <Sun className="w-3.5 h-3.5" strokeWidth={1.5} />
             ) : (
               <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />
             )}
+            <span className="hidden xl:inline">
+              {paletteMode === 'nocturnal' ? 'Nocturnal' : 'Stone'}
+            </span>
           </button>
 
           <button

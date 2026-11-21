@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { SERVER_TIERS } from '../data/spentaManifest';
+import { DEPLOYMENT_PROFILES, DEPLOYMENT_TARGET_ORDER } from '../data/deploymentProfiles';
 import { useStack } from '../store/StackContext';
 
 export function StackComposerDrawer() {
@@ -25,7 +26,9 @@ export function StackComposerDrawer() {
     buildExecutiveBrief,
     buildMailtoHref,
     setActiveTab,
+    deploymentTarget,
     deploymentProfile,
+    setDeploymentTarget,
   } = useStack();
 
   const [copied, setCopied] = useState(false);
@@ -102,6 +105,44 @@ export function StackComposerDrawer() {
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Synced Infrastructure Target Configuration */}
+          <div className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#111315] p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+              <span className="font-bold uppercase tracking-wider">Infrastructure Target</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                {deploymentProfile.latencyBudget}
+              </span>
+            </div>
+            <div
+              role="group"
+              aria-label="Stack Composer deployment target"
+              className="grid grid-cols-3 gap-1"
+            >
+              {DEPLOYMENT_TARGET_ORDER.map((tid) => {
+                const prof = DEPLOYMENT_PROFILES[tid];
+                const active = deploymentTarget === tid;
+                return (
+                  <button
+                    key={tid}
+                    type="button"
+                    onClick={() => setDeploymentTarget(tid, 'Stack Composer')}
+                    aria-pressed={active}
+                    className={`px-2 py-1.5 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                      active
+                        ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
+                        : 'bg-white dark:bg-[#09090B] text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-white/[0.08] hover:border-emerald-500/40'
+                    }`}
+                  >
+                    {prof.switcherLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+              {deploymentProfile.enclaveBoundary}
+            </div>
+          </div>
+
           {/* Active Sovereign Layers */}
           <div>
             <div className="flex items-center justify-between mb-2">
