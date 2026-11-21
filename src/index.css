@@ -1,0 +1,314 @@
+@import "tailwindcss";
+@source "../index.html";
+@source "../src";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle 24x24 Swiss architectural grid for hero surfaces */
+.bg-obsidian-grid {
+  background-image:
+    linear-gradient(to right, rgba(9, 9, 11, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(9, 9, 11, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .bg-obsidian-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Governance marquee ticker */
+@keyframes spenta-marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-spenta-marquee {
+  display: flex;
+  width: max-content;
+  animation: spenta-marquee 42s linear infinite;
+}
+
+.animate-spenta-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spenta-marquee {
+    animation: none;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Crisp custom slider for HITL & Financial Sensitivity controls */
+input[type="range"].spenta-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: #d4d4d8;
+  outline: none;
+}
+
+.dark input[type="range"].spenta-slider {
+  background: #27272a;
+}
+
+input[type="range"].spenta-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #09090b;
+  border: 2px solid #10b981;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.dark input[type="range"].spenta-slider::-webkit-slider-thumb {
+  background: #fafafa;
+  border: 2px solid #10b981;
+}
+
+input[type="range"].spenta-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+
+input[type="range"].spenta-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #09090b;
+  border: 2px solid #10b981;
+  cursor: pointer;
+}
+
+.dark input[type="range"].spenta-slider::-moz-range-thumb {
+  background: #fafafa;
+  border: 2px solid #10b981;
+}
+
+/* Print-only Pitch Deck container is hidden on screen */
+.pitch-deck-print-deck {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all site & deck navigational chrome, drawers, modals, and toolbars */
+  header,
+  nav,
+  footer,
+  aside,
+  .no-print,
+  .pitch-deck-nav,
+  .pitch-deck-screen-only {
+    display: none !important;
+  }
+
+  /* Override dark-mode root canvas so printed PDFs never render faint/invisible text */
+  html,
+  html.dark,
+  body,
+  .dark body,
+  #root,
+  main {
+    background: #ffffff !important;
+    color: #09090b !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  /* Reveal dedicated print-formatted 18-slide deck */
+  .pitch-deck-print-deck {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .pitch-deck-print-slide {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-height: 176mm !important;
+    padding: 9mm 11mm !important;
+    background: #ffffff !important;
+    color: #09090b !important;
+    border: 1pt solid #d4d4d8 !important;
+    border-top: 3.5pt solid #059669 !important;
+    border-radius: 6pt !important;
+    box-sizing: border-box !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    overflow: visible !important;
+  }
+
+  .pitch-deck-print-slide:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .pitch-deck-print-slide h2 {
+    color: #09090b !important;
+    font-size: 20pt !important;
+    line-height: 1.18 !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+  }
+
+  .pitch-deck-print-subtitle {
+    color: #27272a !important;
+    font-size: 10.5pt !important;
+    line-height: 1.45 !important;
+  }
+
+  .pitch-deck-print-badge {
+    background: #ecfdf5 !important;
+    color: #065f46 !important;
+    border: 0.75pt solid #a7f3d0 !important;
+  }
+
+  .pitch-deck-print-counter {
+    color: #3f3f46 !important;
+  }
+
+  .pitch-deck-print-kpi {
+    background: #f8fafc !important;
+    border: 0.75pt solid #d4d4d8 !important;
+    border-radius: 5pt !important;
+    padding: 3.5mm 4mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .pitch-deck-print-kpi-label {
+    color: #52525b !important;
+    font-size: 7.5pt !important;
+  }
+
+  .pitch-deck-print-kpi-value {
+    font-size: 13.5pt !important;
+    font-weight: 800 !important;
+  }
+
+  .print-accent-emerald {
+    color: #065f46 !important;
+  }
+
+  .print-accent-teal {
+    color: #0f766e !important;
+  }
+
+  .print-accent-amber {
+    color: #b45309 !important;
+  }
+
+  .print-accent-crimson {
+    color: #be123c !important;
+  }
+
+  .pitch-deck-print-bullet-dot {
+    background: #059669 !important;
+  }
+
+  .pitch-deck-print-bullet-text {
+    color: #18181b !important;
+    font-size: 9.5pt !important;
+    line-height: 1.45 !important;
+  }
+
+  .pitch-deck-print-callout {
+    background: #ecfdf5 !important;
+    border: 0.75pt solid #a7f3d0 !important;
+    color: #064e3b !important;
+    border-radius: 5pt !important;
+    padding: 3mm 4mm !important;
+    font-size: 8.75pt !important;
+    line-height: 1.4 !important;
+  }
+
+  .pitch-deck-print-callout-label {
+    color: #065f46 !important;
+    font-weight: 700 !important;
+  }
+
+  .pitch-deck-print-notes {
+    background: #f4f4f5 !important;
+    border: 0.75pt solid #d4d4d8 !important;
+    border-left: 3pt solid #059669 !important;
+    color: #18181b !important;
+    border-radius: 4pt !important;
+    padding: 2.5mm 3.5mm !important;
+    font-size: 8.25pt !important;
+    line-height: 1.4 !important;
+  }
+
+  .pitch-deck-print-notes-title {
+    color: #065f46 !important;
+    font-size: 7.5pt !important;
+    font-weight: 700 !important;
+  }
+
+  .pitch-deck-print-footer {
+    border-top: 0.75pt solid #d4d4d8 !important;
+    color: #52525b !important;
+    font-size: 8pt !important;
+    padding-top: 2.5mm !important;
+  }
+}
+

@@ -1,0 +1,902 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { BRAIN_HUBS, SPENTA_APPS } from '../../data/spentaManifest';
+import { useStack } from '../../store/StackContext';
+
+interface SovereignBrain3DCanvasProps {
+  compact?: boolean;
+  onSelectHub?: (hubId: string) => void;
+  selectedHubId?: string | null;
+}
+
+type CameraPreset = 'overview' | 'operations' | 'experience' | 'top';
+
+interface HubNodeMeta {
+  hubId: string;
+  group: THREE.Group;
+  coreMat: THREE.MeshStandardMaterial;
+  ringMat: THREE.MeshStandardMaterial;
+  capMat: THREE.MeshStandardMaterial;
+  lineMat: THREE.LineBasicMaterial;
+  basePos: THREE.Vector3;
+  curve: THREE.QuadraticBezierCurve3;
+}
+
+// Pre-allocated scratch math objects (zero GC in animation loop)
+const _packetPos = new THREE.Vector3();
+const _emeraldColor = new THREE.Color('#1EB56A');
+const _amberColor = new THREE.Color('#F59E0B');
+
+const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
+  overview: { pos: [0, 2.35, 10.2], target: [0, -0.1, 0] },
+  operations: { pos: [-5.6, 1.8, 7.6], target: [-1.1, 0, 0] },
+  experience: { pos: [5.6, 1.8, 7.6], target: [1.1, 0, 0] },
+  top: { pos: [0, 9.8, 2.8], target: [0, 0, 0] },
+};
+
+function createProceduralCircuitTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#091A14';
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle concentric telemetry rings
+  ctx.strokeStyle = 'rgba(30, 181, 106, 0.24)';
+  ctx.lineWidth = 2;
+  for (let r = 46; r <= 236; r += 38) {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Radial circuit traces
+  ctx.strokeStyle = 'rgba(20, 184, 166, 0.22)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(size / 2 + Math.cos(a) * 44, size / 2 + Math.sin(a) * 44);
+    ctx.lineTo(size / 2 + Math.cos(a) * 238, size / 2 + Math.sin(a) * 238);
+    ctx.stroke();
+
+    ctx.fillStyle = i % 2 === 0 ? '#1EB56A' : '#14B8A6';
+    ctx.beginPath();
+    ctx.arc(size / 2 + Math.cos(a) * 198, size / 2 + Math.sin(a) * 198, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = maxAnisotropy;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function createContactShadowTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 12, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.72)');
+  grad.addColorStop(0.5, 'rgba(2, 10, 8, 0.32)');
+  grad.addColorStop(1, 'rgba(7, 19, 15, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export default function SovereignBrain3DCanvas({
+  compact = false,
+  onSelectHub,
+  selectedHubId = null,
+}: SovereignBrain3DCanvasProps) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const { selectedIds, hitlConfidence, toggleApp } = useStack();
+  const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
+  const [contextLost, setContextLost] = useState(false);
+  const [dockCollapsed, setDockCollapsed] = useState(false);
+  const [activePreset, setActivePreset] = useState<CameraPreset>('overview');
+
+  const selectedIdsRef = useRef<string[]>(selectedIds);
+  const hitlRef = useRef<number>(hitlConfidence);
+  const selectedHubRef = useRef<string | null>(selectedHubId);
+  const onSelectHubRef = useRef(onSelectHub);
+  const targetCamPosRef = useRef<THREE.Vector3 | null>(null);
+  const targetLookAtRef = useRef<THREE.Vector3 | null>(null);
+
+  useEffect(() => {
+    selectedIdsRef.current = selectedIds;
+  }, [selectedIds]);
+
+  useEffect(() => {
+    hitlRef.current = hitlConfidence;
+  }, [hitlConfidence]);
+
+  useEffect(() => {
+    selectedHubRef.current = selectedHubId;
+  }, [selectedHubId]);
+
+  useEffect(() => {
+    onSelectHubRef.current = onSelectHub;
+  }, [onSelectHub]);
+
+  // Keyboard shortcut 'H' to collapse/expand bottom control dock
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag && ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+      if (e.key.toLowerCase() === 'h') {
+        setDockCollapsed((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const applyCameraPreset = (preset: CameraPreset) => {
+    setActivePreset(preset);
+    const cfg = CAMERA_PRESETS[preset];
+    targetCamPosRef.current = new THREE.Vector3(cfg.pos[0], cfg.pos[1], compact ? cfg.pos[2] * 0.96 : cfg.pos[2]);
+    targetLookAtRef.current = new THREE.Vector3(cfg.target[0], cfg.target[1], cfg.target[2]);
+  };
+
+  const activeHubIds = useMemo(() => {
+    const set = new Set<string>();
+    SPENTA_APPS.forEach((app) => {
+      if (selectedIds.includes(app.id)) set.add(app.hubId);
+    });
+    return set;
+  }, [selectedIds]);
+
+  const inspectedHub = useMemo(() => {
+    const id = hoveredHubId ?? selectedHubId;
+    if (!id) return null;
+    return BRAIN_HUBS.find((h) => h.id === id) ?? null;
+  }, [hoveredHubId, selectedHubId]);
+
+  const inspectedApps = useMemo(() => {
+    if (!inspectedHub) return [];
+    return SPENTA_APPS.filter((a) => a.hubId === inspectedHub.id);
+  }, [inspectedHub]);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
+
+    // Detect software WebGL from GPU renderer string
+    const isSoftwareGl = (() => {
+      try {
+        const probeCanvas = document.createElement('canvas');
+        const glProbe = probeCanvas.getContext('webgl2');
+        if (!glProbe) return true;
+        const ext = glProbe.getExtension('WEBGL_debug_renderer_info');
+        const param = ext ? ext.UNMASKED_RENDERER_WEBGL : glProbe.RENDERER;
+        const gpu = String(glProbe.getParameter(param));
+        glProbe.getExtension('WEBGL_lose_context')?.loseContext();
+        return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+      } catch {
+        return true;
+      }
+    })();
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isSoftwareGl,
+        powerPreference: 'high-performance',
+        alpha: false,
+      });
+    } catch {
+      setContextLost(true);
+      return;
+    }
+
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(container.clientWidth || 640, container.clientHeight || 460);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = !isSoftwareGl;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
+
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      setContextLost(true);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#07130F');
+    scene.fog = new THREE.FogExp2('#07130F', 0.042);
+
+    // Mandatory Studio PBR Environment Reflection
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = envTex;
+    pmrem.dispose();
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      (container.clientWidth || 640) / (container.clientHeight || 460),
+      0.1,
+      100,
+    );
+    const startCfg = CAMERA_PRESETS.overview;
+    camera.position.set(startCfg.pos[0], startCfg.pos[1], compact ? startCfg.pos[2] * 0.96 : startCfg.pos[2]);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = !isSoftwareGl;
+    controls.dampingFactor = 0.06;
+    controls.enablePan = false;
+    controls.minDistance = 6.2;
+    controls.maxDistance = 16.0;
+    controls.maxPolarAngle = Math.PI * 0.72;
+    controls.minPolarAngle = Math.PI * 0.16;
+    controls.target.set(0, -0.1, 0);
+
+    // Cancel scripted camera transition immediately when user drags
+    const onControlStart = () => {
+      targetCamPosRef.current = null;
+      targetLookAtRef.current = null;
+    };
+    controls.addEventListener('start', onControlStart);
+
+    // Warm Key Light vs Cool Hemisphere Fill + Rim Light
+    const hemiLight = new THREE.HemisphereLight('#99F6E4', '#051A13', 0.75);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight('#FFF7ED', 1.85);
+    keyLight.position.set(6, 9, 7);
+    if (!isSoftwareGl) {
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(1024, 1024);
+      keyLight.shadow.camera.left = -7;
+      keyLight.shadow.camera.right = 7;
+      keyLight.shadow.camera.top = 7;
+      keyLight.shadow.camera.bottom = -7;
+      keyLight.shadow.bias = -0.0005;
+      keyLight.shadow.normalBias = 0.02;
+    }
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight('#14B8A6', 1.25);
+    rimLight.position.set(-7, 4, -6);
+    scene.add(rimLight);
+
+    const coreLight = new THREE.PointLight('#1EB56A', 2.4, 14);
+    coreLight.position.set(0, 0.2, 0);
+    scene.add(coreLight);
+
+    const geometries: THREE.BufferGeometry[] = [];
+    const materials: THREE.Material[] = [];
+    const textures: THREE.Texture[] = [];
+
+    // Grounded Procedural Circuit Pedestal + Radial Contact Shadow (Zero Floating)
+    const maxAniso = renderer.capabilities.getMaxAnisotropy();
+    const circuitTex = createProceduralCircuitTexture(maxAniso);
+    const contactShadowTex = createContactShadowTexture();
+    textures.push(circuitTex, contactShadowTex);
+
+    const pedestalGeo = new THREE.CylinderGeometry(3.6, 4.1, 0.22, 48);
+    const pedestalMat = new THREE.MeshStandardMaterial({
+      map: circuitTex,
+      roughness: 0.62,
+      metalness: 0.35,
+    });
+    const pedestalBevelGeo = new THREE.TorusGeometry(3.65, 0.055, 12, 64);
+    const pedestalBevelMat = new THREE.MeshStandardMaterial({
+      color: '#1EB56A',
+      emissive: '#065F46',
+      emissiveIntensity: 0.5,
+      roughness: 0.22,
+      metalness: 0.85,
+    });
+    const shadowPlaneGeo = new THREE.PlaneGeometry(7.2, 7.2);
+    const shadowPlaneMat = new THREE.MeshBasicMaterial({
+      map: contactShadowTex,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.55,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    geometries.push(pedestalGeo, pedestalBevelGeo, shadowPlaneGeo);
+    materials.push(pedestalMat, pedestalBevelMat, shadowPlaneMat);
+
+    const pedestalGroup = new THREE.Group();
+    pedestalGroup.position.y = -2.85;
+    const pedestalMesh = new THREE.Mesh(pedestalGeo, pedestalMat);
+    pedestalMesh.position.y = 0.11;
+    pedestalMesh.receiveShadow = !isSoftwareGl;
+    const pedestalTrim = new THREE.Mesh(pedestalBevelGeo, pedestalBevelMat);
+    pedestalTrim.rotation.x = Math.PI / 2;
+    pedestalTrim.position.y = 0.22;
+    const contactShadow = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.y = 0.24;
+    pedestalGroup.add(pedestalMesh, pedestalTrim, contactShadow);
+    scene.add(pedestalGroup);
+
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    // Composite Multi-Part Sovereign Neural Core (Primary Hemispheres + Rib Collars + L1-L6 Spine)
+    const brainCoreGroup = new THREE.Group();
+    rootGroup.add(brainCoreGroup);
+
+    const hemiGeo = new THREE.IcosahedronGeometry(1.36, 2);
+    const collarRibGeo = new THREE.TorusGeometry(1.42, 0.028, 10, 48);
+    geometries.push(hemiGeo, collarRibGeo);
+
+    // Left Hemisphere — Operations Engine (#1EB56A)
+    const leftHemiGroup = new THREE.Group();
+    leftHemiGroup.position.x = -0.34;
+    leftHemiGroup.scale.set(0.84, 1.06, 0.92);
+    const leftShellMat = new THREE.MeshStandardMaterial({
+      color: '#0D2F22',
+      emissive: '#1EB56A',
+      emissiveIntensity: 0.42,
+      roughness: 0.52,
+      metalness: 0.35,
+      flatShading: true,
+    });
+    const leftWireMat = new THREE.MeshBasicMaterial({
+      color: '#6EE7B7',
+      wireframe: true,
+      transparent: true,
+      opacity: 0.34,
+    });
+    const leftRibMat = new THREE.MeshStandardMaterial({
+      color: '#A7F3D0',
+      roughness: 0.18,
+      metalness: 0.9,
+    });
+    materials.push(leftShellMat, leftWireMat, leftRibMat);
+    const leftShell = new THREE.Mesh(hemiGeo, leftShellMat);
+    leftShell.castShadow = !isSoftwareGl;
+    const leftRib = new THREE.Mesh(collarRibGeo, leftRibMat);
+    leftRib.rotation.y = Math.PI / 2;
+    leftHemiGroup.add(leftShell, new THREE.Mesh(hemiGeo, leftWireMat), leftRib);
+    brainCoreGroup.add(leftHemiGroup);
+
+    // Right Hemisphere — Experience Engine (#0D9488)
+    const rightHemiGroup = new THREE.Group();
+    rightHemiGroup.position.x = 0.34;
+    rightHemiGroup.scale.set(0.84, 1.06, 0.92);
+    const rightShellMat = new THREE.MeshStandardMaterial({
+      color: '#0B2C2B',
+      emissive: '#0D9488',
+      emissiveIntensity: 0.48,
+      roughness: 0.52,
+      metalness: 0.35,
+      flatShading: true,
+    });
+    const rightWireMat = new THREE.MeshBasicMaterial({
+      color: '#5EEAD4',
+      wireframe: true,
+      transparent: true,
+      opacity: 0.34,
+    });
+    const rightRibMat = new THREE.MeshStandardMaterial({
+      color: '#99F6E4',
+      roughness: 0.18,
+      metalness: 0.9,
+    });
+    materials.push(rightShellMat, rightWireMat, rightRibMat);
+    const rightShell = new THREE.Mesh(hemiGeo, rightShellMat);
+    rightShell.castShadow = !isSoftwareGl;
+    const rightRib = new THREE.Mesh(collarRibGeo, rightRibMat);
+    rightRib.rotation.y = Math.PI / 2;
+    rightHemiGroup.add(rightShell, new THREE.Mesh(hemiGeo, rightWireMat), rightRib);
+    brainCoreGroup.add(rightHemiGroup);
+
+    // L1-L6 Vertical Sovereign Stack Core Spine (6 precision metallic rings)
+    const spineRingGeo = new THREE.TorusGeometry(0.42, 0.032, 10, 28);
+    geometries.push(spineRingGeo);
+    const spineMat = new THREE.MeshStandardMaterial({
+      color: '#ECFDF5',
+      emissive: '#1EB56A',
+      emissiveIntensity: 0.65,
+      roughness: 0.18,
+      metalness: 0.88,
+    });
+    materials.push(spineMat);
+    for (let i = 0; i < 6; i++) {
+      const r = new THREE.Mesh(spineRingGeo, spineMat);
+      r.rotation.x = Math.PI / 2;
+      r.position.y = -0.85 + i * 0.34;
+      brainCoreGroup.add(r);
+    }
+
+    // Orbiting OPA 0.88 HITL Governance Ring
+    const opaRingGroup = new THREE.Group();
+    rootGroup.add(opaRingGroup);
+    const opaTorusGeo = new THREE.TorusGeometry(2.45, 0.045, 12, 72);
+    const opaGateGeo = new THREE.BoxGeometry(0.16, 0.16, 0.26);
+    geometries.push(opaTorusGeo, opaGateGeo);
+
+    const opaRingMat = new THREE.MeshStandardMaterial({
+      color: '#1EB56A',
+      emissive: '#1EB56A',
+      emissiveIntensity: 0.7,
+      roughness: 0.22,
+      metalness: 0.82,
+    });
+    materials.push(opaRingMat);
+    const opaMainRing = new THREE.Mesh(opaTorusGeo, opaRingMat);
+    opaMainRing.rotation.x = Math.PI / 2 - 0.18;
+    opaRingGroup.add(opaMainRing);
+
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const gate = new THREE.Mesh(opaGateGeo, opaRingMat);
+      gate.position.set(
+        Math.cos(angle) * 2.45,
+        Math.sin(angle) * 2.45 * Math.sin(0.18),
+        Math.sin(angle) * 2.45 * Math.cos(0.18),
+      );
+      gate.lookAt(0, 0, 0);
+      opaRingGroup.add(gate);
+    }
+
+    // 8 Orbiting Composite Domain Hub Assemblies (4 parts each: core + bevel ring + top/bottom caps)
+    const hubCoreGeo = new THREE.OctahedronGeometry(0.32, 0);
+    const hubCollarGeo = new THREE.TorusGeometry(0.46, 0.032, 10, 28);
+    const hubCapGeo = new THREE.CylinderGeometry(0.08, 0.14, 0.12, 8);
+    geometries.push(hubCoreGeo, hubCollarGeo, hubCapGeo);
+
+    const hubNodes: HubNodeMeta[] = [];
+    const hitTargets: THREE.Object3D[] = [];
+
+    BRAIN_HUBS.forEach((hub, index) => {
+      const isLeft = hub.side === 'left';
+      const sideIdx = index % 4;
+      const angleBase = isLeft
+        ? Math.PI * (0.72 + sideIdx * 0.19)
+        : Math.PI * (-0.28 + sideIdx * 0.19);
+      const radius = 4.15;
+      const yOffset = (1.5 - sideIdx) * 0.85;
+      const basePos = new THREE.Vector3(
+        Math.cos(angleBase) * radius,
+        yOffset,
+        Math.sin(angleBase) * (radius * 0.65),
+      );
+
+      const group = new THREE.Group();
+      group.position.copy(basePos);
+      group.userData.hubId = hub.id;
+
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: hub.accent,
+        emissive: hub.accent,
+        emissiveIntensity: 0.4,
+        roughness: 0.55,
+        metalness: 0.3,
+      });
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: '#E2E8F0',
+        emissive: hub.accent,
+        emissiveIntensity: 0.3,
+        roughness: 0.2,
+        metalness: 0.85,
+      });
+      const capMat = new THREE.MeshStandardMaterial({
+        color: '#0D261D',
+        roughness: 0.22,
+        metalness: 0.85,
+      });
+      materials.push(coreMat, ringMat, capMat);
+
+      const coreMesh = new THREE.Mesh(hubCoreGeo, coreMat);
+      coreMesh.userData.hubId = hub.id;
+      const collarMesh = new THREE.Mesh(hubCollarGeo, ringMat);
+      collarMesh.rotation.x = Math.PI / 3;
+      collarMesh.userData.hubId = hub.id;
+      const topCap = new THREE.Mesh(hubCapGeo, capMat);
+      topCap.position.y = 0.35;
+      topCap.userData.hubId = hub.id;
+      const botCap = new THREE.Mesh(hubCapGeo, capMat);
+      botCap.position.y = -0.35;
+      botCap.rotation.x = Math.PI;
+      botCap.userData.hubId = hub.id;
+
+      group.add(coreMesh, collarMesh, topCap, botCap);
+      rootGroup.add(group);
+      hitTargets.push(coreMesh, collarMesh, topCap, botCap);
+
+      const mid = basePos.clone().multiplyScalar(0.55);
+      mid.y += isLeft ? 0.55 : -0.45;
+      const curve = new THREE.QuadraticBezierCurve3(
+        basePos,
+        mid,
+        new THREE.Vector3(isLeft ? -0.9 : 0.9, 0, 0),
+      );
+      const points = curve.getPoints(28);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+      geometries.push(lineGeo);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: hub.accent,
+        transparent: true,
+        opacity: 0.35,
+      });
+      materials.push(lineMat);
+      const line = new THREE.Line(lineGeo, lineMat);
+      rootGroup.add(line);
+
+      hubNodes.push({
+        hubId: hub.id,
+        group,
+        coreMat,
+        ringMat,
+        capMat,
+        lineMat,
+        basePos,
+        curve,
+      });
+    });
+
+    // InstancedMesh Synaptic Packets (frustumCulled = false so moving instances never clip)
+    const packetCount = BRAIN_HUBS.length * 4;
+    const packetGeo = new THREE.SphereGeometry(0.065, 8, 8);
+    geometries.push(packetGeo);
+    const packetMat = new THREE.MeshBasicMaterial({ color: '#A7F3D0' });
+    materials.push(packetMat);
+    const packetMesh = new THREE.InstancedMesh(packetGeo, packetMat, packetCount);
+    packetMesh.frustumCulled = false;
+    rootGroup.add(packetMesh);
+
+    const dummy = new THREE.Object3D();
+
+    if (!isSoftwareGl) {
+      renderer.compile(scene, camera);
+    }
+
+    // Raycaster Pointer Interaction
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let hoveredLocal: string | null = null;
+    let pointerDownPos = { x: 0, y: 0 };
+
+    const updatePointer = (clientX: number, clientY: number) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      updatePointer(e.clientX, e.clientY);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(hitTargets, false);
+      const hitHubId = hits.length > 0 ? (hits[0].object.userData.hubId as string) : null;
+      if (hitHubId !== hoveredLocal) {
+        hoveredLocal = hitHubId;
+        setHoveredHubId(hitHubId);
+        renderer.domElement.style.cursor = hitHubId ? 'pointer' : 'grab';
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist > 6) return;
+      updatePointer(e.clientX, e.clientY);
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(hitTargets, false);
+      if (hits.length > 0) {
+        const hubId = hits[0].object.userData.hubId as string;
+        onSelectHubRef.current?.(hubId);
+      }
+    };
+
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+    renderer.domElement.addEventListener('pointerup', handlePointerUp);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = Math.max(200, Math.floor(entry.contentRect.width));
+        const h = Math.max(200, Math.floor(entry.contentRect.height));
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+    });
+    resizeObserver.observe(container);
+
+    // WebGL2 Fence-Sync afterDraw pacing for software WebGL
+    let frameId = 0;
+    let disposed = false;
+    let lastTime = performance.now();
+    let elapsed = 0;
+
+    function afterDraw(cb: () => void) {
+      const gl = renderer.getContext() as WebGL2RenderingContext;
+      if (typeof gl.fenceSync === 'function') {
+        const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.flush();
+        const poll = () => {
+          if (disposed) {
+            if (sync) gl.deleteSync(sync);
+            return;
+          }
+          const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
+          if (state === gl.UNSIGNALED) {
+            frameId = window.setTimeout(poll, 5);
+          } else {
+            if (sync) gl.deleteSync(sync);
+            frameId = window.setTimeout(cb, 80);
+          }
+        };
+        frameId = window.setTimeout(poll, 5);
+      } else {
+        frameId = window.setTimeout(cb, 80);
+      }
+    }
+
+    const tick = () => {
+      if (disposed) return;
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      elapsed += dt;
+
+      // Smooth exponential camera preset transition
+      if (targetCamPosRef.current && targetLookAtRef.current) {
+        const alpha = 1 - Math.exp(-5.5 * dt);
+        camera.position.lerp(targetCamPosRef.current, alpha);
+        controls.target.lerp(targetLookAtRef.current, alpha);
+        if (camera.position.distanceTo(targetCamPosRef.current) < 0.04) {
+          targetCamPosRef.current = null;
+          targetLookAtRef.current = null;
+        }
+      }
+
+      const currentSelected = new Set(selectedIdsRef.current);
+      const activeHubs = new Set<string>();
+      SPENTA_APPS.forEach((a) => {
+        if (currentSelected.has(a.id)) activeHubs.add(a.hubId);
+      });
+
+      const passHitl = hitlRef.current >= 0.88;
+      const targetRingColor = passHitl ? _emeraldColor : _amberColor;
+      const colorStep = 1 - Math.exp(-6 * dt);
+      opaRingMat.color.lerp(targetRingColor, colorStep);
+      opaRingMat.emissive.lerp(targetRingColor, colorStep);
+      coreLight.color.lerp(targetRingColor, colorStep);
+
+      brainCoreGroup.rotation.y += dt * 0.16;
+      opaRingGroup.rotation.y -= dt * (passHitl ? 0.28 : 0.62);
+      opaRingGroup.rotation.z = Math.sin(elapsed * 0.5) * 0.08;
+
+      let instIdx = 0;
+      hubNodes.forEach((node, idx) => {
+        const isActive = activeHubs.has(node.hubId);
+        const isFocus = hoveredLocal === node.hubId || selectedHubRef.current === node.hubId;
+        const targetScale = isFocus ? 1.3 : isActive ? 1.12 : 0.86;
+
+        node.group.scale.x = THREE.MathUtils.damp(node.group.scale.x, targetScale, 8, dt);
+        node.group.scale.y = THREE.MathUtils.damp(node.group.scale.y, targetScale, 8, dt);
+        node.group.scale.z = THREE.MathUtils.damp(node.group.scale.z, targetScale, 8, dt);
+
+        node.group.position.y = node.basePos.y + Math.sin(elapsed * 1.4 + idx) * 0.11;
+        node.group.rotation.y += dt * (isActive ? 0.85 : 0.32);
+
+        node.coreMat.emissiveIntensity = THREE.MathUtils.damp(
+          node.coreMat.emissiveIntensity,
+          isFocus ? 1.35 : isActive ? 0.85 : 0.18,
+          6,
+          dt,
+        );
+        node.ringMat.emissiveIntensity = THREE.MathUtils.damp(
+          node.ringMat.emissiveIntensity,
+          isFocus ? 1.1 : isActive ? 0.65 : 0.12,
+          6,
+          dt,
+        );
+        node.lineMat.opacity = THREE.MathUtils.damp(
+          node.lineMat.opacity,
+          isFocus ? 0.95 : isActive ? 0.72 : 0.16,
+          6,
+          dt,
+        );
+
+        for (let p = 0; p < 4; p++) {
+          const speed = isActive ? 0.42 : 0.14;
+          const t = (elapsed * speed + p * 0.25 + idx * 0.11) % 1;
+          node.curve.getPoint(t, _packetPos);
+          dummy.position.copy(_packetPos);
+          const s = isActive ? 1.0 : 0.32;
+          dummy.scale.set(s, s, s);
+          dummy.updateMatrix();
+          packetMesh.setMatrixAt(instIdx++, dummy.matrix);
+        }
+      });
+      packetMesh.instanceMatrix.needsUpdate = true;
+
+      controls.update();
+      renderer.render(scene, camera);
+
+      if (isSoftwareGl) {
+        afterDraw(tick);
+      } else {
+        frameId = requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frameId);
+      clearTimeout(frameId);
+      resizeObserver.disconnect();
+      controls.removeEventListener('start', onControlStart);
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+      renderer.domElement.removeEventListener('pointerup', handlePointerUp);
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+      controls.dispose();
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+      textures.forEach((t) => t.dispose());
+      envTex.dispose();
+      renderer.dispose();
+    };
+  }, [compact]);
+
+  const hitlPass = hitlConfidence >= 0.88;
+
+  if (contextLost) {
+    return (
+      <div className="w-full h-full min-h-[420px] bg-[#07130F] text-white rounded-xl p-6 flex flex-col justify-center items-center text-center">
+        <div className="text-xs font-mono uppercase tracking-wider text-[#6EE7B7] mb-2">
+          WebGL 2D Fallback Mode
+        </div>
+        <h3 className="text-lg font-bold">Spenta 3D Sovereign Neural Core</h3>
+        <p className="text-xs text-slate-300 max-w-md mt-2">
+          Hardware WebGL context is unavailable in this viewport. Inspect and compose all 8 hubs below.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 w-full max-w-2xl">
+          {BRAIN_HUBS.map((hub) => {
+            const active = activeHubIds.has(hub.id);
+            return (
+              <button
+                key={hub.id}
+                type="button"
+                onClick={() => onSelectHub?.(hub.id)}
+                className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                  active
+                    ? 'bg-emerald-950 border-[#1EB56A] text-white'
+                    : 'bg-[#0C1F18] border-emerald-900/60 text-slate-300'
+                }`}
+              >
+                <div className="text-[10px] font-mono text-[#6EE7B7]">HUB {hub.num}</div>
+                <div className="text-xs font-semibold mt-0.5">{hub.label}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full min-h-[450px] bg-[#07130F] rounded-xl overflow-hidden select-none">
+      {/* Isolated Stable WebGL Canvas Container */}
+      <div ref={mountRef} className="w-full h-full min-h-[450px]" />
+
+      {/* Minimal Top-Left Spec Badge (Zero Side-Flank Occlusion, Solid Surface) */}
+      <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap items-center gap-2">
+        <div className="bg-[#07130F]/95 border border-emerald-800/70 rounded-lg px-3 py-1.5 text-white">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-[#6EE7B7]">
+            3D Sovereign Neural Core · {activeHubIds.size}/8 Hubs · {selectedIds.length} Apps
+          </div>
+        </div>
+        <div
+          className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-semibold tabular-nums ${
+            hitlPass
+              ? 'bg-[#07130F]/95 border-[#1EB56A] text-[#6EE7B7]'
+              : 'bg-[#07130F]/95 border-[#F59E0B] text-[#FCD34D]'
+          }`}
+        >
+          OPA {hitlConfidence.toFixed(2)} · {hitlPass ? 'AUTO-COMMIT' : 'HITL AUDIT'}
+        </div>
+      </div>
+
+      {/* Unified Collapsible Bottom Control Dock (Zero backdrop-filter over WebGL) */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[min(94%,760px)] flex flex-col items-center pointer-events-none">
+        <button
+          type="button"
+          onClick={() => setDockCollapsed((v) => !v)}
+          className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-t-lg bg-[#07130F]/95 border border-b-0 border-emerald-800/70 text-[10px] font-mono text-slate-300 hover:text-white cursor-pointer"
+        >
+          {dockCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          <span>{dockCollapsed ? 'Show Controls (H)' : 'Hide Controls (H)'}</span>
+        </button>
+
+        {!dockCollapsed && (
+          <div className="pointer-events-auto w-full bg-[#07130F]/95 border border-emerald-800/70 rounded-xl px-3.5 py-2.5 text-white space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                {(['overview', 'operations', 'experience', 'top'] as const).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyCameraPreset(preset)}
+                    className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase font-semibold transition-colors cursor-pointer ${
+                      activePreset === preset
+                        ? 'bg-[#1EB56A] text-[#07130F]'
+                        : 'bg-[#0E241C] text-slate-300 hover:text-white'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => applyCameraPreset('overview')}
+                  className="p-1 rounded-md bg-[#0E241C] text-slate-300 hover:text-white cursor-pointer"
+                  title="Reset camera"
+                  aria-label="Reset camera"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {inspectedHub ? (
+                <div className="text-[11px] font-mono text-[#6EE7B7] truncate">
+                  HUB {inspectedHub.num}: <strong className="text-white">{inspectedHub.label}</strong>
+                </div>
+              ) : (
+                <div className="text-[10px] font-mono text-slate-400">
+                  Drag to orbit · Click any hub node to toggle apps
+                </div>
+              )}
+            </div>
+
+            {inspectedHub && inspectedApps.length > 0 && (
+              <div className="pt-1.5 border-t border-emerald-900/60 flex flex-wrap items-center gap-1.5">
+                {inspectedApps.map((app) => {
+                  const isSelected = selectedIds.includes(app.id);
+                  return (
+                    <button
+                      key={app.id}
+                      type="button"
+                      onClick={() => toggleApp(app.id)}
+                      className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#1EB56A] text-[#07130F] border-[#1EB56A] font-bold'
+                          : 'bg-[#0E241C] text-slate-200 border-emerald-800 hover:border-[#1EB56A]'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : '+ '}
+                      {app.shortName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
