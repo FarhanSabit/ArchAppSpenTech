@@ -3,6 +3,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Code2,
+  Columns2,
   Copy,
   Download,
   ExternalLink,
@@ -12,8 +14,12 @@ import {
   Monitor,
   Moon,
   Palette,
+  RotateCcw,
   Search,
+  SlidersHorizontal,
+  Smartphone,
   Sun,
+  Tablet,
   X,
 } from 'lucide-react';
 import {
@@ -32,9 +38,14 @@ import {
   buildThemeTemplatesPackMd,
   downloadMarkdownFile,
 } from '../data/promptThemeStudioData';
-import { buildVirtualThemeIframeSrcDoc } from '../utils/virtualThemeIframeHtml';
+import {
+  ThemeOverridePatch,
+  buildCustomThemeTokenCss,
+  buildVirtualThemeIframeSrcDoc,
+} from '../utils/virtualThemeIframeHtml';
 import { DesignComparisonTable } from './DesignComparisonTable';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
+import { ReferoPatternExplorer } from './ReferoPatternExplorer';
 
 const PRIORITY_FILTERS: { id: 'All' | PromptPriority; label: string }[] = [
   { id: 'All', label: 'All (11)' },
@@ -50,19 +61,39 @@ const INITIAL_IFRAME_POLARITIES: Record<ThemeRefId, 'light' | 'dark'> = {
   'spenta-os': 'dark',
 };
 
+const BRAND_SWATCH_PRESETS = [
+  { label: 'Heritage Navy', hex: '#1F3863' },
+  { label: 'Sovereign Emerald', hex: '#10B981' },
+  { label: 'OITS Green', hex: '#1C6E46' },
+  { label: 'Enterprise Cobalt', hex: '#2563EB' },
+  { label: 'Sovereign Crimson', hex: '#E11D48' },
+  { label: 'Governance Amber', hex: '#B45309' },
+];
+
+type ViewportSize = 'desktop' | 'tablet' | 'mobile';
+type WorkbenchMode = 'preview' | 'split' | 'code';
+
 export function PromptThemeStudio() {
   // P0/P1/P2 prompt deck state
   const [priorityFilter, setPriorityFilter] = useState<'All' | PromptPriority>('All');
   const [promptQuery, setPromptQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<string[]>(['p0-1-shell']);
 
-  // Live Preview Toggle: 2x2 Virtual Iframes Grid vs Single Focus Inspector
+  // Live Preview Toggle: 2x2 Virtual Iframes Grid vs Single Focus v0 Workbench
   const [previewLayout, setPreviewLayout] = useState<'iframes' | 'single'>('iframes');
   const [activeThemeId, setActiveThemeId] = useState<ThemeRefId>('oitsdhaka');
   const [previewPolarity, setPreviewPolarity] = useState<'dark' | 'light'>('light');
   const [iframePolarities, setIframePolarities] = useState<Record<ThemeRefId, 'light' | 'dark'>>(
     INITIAL_IFRAME_POLARITIES,
   );
+
+  // v0 Workbench Controls (Viewport Switcher, Preview/Split/Code, Visual Design Mode Token Tweaker)
+  const [viewportSize, setViewportSize] = useState<ViewportSize>('desktop');
+  const [workbenchMode, setWorkbenchMode] = useState<WorkbenchMode>('preview');
+  const [designModeOpen, setDesignModeOpen] = useState<boolean>(true);
+  const [themeOverrides, setThemeOverrides] = useState<
+    Partial<Record<ThemeRefId, ThemeOverridePatch>>
+  >({});
 
   // Master Prompt accordion state
   const [masterPromptExpanded, setMasterPromptExpanded] = useState(true);
@@ -76,9 +107,52 @@ export function PromptThemeStudio() {
     [activeThemeId],
   );
 
+  const activeOverrides = themeOverrides[activeThemeId];
+  const hasActiveOverrides = Boolean(
+    activeOverrides &&
+      (activeOverrides.brandHex ||
+        activeOverrides.accentHex ||
+        activeOverrides.radiusCardPx !== undefined ||
+        activeOverrides.density),
+  );
+
+  const defaultCardRadiusPx = useMemo(() => {
+    const parsed = parseInt(activeTheme.radiusCard, 10);
+    return Number.isFinite(parsed) ? parsed : 10;
+  }, [activeTheme.radiusCard]);
+
+  const effectiveRadiusPx = activeOverrides?.radiusCardPx ?? defaultCardRadiusPx;
+  const effectiveDensity = activeOverrides?.density ?? 'balanced';
+  const effectiveBrandHex =
+    activeOverrides?.brandHex ??
+    (previewPolarity === 'dark' ? activeTheme.dark.brand : activeTheme.light.brand);
+
+  const updateActiveOverride = (patch: Partial<ThemeOverridePatch>) => {
+    setThemeOverrides((prev) => ({
+      ...prev,
+      [activeThemeId]: {
+        ...(prev[activeThemeId] ?? {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const resetActiveOverrides = () => {
+    setThemeOverrides((prev) => {
+      const next = { ...prev };
+      delete next[activeThemeId];
+      return next;
+    });
+  };
+
   const singleIframeSrcDoc = useMemo(
-    () => buildVirtualThemeIframeSrcDoc(activeTheme, previewPolarity),
-    [activeTheme, previewPolarity],
+    () => buildVirtualThemeIframeSrcDoc(activeTheme, previewPolarity, activeOverrides),
+    [activeTheme, previewPolarity, activeOverrides],
+  );
+
+  const liveTokenCssCode = useMemo(
+    () => buildCustomThemeTokenCss(activeTheme, previewPolarity, activeOverrides),
+    [activeTheme, previewPolarity, activeOverrides],
   );
 
   const gridIframeDocs = useMemo(
@@ -86,9 +160,13 @@ export function PromptThemeStudio() {
       THEME_REFERENCE_SPECS.map((spec) => ({
         spec,
         polarity: iframePolarities[spec.id],
-        srcDoc: buildVirtualThemeIframeSrcDoc(spec, iframePolarities[spec.id]),
+        srcDoc: buildVirtualThemeIframeSrcDoc(
+          spec,
+          iframePolarities[spec.id],
+          themeOverrides[spec.id],
+        ),
       })),
-    [iframePolarities],
+    [iframePolarities, themeOverrides],
   );
 
   const filteredPrompts = useMemo(() => {
@@ -126,7 +204,11 @@ export function PromptThemeStudio() {
     }, 1800);
   };
 
-  const handleSelectTheme = (id: ThemeRefId, switchToSingle = false) => {
+  const handleSelectTheme = (
+    id: ThemeRefId,
+    switchToSingle = false,
+    openDesignWorkbench = false,
+  ) => {
     setActiveThemeId(id);
     const spec = THEME_REFERENCE_SPECS.find((t) => t.id === id);
     if (spec) {
@@ -134,6 +216,11 @@ export function PromptThemeStudio() {
     }
     if (switchToSingle) {
       setPreviewLayout('single');
+    }
+    if (openDesignWorkbench) {
+      setPreviewLayout('single');
+      setWorkbenchMode('split');
+      setDesignModeOpen(true);
     }
   };
 
@@ -174,6 +261,13 @@ export function PromptThemeStudio() {
     }
   };
 
+  const viewportWidthClass =
+    viewportSize === 'mobile'
+      ? 'max-w-[375px] mx-auto'
+      : viewportSize === 'tablet'
+        ? 'max-w-[768px] mx-auto'
+        : 'w-full';
+
   return (
     <div className="space-y-10">
       {/* Downloadable Universal Markdown Prompt Pack Bar */}
@@ -187,15 +281,15 @@ export function PromptThemeStudio() {
               <span aria-hidden="true">·</span>
               <span className="font-mono tabular-nums">11 P0–P2 Prompts</span>
               <span aria-hidden="true">·</span>
-              <span className="font-mono tabular-nums">4 Virtual Iframe Themes</span>
+              <span className="font-mono tabular-nums">v0 Responsive Design Workbench</span>
               <span aria-hidden="true">·</span>
-              <span>OITS Dhaka × roadmap.sh Master Remix Prompt</span>
+              <span>Refero State Taxonomy &amp; OITS Dhaka Master Remix</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-zinc-950 dark:text-zinc-50 tracking-tight text-balance">
-              Coding-Agent Prompt Pack, 4-Theme Virtual Iframes &amp; OITS Dhaka Remix Studio
+              Coding-Agent Prompt Pack, v0 Theme Workbench &amp; OITS Dhaka Remix Studio
             </h2>
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl leading-relaxed">
-              Download any individual P0/P1/P2 section or phase bundle as Markdown, compare all four referenced themes live inside isolated virtual iframes, and export the OITS Dhaka × roadmap.sh Master Prompt for branching in GitHub.
+              Download any individual P0/P1/P2 section or phase bundle as Markdown, test all four themes live across Desktop/Tablet/Mobile frames with live CSS token tweaking, and audit UI pattern completeness.
             </p>
           </div>
 
@@ -297,7 +391,6 @@ export function PromptThemeStudio() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Phase-Level Direct Markdown Downloads */}
             {(['P0', 'P1', 'P2'] as const).map((phase) => {
               const dlKey = `phase-${phase}`;
               const isDone = downloadedKey === dlKey;
@@ -395,7 +488,7 @@ export function PromptThemeStudio() {
           </div>
         </div>
 
-        {/* Prompt Accordion List (Single-Elevation Divider List with Explicit Download Markdown Button) */}
+        {/* Prompt Accordion List */}
         {filteredPrompts.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-8 text-center space-y-3">
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
@@ -525,25 +618,25 @@ export function PromptThemeStudio() {
         )}
       </section>
 
-      {/* SECTION 02: 4-Theme Live Virtual Iframe Preview Studio */}
+      {/* SECTION 02: 4-Theme Live Virtual Iframe Preview & v0 Design Mode Workbench */}
       <section className="space-y-4">
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-3">
           <div>
             <div className="text-xs text-zinc-500 dark:text-zinc-400">
-              <span>02. Live Virtual Iframe Sandbox</span>
+              <span>02. Live Virtual Iframe Sandbox &amp; v0 Workbench</span>
               <span className="mx-1.5" aria-hidden="true">
                 ·
               </span>
-              <span>CSS-isolated srcDoc iframes · Zero bleed into global portal theme</span>
+              <span>Responsive 100%/768px/375px frames · Preview / Split / Code · Visual Token Tweaker</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
               <Palette className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
-              <span>4-Theme Live Virtual Iframe Preview &amp; Theme Templating Prompts</span>
+              <span>4-Theme Virtual Iframes &amp; Interactive Design Mode Workbench</span>
             </h3>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Primary Live Preview Toggle: 2x2 Virtual Iframes vs Single Focus View */}
+            {/* Primary Live Preview Toggle: 2x2 Virtual Iframes vs Single Focus v0 Workbench */}
             <div
               role="group"
               aria-label="Live preview viewport layout"
@@ -573,11 +666,10 @@ export function PromptThemeStudio() {
                 }`}
               >
                 <Monitor className="w-3.5 h-3.5" strokeWidth={1.65} />
-                <span>Single Focus &amp; Prompt</span>
+                <span>Single Focus v0 Workbench</span>
               </button>
             </div>
 
-            {/* Global Polarity Controls for 2x2 Iframe Mode */}
             {previewLayout === 'iframes' ? (
               <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]">
                 <button
@@ -702,10 +794,11 @@ export function PromptThemeStudio() {
 
                       <button
                         type="button"
-                        onClick={() => handleSelectTheme(spec.id, true)}
-                        className="px-2.5 py-1 rounded-md bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                        onClick={() => handleSelectTheme(spec.id, true, true)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
                       >
-                        Prompt
+                        <SlidersHorizontal className="w-3 h-3" strokeWidth={1.75} />
+                        <span>Design / Code</span>
                       </button>
 
                       <a
@@ -758,59 +851,319 @@ export function PromptThemeStudio() {
             })}
           </div>
         ) : (
-          /* Single Focus Virtual Iframe + Copyable Theme Templating Prompt Split */
+          /* Single Focus v0 Workbench: Responsive Viewport + Preview/Split/Code + Visual Design Mode */
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
-            {/* Left 7 cols: Full-Size Isolated Virtual Iframe Specimen */}
-            <div className="xl:col-span-7 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
-                <div>
+            {/* Left 8 cols: v0 Responsive Preview / Split / Code Workbench */}
+            <div className="xl:col-span-8 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-4">
+              {/* Top v0 Workbench Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
+                <div className="min-w-0">
                   <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50">
                     {activeTheme.name} — {activeTheme.archetype}
                   </div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex flex-wrap items-center gap-2">
                     <span>
-                      Default:{' '}
-                      <strong className="font-mono text-zinc-800 dark:text-zinc-200">
-                        {activeTheme.defaultPolarity}
-                      </strong>
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>
-                      Previewing:{' '}
+                      Polarity:{' '}
                       <strong className="font-mono text-emerald-700 dark:text-emerald-400">
                         {previewPolarity}
                       </strong>
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span className="font-mono">
-                      Radius {activeTheme.radiusCard} / {activeTheme.radiusControl}
+                    <span className="font-mono tabular-nums">
+                      Radius {effectiveRadiusPx}px · {effectiveDensity}
                     </span>
+                    {hasActiveOverrides && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                          Custom Tokens Active
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <a
-                  href={activeTheme.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap shrink-0"
-                >
-                  <span>Inspect Live Site</span>
-                  <ExternalLink className="w-3 h-3" strokeWidth={1.5} />
-                </a>
+
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Responsive Viewport Switcher (Desktop 100% / Tablet 768px / Mobile 375px) */}
+                  <div
+                    role="group"
+                    aria-label="Virtual preview viewport width"
+                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+                  >
+                    {(
+                      [
+                        { id: 'desktop', label: '100%', icon: Monitor },
+                        { id: 'tablet', label: '768px', icon: Tablet },
+                        { id: 'mobile', label: '375px', icon: Smartphone },
+                      ] as const
+                    ).map((vp) => {
+                      const Icon = vp.icon;
+                      const active = viewportSize === vp.id;
+                      return (
+                        <button
+                          key={vp.id}
+                          type="button"
+                          onClick={() => setViewportSize(vp.id)}
+                          aria-pressed={active}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                            active
+                              ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" strokeWidth={1.65} />
+                          <span>{vp.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Preview | Split | Code Switcher */}
+                  <div
+                    role="group"
+                    aria-label="Workbench view mode"
+                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+                  >
+                    {(
+                      [
+                        { id: 'preview', label: 'Preview', icon: Monitor },
+                        { id: 'split', label: 'Split', icon: Columns2 },
+                        { id: 'code', label: 'Code', icon: Code2 },
+                      ] as const
+                    ).map((m) => {
+                      const Icon = m.icon;
+                      const active = workbenchMode === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setWorkbenchMode(m.id)}
+                          aria-pressed={active}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                            active
+                              ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
+                              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" strokeWidth={1.65} />
+                          <span>{m.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Visual Design Mode Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setDesignModeOpen((v) => !v)}
+                    aria-pressed={designModeOpen}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                      designModeOpen
+                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] text-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.6} />
+                    <span>Design Mode</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-white/[0.1]">
-                <iframe
-                  title={`${activeTheme.name} focused virtual preview (${previewPolarity})`}
-                  srcDoc={singleIframeSrcDoc}
-                  sandbox="allow-scripts"
-                  className="w-full h-[380px] border-0 block"
-                />
+              {/* Collapsible Visual Design Mode Token Tweaker */}
+              {designModeOpen && (
+                <div className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0D1014] p-3.5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300">
+                      Visual Design Mode · Live CSS Custom Property Tweaker
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('css-tokens-live', liveTokenCssCode)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap"
+                      >
+                        {copiedKey === 'css-tokens-live' ? (
+                          <Check className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                        <span>{copiedKey === 'css-tokens-live' ? 'Copied CSS' : 'Copy CSS Tokens'}</span>
+                      </button>
+                      {hasActiveOverrides && (
+                        <button
+                          type="button"
+                          onClick={resetActiveOverrides}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:border-rose-500/40 cursor-pointer whitespace-nowrap"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Reset Tokens</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                    {/* Brand Accent Swatches + Native Picker */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                        Brand Accent ({effectiveBrandHex})
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {BRAND_SWATCH_PRESETS.map((sw) => (
+                          <button
+                            key={sw.hex}
+                            type="button"
+                            onClick={() =>
+                              updateActiveOverride({ brandHex: sw.hex, accentHex: sw.hex })
+                            }
+                            title={`${sw.label} (${sw.hex})`}
+                            aria-label={`Set brand accent to ${sw.label}`}
+                            className={`w-5 h-5 rounded-md border cursor-pointer transition-transform hover:scale-110 ${
+                              effectiveBrandHex.toLowerCase() === sw.hex.toLowerCase()
+                                ? 'ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-[#0D1014]'
+                                : 'border-black/15 dark:border-white/20'
+                            }`}
+                            style={{ backgroundColor: sw.hex }}
+                          />
+                        ))}
+                        <label
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                          title="Pick custom hex color"
+                        >
+                          <input
+                            type="color"
+                            value={effectiveBrandHex.startsWith('#') ? effectiveBrandHex : '#1F3863'}
+                            onChange={(e) =>
+                              updateActiveOverride({
+                                brandHex: e.target.value,
+                                accentHex: e.target.value,
+                              })
+                            }
+                            aria-label="Custom brand accent color"
+                            className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Card Radius Slider (4px - 22px) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400 tabular-nums">
+                        <span>Card Radius</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                          {effectiveRadiusPx}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={4}
+                        max={22}
+                        step={1}
+                        value={effectiveRadiusPx}
+                        onChange={(e) =>
+                          updateActiveOverride({ radiusCardPx: Number(e.target.value) })
+                        }
+                        aria-label="Card border radius in pixels"
+                        className="w-full spenta-slider"
+                      />
+                    </div>
+
+                    {/* Layout Density Segmented Toggle */}
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                        Layout Density
+                      </div>
+                      <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-zinc-200/70 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]">
+                        {(['compact', 'balanced', 'editorial'] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => updateActiveOverride({ density: d })}
+                            className={`px-2 py-1 rounded text-[10px] font-mono font-semibold capitalize transition-colors cursor-pointer whitespace-nowrap ${
+                              effectiveDensity === d
+                                ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                            }`}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview / Split / Code Main Viewport */}
+              <div
+                className={
+                  workbenchMode === 'split'
+                    ? 'grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch'
+                    : 'block'
+                }
+              >
+                {(workbenchMode === 'preview' || workbenchMode === 'split') && (
+                  <div
+                    className={`${
+                      workbenchMode === 'split' ? 'lg:col-span-7' : 'w-full'
+                    } rounded-xl border border-zinc-200 dark:border-white/[0.1] bg-zinc-100/70 dark:bg-[#09090B] p-2.5 overflow-x-auto`}
+                  >
+                    <div
+                      className={`${viewportWidthClass} transition-all duration-200 rounded-lg overflow-hidden border border-zinc-300/70 dark:border-white/[0.12] bg-white dark:bg-zinc-950 shadow-sm`}
+                    >
+                      <iframe
+                        title={`${activeTheme.name} focused virtual preview (${previewPolarity}, ${viewportSize})`}
+                        srcDoc={singleIframeSrcDoc}
+                        sandbox="allow-scripts"
+                        className="w-full h-[380px] border-0 block"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(workbenchMode === 'code' || workbenchMode === 'split') && (
+                  <div
+                    className={`${
+                      workbenchMode === 'split' ? 'lg:col-span-5' : 'w-full'
+                    } rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col overflow-hidden`}
+                  >
+                    <div className="px-3.5 py-2 border-b border-zinc-800 flex items-center justify-between gap-2 text-[11px] font-mono text-zinc-400">
+                      <span>tokens.{activeTheme.id}.css</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('css-code-pane', liveTokenCssCode)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 cursor-pointer whitespace-nowrap"
+                      >
+                        {copiedKey === 'css-code-pane' ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                        <span>{copiedKey === 'css-code-pane' ? 'Copied' : 'Copy CSS'}</span>
+                      </button>
+                    </div>
+                    <pre className="p-3.5 text-[11px] leading-relaxed font-mono text-emerald-200 overflow-auto max-h-[370px] whitespace-pre">
+                      {liveTokenCssCode}
+                    </pre>
+                  </div>
+                )}
               </div>
 
               {/* Verified Hex Swatches (1-click copy) */}
               <div>
-                <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 mb-2">
-                  Verified Extracted Palette Tokens (click any swatch to copy hex)
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                    Verified Extracted Palette Tokens (click any swatch to copy hex)
+                  </span>
+                  <a
+                    href={activeTheme.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap shrink-0"
+                  >
+                    <span>Inspect Live Site</span>
+                    <ExternalLink className="w-3 h-3" strokeWidth={1.5} />
+                  </a>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {activeTheme.keySwatches.map((swatch) => {
@@ -840,8 +1193,8 @@ export function PromptThemeStudio() {
               </div>
             </div>
 
-            {/* Right 5 cols: Copyable Theme Templating Prompt */}
-            <div className="xl:col-span-5 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-3">
+            {/* Right 4 cols: Copyable Theme Templating Prompt */}
+            <div className="xl:col-span-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-3">
               <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
                 <div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -865,7 +1218,7 @@ export function PromptThemeStudio() {
                       <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
                     )}
                     <span>
-                      {copiedKey === `theme-prompt-${activeTheme.id}` ? 'Copied' : 'Copy Prompt'}
+                      {copiedKey === `theme-prompt-${activeTheme.id}` ? 'Copied' : 'Copy'}
                     </span>
                   </button>
                   <button
@@ -890,12 +1243,12 @@ export function PromptThemeStudio() {
                 </div>
               </div>
 
-              <pre className="flex-1 p-3.5 rounded-lg bg-zinc-950 text-zinc-100 text-[11.5px] leading-relaxed font-mono overflow-auto max-h-[420px] whitespace-pre-wrap border border-zinc-800">
+              <pre className="flex-1 p-3.5 rounded-lg bg-zinc-950 text-zinc-100 text-[11.5px] leading-relaxed font-mono overflow-auto max-h-[460px] whitespace-pre-wrap border border-zinc-800">
                 {activeTheme.templatePromptMarkdown}
               </pre>
 
               <div className="text-[11px] text-zinc-500 dark:text-zinc-400 pt-1">
-                Paste this theme block above any P0–P2 section prompt to restyle a target codebase using verified live tokens from{' '}
+                Paste this theme block (or your tweaked CSS tokens) above any P0–P2 prompt to restyle a branch using{' '}
                 <span className="font-mono text-zinc-800 dark:text-zinc-200">
                   {activeTheme.shortLabel}
                 </span>
@@ -1018,7 +1371,7 @@ export function PromptThemeStudio() {
                 git checkout -b remix/oitsdhaka-roadmap-edition
               </div>
               <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
-                Executable Master Prompt — Recreate OITS Dhaka Theme + Code-Drawn roadmap.sh Infographics + Tactile 3D PBR
+                Executable Master Prompt — OITS Dhaka Theme + Code-Drawn roadmap.sh Infographics + Tactile 3D PBR + 4-Resource Spec
               </div>
             </div>
             <button
@@ -1049,7 +1402,10 @@ export function PromptThemeStudio() {
         </div>
       </section>
 
-      {/* SECTION 04: 4-Way Design & Theme Comparison Matrix */}
+      {/* SECTION 04: Refero UI Pattern Taxonomy & State Completeness Explorer */}
+      <ReferoPatternExplorer />
+
+      {/* SECTION 05: 4-Way Design & Theme Comparison Matrix */}
       <DesignComparisonTable />
     </div>
   );

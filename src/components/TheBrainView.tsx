@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Globe,
   Loader2,
+  Moon,
   Plus,
   Radar,
   Search,
@@ -15,11 +16,13 @@ import {
   ShieldCheck,
   Sliders,
   Sparkles,
+  Sun,
   X,
 } from 'lucide-react';
 import {
   AGENTIC_VERTICALS,
   BLUEPRINT_PILLARS,
+  BRAIN_HUBS,
   HITL_SAMPLE_EVENTS,
   SPENTA_APPS,
 } from '../data/spentaManifest';
@@ -32,10 +35,17 @@ interface GroundedBriefState {
   query: string;
 }
 
+type RadarQuadrant =
+  | 'All'
+  | 'Healthcare & Bio'
+  | 'Banking & Fintech'
+  | 'Enterprise & Data'
+  | 'XR, Voice & Edge';
+
 interface RadarNodeSpec {
   appId: string;
   code: string;
-  quadrant: 'Healthcare & Bio' | 'Banking & Fintech' | 'Enterprise & Data' | 'XR, Voice & Edge';
+  quadrant: Exclude<RadarQuadrant, 'All'>;
   ring: 'CORE' | 'PRODUCTION' | 'PILOT';
   angleDeg: number;
   radius: number;
@@ -70,6 +80,14 @@ const GROUNDING_PRESETS = [
   'Bangladesh Bank ICT security & financial data residency compliance expectations',
 ];
 
+function polarCoords(angleDeg: number, radius: number): { cx: number; cy: number } {
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    cx: 260 + Math.cos(rad) * radius,
+    cy: 260 + Math.sin(rad) * radius,
+  };
+}
+
 export function TheBrainView() {
   const {
     theme,
@@ -83,7 +101,9 @@ export function TheBrainView() {
     setAiAssistantOpen,
   } = useStack();
 
+  const [brainPolarity, setBrainPolarity] = useState<'light' | 'dark'>(theme);
   const [visualMode, setVisualMode] = useState<'radar' | '3d'>('radar');
+  const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
   const [selectedHubId, setSelectedHubId] = useState<string | null>('fintech');
   const [focusedAppId, setFocusedAppId] = useState<string>('icr_ops');
   const [hoveredRadarId, setHoveredRadarId] = useState<string | null>(null);
@@ -94,6 +114,11 @@ export function TheBrainView() {
   const [groundError, setGroundError] = useState<string | null>(null);
   const [groundResult, setGroundResult] = useState<GroundedBriefState | null>(null);
 
+  // Sync local OITS Dhaka polarity whenever the global portal theme changes
+  useEffect(() => {
+    setBrainPolarity(theme);
+  }, [theme]);
+
   useEffect(() => {
     if (pendingNavFocus?.type === 'blueprint') {
       const q = pendingNavFocus.id;
@@ -103,6 +128,23 @@ export function TheBrainView() {
       clearPendingNavFocus();
     }
   }, [pendingNavFocus, clearPendingNavFocus]);
+
+  // Bidirectional 3D Hub <-> Architecture Profile synchronization
+  const handleSelect3DHub = (hubId: string) => {
+    setSelectedHubId(hubId);
+    const hubApps = SPENTA_APPS.filter((a) => a.hubId === hubId);
+    if (hubApps.length > 0) {
+      setFocusedAppId(hubApps[0].id);
+    }
+  };
+
+  const handleSelectRadarApp = (appId: string) => {
+    setFocusedAppId(appId);
+    const app = appMap[appId];
+    if (app) {
+      setSelectedHubId(app.hubId);
+    }
+  };
 
   const runLiveGrounding = async (overrideQuery?: string) => {
     const q = (overrideQuery ?? groundQuery).trim();
@@ -133,6 +175,14 @@ export function TheBrainView() {
   const passGate = hitlConfidence >= 0.88;
   const inspectedApp = appMap[hoveredRadarId ?? focusedAppId] ?? SPENTA_APPS[0];
   const inspectedInStack = selectedIds.includes(inspectedApp.id);
+  const activeHub = useMemo(
+    () => BRAIN_HUBS.find((h) => h.id === (selectedHubId ?? inspectedApp.hubId)) ?? BRAIN_HUBS[0],
+    [selectedHubId, inspectedApp.hubId],
+  );
+  const hubSiblingApps = useMemo(
+    () => SPENTA_APPS.filter((a) => a.hubId === activeHub.id),
+    [activeHub.id],
+  );
 
   const simulatedEvents = useMemo(() => {
     const delta = hitlConfidence - 0.88;
@@ -174,76 +224,181 @@ export function TheBrainView() {
     );
   }, [blueprintQuery]);
 
-  const isDark = theme === 'dark';
+  const isDark = brainPolarity === 'dark';
+
+  // OITS Dhaka Swiss Editorial Palette Classes
+  const surfaceCard = isDark
+    ? 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5]'
+    : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#16213A]';
+  const bandSurface = isDark
+    ? 'bg-[#0F1529] border-[#232B4A] text-[#E7EBF5]'
+    : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#16213A]';
+  const recessedBox = isDark
+    ? 'bg-[#0B1020] border-[#232B4A]'
+    : 'bg-[#F2EFE9] border-[#E4DFD6]';
+  const bodyInk = isDark ? 'text-[#C3CCE4]' : 'text-[#4A5163]';
+  const mutedInk = isDark ? 'text-[#8D97B5]' : 'text-[#5F6576]';
+  const brandInk = isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]';
+  const greenInk = isDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]';
+  const amberInk = isDark ? 'text-[#E0B063]' : 'text-[#8A5C10]';
+
+  // Radar SVG OITS Dhaka Tokens
+  const rNavy = isDark ? '#8FA6E8' : '#1F3863';
+  const rGreen = isDark ? '#6FCB9F' : '#1C6E46';
+  const rAmber = isDark ? '#E0B063' : '#8A5C10';
+  const rGrid = isDark ? '#232B4A' : '#E4DFD6';
+  const rGridStrong = isDark ? '#34416E' : '#CFC8BC';
+  const rInk = isDark ? '#E7EBF5' : '#16213A';
+  const rMuted = isDark ? '#8D97B5' : '#5F6576';
+  const rNodeIdle = isDark ? '#0F1529' : '#FAF8F4';
+
+  const focusedNodeSpec = RADAR_NODES.find((n) => n.appId === inspectedApp.id);
+  const focusedPos = focusedNodeSpec
+    ? polarCoords(focusedNodeSpec.angleDeg, focusedNodeSpec.radius)
+    : null;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* OITS Dhaka Editorial Header */}
+      <section className={`rounded-[10px] border p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors ${bandSurface}`}>
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
-            SPENTA INTELLIGENCE CORE · OPERATIONAL TECH RADAR + 3D NEURAL CORE
+          <div className={`text-[11px] font-mono font-semibold ${brandInk}`}>
+            OITS Dhaka Edition · Sovereign Operational Tech Radar &amp; Dual-Studio 3D Neural Core
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
-            The Brain — Sovereign Tech Radar &amp; 0.88 HITL Gate Simulator
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-balance">
+            The Brain — Sovereign Tech Radar, 3D Core &amp; 0.88 HITL Simulator
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-3xl">
-            Inspect module maturity across CORE, PRODUCTION, and PILOT rings synced with your composed stack, launch the Three.js 3D Neural Core, and test live OPA 0.88 confidence gating.
+          <p className={`text-xs sm:text-sm mt-1 max-w-3xl leading-relaxed ${bodyInk}`}>
+            Inspect all 13 modules across CORE, PRODUCTION, and PILOT rings with live synergy arcs, explore the OITS Heritage 3D Neural Core synced to your Architecture Profile, and test deterministic OPA 0.88 confidence gating.
           </p>
         </div>
 
-        {/* Radar vs 3D Segmented Toggle */}
-        <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-[#18181B] p-1 border border-zinc-200 dark:border-white/[0.08] self-start lg:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => setVisualMode('radar')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              visualMode === 'radar'
-                ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
-            }`}
+        <div className="flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
+          {/* Radar vs 3D Segmented Toggle */}
+          <div
+            role="group"
+            aria-label="Brain visualization mode"
+            className={`inline-flex rounded-lg p-1 border ${recessedBox}`}
           >
-            <Radar className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>Operational Tech Radar</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setVisualMode('3d')}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              visualMode === '3d'
-                ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
-            }`}
+            <button
+              type="button"
+              onClick={() => setVisualMode('radar')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                visualMode === 'radar'
+                  ? isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020]'
+                    : 'bg-[#1F3863] text-white'
+                  : `${bodyInk} hover:opacity-100`
+              }`}
+            >
+              <Radar className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Operational Tech Radar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisualMode('3d')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                visualMode === '3d'
+                  ? isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020]'
+                    : 'bg-[#1F3863] text-white'
+                  : `${bodyInk} hover:opacity-100`
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>3D Neural Core</span>
+            </button>
+          </div>
+
+          {/* Local OITS Dhaka Stone Light / Nocturnal Dark Toggle */}
+          <div
+            role="group"
+            aria-label="The Brain OITS Dhaka polarity"
+            className={`inline-flex rounded-lg p-1 border ${recessedBox}`}
           >
-            <Box className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>3D Neural Core</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setBrainPolarity('light')}
+              aria-pressed={!isDark}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                !isDark
+                  ? 'bg-[#1F3863] text-white'
+                  : 'text-[#8D97B5] hover:text-[#E7EBF5]'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Stone</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBrainPolarity('dark')}
+              aria-pressed={isDark}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                isDark
+                  ? 'bg-[#8FA6E8] text-[#0B1020]'
+                  : 'text-[#4A5163] hover:text-[#16213A]'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Nocturnal</span>
+            </button>
+          </div>
         </div>
       </section>
 
       {/* Split-Panel Hero: Left Radar / 3D Core | Right Profile + 0.88 HITL Inspector */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Left Panel (7 cols) */}
-        <div className="lg:col-span-7 rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between">
+        <div className={`lg:col-span-7 rounded-[10px] border p-4 sm:p-5 flex flex-col justify-between ${surfaceCard}`}>
           {visualMode === 'radar' ? (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
+              <div className={`flex flex-wrap items-center justify-between gap-2 pb-3 border-b ${isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'}`}>
                 <div>
-                  <h2 className="text-sm font-bold text-zinc-950 dark:text-zinc-50">
+                  <h2 className="text-sm font-bold">
                     Interactive Operational Tech Radar (13 Modules)
                   </h2>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Click any node to inspect its architecture profile · Emerald nodes are active in your stack
+                  <p className={`text-[11px] ${mutedInk}`}>
+                    Click any node to inspect architecture &amp; synergy links · Green = Active in Stack · Amber = Native Integration
                   </p>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active ({selectedIds.length})
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600" /> Available
-                  </span>
+                <div className={`font-mono text-[10px] tabular-nums ${mutedInk}`}>
+                  <span className={`font-bold ${greenInk}`}>{selectedIds.length} Active</span>
+                  <span className="mx-1.5">·</span>
+                  <span>{SPENTA_APPS.length - selectedIds.length} Available</span>
                 </div>
+              </div>
+
+              {/* Quadrant Filter Strip */}
+              <div className="flex flex-wrap items-center gap-1 pt-3">
+                {(
+                  [
+                    'All',
+                    'Healthcare & Bio',
+                    'Banking & Fintech',
+                    'Enterprise & Data',
+                    'XR, Voice & Edge',
+                  ] as const
+                ).map((quad) => {
+                  const active = quadrantFilter === quad;
+                  return (
+                    <button
+                      key={quad}
+                      type="button"
+                      onClick={() => setQuadrantFilter(quad)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer border ${
+                        active
+                          ? isDark
+                            ? 'bg-[#161D3A] border-[#8FA6E8] text-[#8FA6E8]'
+                            : 'bg-[#EEF3FB] border-[#1F3863] text-[#1F3863]'
+                          : isDark
+                            ? 'bg-[#0F1529] border-[#232B4A] text-[#8D97B5] hover:text-[#E7EBF5]'
+                            : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#4A5163] hover:text-[#16213A]'
+                      }`}
+                    >
+                      {quad === 'All' ? 'All Quadrants (13)' : quad}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="w-full max-w-[520px] mx-auto aspect-square my-2 flex items-center justify-center">
@@ -251,7 +406,7 @@ export function TheBrainView() {
                   viewBox="0 0 520 520"
                   className="w-full h-full select-none"
                   role="img"
-                  aria-label="Spenta Operational Tech Radar"
+                  aria-label="Spenta Operational Tech Radar in OITS Dhaka Editorial Palette"
                 >
                   {/* Concentric Rings */}
                   {[220, 158, 96].map((r, i) => (
@@ -263,85 +418,48 @@ export function TheBrainView() {
                       fill={
                         i === 2
                           ? isDark
-                            ? 'rgba(16,185,129,0.06)'
-                            : 'rgba(16,185,129,0.08)'
+                            ? 'rgba(143,166,232,0.08)'
+                            : 'rgba(31,56,99,0.05)'
                           : 'none'
                       }
-                      stroke={isDark ? 'rgba(255,255,255,0.10)' : 'rgba(24,24,27,0.12)'}
-                      strokeWidth="1"
+                      stroke={i === 2 ? rGridStrong : rGrid}
+                      strokeWidth="1.1"
                       strokeDasharray={i === 0 ? '4 4' : undefined}
                     />
                   ))}
 
                   {/* Crosshair Axes */}
-                  <line
-                    x1="260"
-                    y1="26"
-                    x2="260"
-                    y2="494"
-                    stroke={isDark ? 'rgba(255,255,255,0.09)' : 'rgba(24,24,27,0.1)'}
-                    strokeWidth="1"
-                  />
-                  <line
-                    x1="26"
-                    y1="260"
-                    x2="494"
-                    y2="260"
-                    stroke={isDark ? 'rgba(255,255,255,0.09)' : 'rgba(24,24,27,0.1)'}
-                    strokeWidth="1"
-                  />
+                  <line x1="260" y1="26" x2="260" y2="494" stroke={rGrid} strokeWidth="1" />
+                  <line x1="26" y1="260" x2="494" y2="260" stroke={rGrid} strokeWidth="1" />
 
                   {/* Ring Labels */}
-                  <text
-                    x="266"
-                    y="174"
-                    fill={isDark ? '#10B981' : '#065F46'}
-                    fontSize="9"
-                    fontWeight="700"
-                    fontFamily="JetBrains Mono, monospace"
-                  >
+                  <text x="266" y="174" fill={rNavy} fontSize="9" fontWeight="800" fontFamily="JetBrains Mono, monospace">
                     CORE
                   </text>
-                  <text
-                    x="266"
-                    y="112"
-                    fill={isDark ? '#A1A1AA' : '#52525B'}
-                    fontSize="9"
-                    fontWeight="600"
-                    fontFamily="JetBrains Mono, monospace"
-                  >
+                  <text x="266" y="112" fill={rMuted} fontSize="9" fontWeight="700" fontFamily="JetBrains Mono, monospace">
                     PRODUCTION
                   </text>
-                  <text
-                    x="266"
-                    y="50"
-                    fill={isDark ? '#71717A' : '#71717A'}
-                    fontSize="9"
-                    fontWeight="600"
-                    fontFamily="JetBrains Mono, monospace"
-                  >
+                  <text x="266" y="50" fill={rMuted} fontSize="9" fontWeight="600" fontFamily="JetBrains Mono, monospace">
                     PILOT
                   </text>
 
                   {/* Quadrant Headers */}
-                  <text x="34" y="34" fill={isDark ? '#A1A1AA' : '#52525B'} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
-                    HEALTHCARE &amp; SECURITY
+                  <text x="30" y="34" fill={quadrantFilter === 'Healthcare & Bio' ? rNavy : rMuted} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+                    01. HEALTHCARE &amp; SECURITY
                   </text>
-                  <text x="486" y="34" textAnchor="end" fill={isDark ? '#A1A1AA' : '#52525B'} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
-                    BANKING &amp; FINTECH
+                  <text x="490" y="34" textAnchor="end" fill={quadrantFilter === 'Banking & Fintech' ? rNavy : rMuted} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+                    02. BANKING &amp; FINTECH
                   </text>
-                  <text x="34" y="498" fill={isDark ? '#A1A1AA' : '#52525B'} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
-                    ENTERPRISE &amp; BI
+                  <text x="30" y="498" fill={quadrantFilter === 'Enterprise & Data' ? rNavy : rMuted} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+                    03. ENTERPRISE &amp; BI
                   </text>
-                  <text x="486" y="498" textAnchor="end" fill={isDark ? '#A1A1AA' : '#52525B'} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
-                    XR, VOICE &amp; EDGE
+                  <text x="490" y="498" textAnchor="end" fill={quadrantFilter === 'XR, Voice & Edge' ? rNavy : rMuted} fontSize="9.5" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+                    04. XR, VOICE &amp; EDGE
                   </text>
 
-                  {/* Active Synergy Spokes to Center */}
+                  {/* Active Stack Spokes to Center Kernel */}
                   {RADAR_NODES.map((node) => {
-                    const rad = (node.angleDeg * Math.PI) / 180;
-                    const cx = 260 + Math.cos(rad) * node.radius;
-                    const cy = 260 + Math.sin(rad) * node.radius;
+                    const { cx, cy } = polarCoords(node.angleDeg, node.radius);
                     const isSelected = selectedIds.includes(node.appId);
                     const isFocused = inspectedApp.id === node.appId;
                     if (!isSelected && !isFocused) return null;
@@ -352,24 +470,48 @@ export function TheBrainView() {
                         y1="260"
                         x2={cx}
                         y2={cy}
-                        stroke={isFocused ? '#10B981' : 'rgba(16,185,129,0.35)'}
+                        stroke={isFocused ? rNavy : rGreen}
+                        strokeOpacity={isFocused ? 0.85 : 0.35}
                         strokeWidth={isFocused ? 1.8 : 1.1}
                       />
                     );
                   })}
 
+                  {/* Native Synergy Connector Arcs from Focused Module */}
+                  {focusedPos &&
+                    RADAR_NODES.filter((n) => inspectedApp.integratesWith.includes(n.appId)).map(
+                      (synNode) => {
+                        const target = polarCoords(synNode.angleDeg, synNode.radius);
+                        const midX = (focusedPos.cx + target.cx) / 2;
+                        const midY = (focusedPos.cy + target.cy) / 2;
+                        const ctrlX = midX + (260 - midX) * 0.28;
+                        const ctrlY = midY + (260 - midY) * 0.28;
+                        return (
+                          <path
+                            key={`syn-arc-${synNode.appId}`}
+                            d={`M ${focusedPos.cx} ${focusedPos.cy} Q ${ctrlX} ${ctrlY} ${target.cx} ${target.cy}`}
+                            fill="none"
+                            stroke={rAmber}
+                            strokeWidth="1.5"
+                            strokeDasharray="4 3"
+                            opacity="0.85"
+                          />
+                        );
+                      },
+                    )}
+
                   {/* Center Kernel */}
                   <circle
                     cx="260"
                     cy="260"
-                    r="28"
-                    fill={isDark ? '#09090B' : '#09090B'}
-                    stroke="#10B981"
-                    strokeWidth="1.8"
+                    r="29"
+                    fill={isDark ? '#141A32' : '#1F3863'}
+                    stroke={passGate ? rGreen : rAmber}
+                    strokeWidth="2"
                   />
                   <text
                     x="260"
-                    y="258"
+                    y="257"
                     textAnchor="middle"
                     fill="#FFFFFF"
                     fontSize="8.5"
@@ -380,66 +522,66 @@ export function TheBrainView() {
                   </text>
                   <text
                     x="260"
-                    y="270"
+                    y="269"
                     textAnchor="middle"
-                    fill="#34D399"
+                    fill={passGate ? '#6FCB9F' : '#E0B063'}
                     fontSize="7.5"
+                    fontWeight="700"
                     fontFamily="JetBrains Mono, monospace"
                   >
-                    L1–L6
+                    OPA {hitlConfidence.toFixed(2)}
                   </text>
 
                   {/* Clickable Radar Nodes */}
                   {RADAR_NODES.map((node) => {
-                    const rad = (node.angleDeg * Math.PI) / 180;
-                    const cx = 260 + Math.cos(rad) * node.radius;
-                    const cy = 260 + Math.sin(rad) * node.radius;
+                    const { cx, cy } = polarCoords(node.angleDeg, node.radius);
                     const isSelected = selectedIds.includes(node.appId);
                     const isFocused = inspectedApp.id === node.appId;
                     const isSynergy = inspectedApp.integratesWith.includes(node.appId);
+                    const isDimmed =
+                      quadrantFilter !== 'All' && node.quadrant !== quadrantFilter;
 
                     return (
                       <g
                         key={node.appId}
-                        onClick={() => setFocusedAppId(node.appId)}
+                        onClick={() => handleSelectRadarApp(node.appId)}
                         onMouseEnter={() => setHoveredRadarId(node.appId)}
                         onMouseLeave={() => setHoveredRadarId(null)}
+                        opacity={isDimmed ? 0.25 : 1}
                         className="cursor-pointer"
                       >
                         {isFocused && (
                           <circle
                             cx={cx}
                             cy={cy}
-                            r="20"
+                            r="21"
                             fill="none"
-                            stroke="#10B981"
-                            strokeWidth="1.5"
+                            stroke={rNavy}
+                            strokeWidth="1.6"
                             strokeDasharray="3 3"
                           />
                         )}
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={isFocused ? 15 : 13}
+                          r={isFocused ? 15.5 : 13.5}
                           fill={
                             isSelected
-                              ? '#10B981'
+                              ? rGreen
                               : isSynergy
-                                ? '#F59E0B'
-                                : isDark
-                                  ? '#18181B'
-                                  : '#F4F4F5'
+                                ? rAmber
+                                : rNodeIdle
                           }
                           stroke={
-                            isSelected
-                              ? '#34D399'
-                              : isSynergy
-                                ? '#F59E0B'
-                                : isDark
-                                  ? 'rgba(255,255,255,0.22)'
-                                  : '#A1A1AA'
+                            isFocused
+                              ? rNavy
+                              : isSelected
+                                ? rGreen
+                                : isSynergy
+                                  ? rAmber
+                                  : rGridStrong
                           }
-                          strokeWidth="1.5"
+                          strokeWidth={isFocused ? 2 : 1.4}
                         />
                         <text
                           x={cx}
@@ -447,10 +589,10 @@ export function TheBrainView() {
                           textAnchor="middle"
                           fill={
                             isSelected || isSynergy
-                              ? '#09090B'
-                              : isDark
-                                ? '#E4E4E7'
-                                : '#18181B'
+                              ? isDark
+                                ? '#0B1020'
+                                : '#FFFFFF'
+                              : rInk
                           }
                           fontSize="8.5"
                           fontWeight="800"
@@ -465,44 +607,53 @@ export function TheBrainView() {
               </div>
 
               {/* Compact Radar Module Strip */}
-              <div className="pt-3 border-t border-zinc-200 dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              <div className={`pt-3 border-t flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono ${isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'} ${mutedInk}`}>
                 <span>
-                  Focused: <strong className="text-zinc-900 dark:text-zinc-100">{inspectedApp.shortName}</strong> ({inspectedApp.layers.join('/')})
+                  Focused: <strong className={isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}>{inspectedApp.shortName}</strong> · {inspectedApp.layers.join('/')}
                 </span>
                 <span>Proof: {inspectedApp.proofClient}</span>
               </div>
             </>
           ) : (
-            <div className="flex-1 min-h-[460px] rounded-xl overflow-hidden bg-[#09090B] border border-white/[0.08]">
+            <div
+              className={`flex-1 min-h-[470px] rounded-[10px] overflow-hidden border ${
+                isDark ? 'border-[#232B4A] bg-[#0B1020]' : 'border-[#E4DFD6] bg-[#F2EFE9]'
+              }`}
+            >
               <SovereignBrain3D
                 compact
+                polarity={brainPolarity}
                 selectedHubId={selectedHubId}
-                onSelectHub={(id) => setSelectedHubId(id)}
+                onSelectHub={handleSelect3DHub}
               />
             </div>
           )}
         </div>
 
-        {/* Right Panel (5 cols): Architecture Profile + Live 0.88 HITL Gate Inspector */}
+        {/* Right Panel (5 cols): Bidirectional Architecture Profile + Live 0.88 HITL Gate Inspector */}
         <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* Inspected Module Architecture Profile */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 space-y-3">
+          {/* Inspected Module & Active Hub Architecture Profile */}
+          <div className={`rounded-[10px] border p-5 space-y-3 ${surfaceCard}`}>
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
-                  ARCHITECTURE PROFILE · {inspectedApp.engine} ENGINE
+              <div className="min-w-0">
+                <div className={`text-[10px] font-mono font-semibold ${brandInk}`}>
+                  HUB {activeHub.num} · {activeHub.label} · {inspectedApp.engine} engine
                 </div>
-                <h2 className="text-base font-bold text-zinc-950 dark:text-zinc-50 mt-0.5 leading-snug">
+                <h2 className="text-base font-bold mt-0.5 leading-snug">
                   {inspectedApp.name}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => toggleApp(inspectedApp.id)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                   inspectedInStack
-                    ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400'
-                    : 'bg-zinc-950 text-white dark:bg-zinc-100 dark:text-zinc-950 hover:opacity-90'
+                    ? isDark
+                      ? 'bg-[#6FCB9F] text-[#0B1020]'
+                      : 'bg-[#1C6E46] text-white'
+                    : isDark
+                      ? 'bg-[#8FA6E8] text-[#0B1020]'
+                      : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
                 }`}
               >
                 {inspectedInStack ? (
@@ -519,26 +670,54 @@ export function TheBrainView() {
               </button>
             </div>
 
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            <p className={`text-xs leading-relaxed ${bodyInk}`}>
               {inspectedApp.tagline}
             </p>
 
+            {/* Hub Sibling Module Selector (Synced directly with 3D Hub Clicks) */}
+            {hubSiblingApps.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className={`font-mono text-[10px] ${mutedInk}`}>Hub Modules:</span>
+                {hubSiblingApps.map((sib) => {
+                  const isCurrent = sib.id === inspectedApp.id;
+                  return (
+                    <button
+                      key={sib.id}
+                      type="button"
+                      onClick={() => setFocusedAppId(sib.id)}
+                      className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                        isCurrent
+                          ? isDark
+                            ? 'bg-[#161D3A] border-[#8FA6E8] text-[#8FA6E8]'
+                            : 'bg-[#EEF3FB] border-[#1F3863] text-[#1F3863]'
+                          : isDark
+                            ? 'bg-[#0F1529] border-[#232B4A] text-[#C3CCE4]'
+                            : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#4A5163]'
+                      }`}
+                    >
+                      {sib.shortName}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2 pt-1 font-mono tabular-nums">
-              <div className="rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-2.5">
-                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Build Scope</div>
-                <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+              <div className={`rounded-lg border p-2.5 ${recessedBox}`}>
+                <div className={`text-[10px] ${mutedInk}`}>Build Scope</div>
+                <div className="text-xs font-bold mt-0.5">
                   ${(inspectedApp.setupUsd / 1000).toFixed(1)}K
                 </div>
               </div>
-              <div className="rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-2.5">
-                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Conservative GM</div>
-                <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">
+              <div className={`rounded-lg border p-2.5 ${recessedBox}`}>
+                <div className={`text-[10px] ${mutedInk}`}>Conservative GM</div>
+                <div className={`text-xs font-bold mt-0.5 ${greenInk}`}>
                   {inspectedApp.gmPct.toFixed(1)}%
                 </div>
               </div>
-              <div className="rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-2.5">
-                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Hardware Min</div>
-                <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+              <div className={`rounded-lg border p-2.5 ${recessedBox}`}>
+                <div className={`text-[10px] ${mutedInk}`}>Hardware Min</div>
+                <div className="text-xs font-bold mt-0.5">
                   Tier {inspectedApp.minServerTier}
                 </div>
               </div>
@@ -546,26 +725,24 @@ export function TheBrainView() {
           </div>
 
           {/* Live 0.88 Confidence HITL Gate Simulator */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex-1 flex flex-col justify-between gap-4">
+          <div className={`rounded-[10px] border p-5 flex-1 flex flex-col justify-between gap-4 ${surfaceCard}`}>
             <div>
               <div className="flex items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-2 text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                  <Sliders className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <div className={`inline-flex items-center gap-2 text-[11px] font-mono font-bold ${brandInk}`}>
+                  <Sliders className="w-3.5 h-3.5" strokeWidth={1.6} />
                   <span>0.88 HITL Gate Simulator</span>
                 </div>
-                <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">OPA Policy-as-Code</span>
+                <span className={`text-[10px] font-mono ${mutedInk}`}>OPA Policy-as-Code</span>
               </div>
 
-              <div className="mt-3 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08]">
+              <div className={`mt-3 p-3.5 rounded-lg border ${recessedBox}`}>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  <span className={`text-xs font-medium ${bodyInk}`}>
                     Simulated Confidence
                   </span>
                   <span
                     className={`font-mono text-2xl sm:text-3xl font-extrabold tabular-nums ${
-                      passGate
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-amber-600 dark:text-amber-400'
+                      passGate ? greenInk : amberInk
                     }`}
                   >
                     {hitlConfidence.toFixed(2)}
@@ -583,9 +760,11 @@ export function TheBrainView() {
                     aria-label="Simulated inference confidence score"
                     className="w-full spenta-slider"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400 mt-1.5">
+                  <div className={`flex justify-between text-[10px] font-mono mt-1.5 ${mutedInk}`}>
                     <span>0.50 Escalate</span>
-                    <span className="font-bold text-zinc-900 dark:text-zinc-100">0.88 Gate</span>
+                    <span className={`font-bold ${isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}`}>
+                      0.88 Gate
+                    </span>
                     <span>0.99 Auto-Commit</span>
                   </div>
                 </div>
@@ -603,8 +782,12 @@ export function TheBrainView() {
                       onClick={() => setHitlConfidence(preset.val)}
                       className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors cursor-pointer ${
                         Math.abs(hitlConfidence - preset.val) < 0.005
-                          ? 'bg-zinc-950 text-white border-zinc-950 dark:bg-emerald-500 dark:text-zinc-950 dark:border-emerald-500'
-                          : 'bg-white dark:bg-[#111315] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-white/[0.1] hover:border-emerald-500/40'
+                          ? isDark
+                            ? 'bg-[#8FA6E8] text-[#0B1020] border-[#8FA6E8] font-bold'
+                            : 'bg-[#1F3863] text-white border-[#1F3863] font-bold'
+                          : isDark
+                            ? 'bg-[#141A32] text-[#C3CCE4] border-[#232B4A] hover:border-[#8FA6E8]'
+                            : 'bg-[#FFFFFF] text-[#4A5163] border-[#E4DFD6] hover:border-[#1F3863]'
                       }`}
                     >
                       {preset.label}
@@ -615,25 +798,29 @@ export function TheBrainView() {
 
               {/* Decision Banner */}
               <div
-                className={`mt-3 rounded-xl p-3.5 border ${
+                className={`mt-3 rounded-lg p-3.5 border ${
                   passGate
-                    ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-900 dark:text-emerald-200'
-                    : 'bg-amber-500/10 border-amber-500/40 text-amber-900 dark:text-amber-200'
+                    ? isDark
+                      ? 'bg-[#0F2A22] border-[#6FCB9F]/40 text-[#E7EBF5]'
+                      : 'bg-[#EBF6F0] border-[#1C6E46]/35 text-[#16213A]'
+                    : isDark
+                      ? 'bg-[#2A2112] border-[#E0B063]/45 text-[#E7EBF5]'
+                      : 'bg-[#FDF5E6] border-[#8A5C10]/35 text-[#16213A]'
                 }`}
               >
                 <div className="flex items-start gap-2.5">
                   {passGate ? (
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" strokeWidth={1.75} />
+                    <ShieldCheck className={`w-4 h-4 shrink-0 mt-0.5 ${greenInk}`} strokeWidth={1.75} />
                   ) : (
-                    <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" strokeWidth={1.75} />
+                    <ShieldAlert className={`w-4 h-4 shrink-0 mt-0.5 ${amberInk}`} strokeWidth={1.75} />
                   )}
                   <div>
-                    <div className="font-mono text-[11px] font-bold uppercase tracking-wide">
+                    <div className={`font-mono text-[11px] font-bold ${passGate ? greenInk : amberInk}`}>
                       {passGate
-                        ? 'PASS (>= 0.88) · AUTO-COMMIT TO LEDGER'
-                        : 'HOLD (< 0.88) · ROUTE TO HUMAN AUDIT QUEUE'}
+                        ? 'PASS (>= 0.88) · Auto-Commit to Ledger'
+                        : 'HOLD (< 0.88) · Route to Human Audit Queue'}
                     </div>
-                    <p className="text-[11px] mt-1 leading-relaxed opacity-90">
+                    <p className={`text-[11px] mt-1 leading-relaxed ${bodyInk}`}>
                       {passGate
                         ? 'OPA verifies schema integrity and signs directly into PostgreSQL/Kafka core with immutable model hash.'
                         : 'Automated ledger write blocked. Opens in React Digital Twin verifier with highlighted low-confidence bounding boxes.'}
@@ -647,17 +834,13 @@ export function TheBrainView() {
                 {simulatedEvents.map((evt) => (
                   <div
                     key={evt.id}
-                    className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#09090B] px-3 py-2 text-xs"
+                    className={`rounded-lg border px-3 py-2 text-xs ${recessedBox}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                        {evt.clientPattern}
-                      </span>
+                      <span className="font-semibold truncate">{evt.clientPattern}</span>
                       <span
                         className={`inline-flex items-center gap-1 font-mono text-[10px] font-bold tabular-nums shrink-0 ${
-                          evt.autoApproved
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-amber-700 dark:text-amber-400'
+                          evt.autoApproved ? greenInk : amberInk
                         }`}
                       >
                         {evt.autoApproved ? (
@@ -668,10 +851,10 @@ export function TheBrainView() {
                         {evt.liveScore.toFixed(2)} · {evt.autoApproved ? 'COMMIT' : 'HITL'}
                       </span>
                     </div>
-                    <div className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5 truncate">
+                    <div className={`text-[11px] mt-0.5 truncate ${bodyInk}`}>
                       {evt.documentType}
                     </div>
-                    <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-500 mt-0.5">
+                    <div className={`text-[10px] font-mono mt-0.5 ${mutedInk}`}>
                       {evt.policyRule} · {evt.latencyMs}ms
                     </div>
                   </div>
@@ -683,23 +866,27 @@ export function TheBrainView() {
       </div>
 
       {/* Live Google Search Grounded Intelligence Panel */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 space-y-4">
+      <section className={`rounded-[10px] border p-5 space-y-4 ${surfaceCard}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-              <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <div className={`inline-flex items-center gap-1.5 text-[11px] font-mono font-bold ${brandInk}`}>
+              <Globe className="w-3.5 h-3.5" strokeWidth={1.6} />
               <span>Live Web Market Intelligence · Google Search Grounding</span>
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+            <h2 className="text-base sm:text-lg font-bold mt-0.5">
               Verify Market Benchmarks, Hardware Pricing &amp; Compliance in Real Time
             </h2>
           </div>
           <button
             type="button"
             onClick={() => setAiAssistantOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-xs font-semibold cursor-pointer self-start md:self-auto"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer self-start md:self-auto whitespace-nowrap ${
+              isDark
+                ? 'bg-[#8FA6E8] text-[#0B1020]'
+                : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
+            }`}
           >
-            <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Sparkles className="w-3.5 h-3.5" strokeWidth={1.6} />
             <span>Open Multi-Turn AI Advisor</span>
           </button>
         </div>
@@ -716,17 +903,25 @@ export function TheBrainView() {
             value={groundQuery}
             onChange={(e) => setGroundQuery(e.target.value)}
             placeholder="Ask for up-to-date AI hardware pricing, regulatory updates, or healthcare ERP trends..."
-            className="flex-1 px-3.5 py-2 text-xs bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+            className={`flex-1 px-3.5 py-2 text-xs border rounded-lg focus:outline-none ${
+              isDark
+                ? 'bg-[#0B1020] border-[#232B4A] text-[#E7EBF5] placeholder:text-[#8D97B5] focus:border-[#8FA6E8]'
+                : 'bg-[#FAF8F4] border-[#CFC8BC] text-[#16213A] placeholder:text-[#5F6576] focus:border-[#1F3863]'
+            }`}
           />
           <button
             type="submit"
             disabled={groundLoading || !groundQuery.trim()}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white dark:text-zinc-950 text-xs font-semibold transition-colors cursor-pointer shrink-0"
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 disabled:opacity-45 whitespace-nowrap ${
+              isDark
+                ? 'bg-[#6FCB9F] text-[#0B1020] hover:bg-[#82D7AE]'
+                : 'bg-[#1C6E46] text-white hover:bg-[#165838]'
+            }`}
           >
             {groundLoading ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Globe className="w-3.5 h-3.5" strokeWidth={1.6} />
             )}
             <span>{groundLoading ? 'Searching Web…' : 'Run Grounded Brief'}</span>
           </button>
@@ -738,7 +933,11 @@ export function TheBrainView() {
               key={preset}
               type="button"
               onClick={() => runLiveGrounding(preset)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/[0.08] font-medium transition-colors cursor-pointer text-left"
+              className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-colors cursor-pointer text-left ${
+                isDark
+                  ? 'bg-[#0F1529] border-[#232B4A] text-[#C3CCE4] hover:border-[#8FA6E8]'
+                  : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#4A5163] hover:border-[#1F3863]'
+              }`}
             >
               {preset}
             </button>
@@ -746,23 +945,23 @@ export function TheBrainView() {
         </div>
 
         {groundError && (
-          <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-3.5 py-2.5 text-xs text-rose-700 dark:text-rose-300">
+          <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-3.5 py-2.5 text-xs text-rose-700 dark:text-rose-300">
             {groundError}
           </div>
         )}
 
         {groundResult && (
-          <div className="rounded-xl bg-zinc-50 dark:bg-[#09090B] border border-emerald-500/30 p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
-              <span className="font-bold truncate">QUERY: {groundResult.query}</span>
-              <span className="shrink-0 text-zinc-500 dark:text-zinc-400">Google Search Grounded</span>
+          <div className={`rounded-lg border p-4 space-y-3 ${recessedBox}`}>
+            <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono ${brandInk}`}>
+              <span className="font-bold truncate">Query: {groundResult.query}</span>
+              <span className={`shrink-0 ${mutedInk}`}>Google Search Grounded</span>
             </div>
-            <div className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">
+            <div className={`text-xs leading-relaxed whitespace-pre-wrap ${bodyInk}`}>
               {groundResult.text}
             </div>
             {groundResult.sources.length > 0 && (
-              <div className="pt-2 border-t border-zinc-200 dark:border-white/[0.08] flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-mono font-bold uppercase text-zinc-500 mr-1">
+              <div className={`pt-2 border-t flex flex-wrap items-center gap-1.5 ${isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'}`}>
+                <span className={`text-[10px] font-mono font-bold mr-1 ${mutedInk}`}>
                   Sources:
                 </span>
                 {groundResult.sources.slice(0, 6).map((src) => (
@@ -771,7 +970,11 @@ export function TheBrainView() {
                     href={src.uri}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[10px] font-mono bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] text-emerald-700 dark:text-emerald-400 hover:border-emerald-500 px-2 py-0.5 rounded"
+                    className={`inline-flex items-center gap-1 text-[10px] font-mono border px-2 py-0.5 rounded ${
+                      isDark
+                        ? 'bg-[#141A32] border-[#232B4A] text-[#8FA6E8] hover:border-[#8FA6E8]'
+                        : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#1F3863] hover:border-[#1F3863]'
+                    }`}
                   >
                     <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                     <span className="max-w-[200px] truncate">{src.title}</span>
@@ -784,33 +987,37 @@ export function TheBrainView() {
       </section>
 
       {/* Consolidated Master Blueprint Explorer */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-zinc-200 dark:border-white/[0.08]">
+      <section className={`rounded-[10px] border p-5 ${surfaceCard}`}>
+        <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b ${isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'}`}>
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-              <Brain className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <div className={`inline-flex items-center gap-1.5 text-[11px] font-mono font-bold ${brandInk}`}>
+              <Brain className="w-3.5 h-3.5" strokeWidth={1.6} />
               <span>Consolidated Master Blueprint Explorer</span>
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+            <h2 className="text-base sm:text-lg font-bold mt-0.5">
               6 Capability Pillars &amp; 8-Vertical Agentic Core (Think · Learn · Solve)
             </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" strokeWidth={1.5} />
+              <Search className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${mutedInk}`} strokeWidth={1.5} />
               <input
                 type="text"
                 value={blueprintQuery}
                 onChange={(e) => setBlueprintQuery(e.target.value)}
                 placeholder="Query capabilities, SLAs, verticals..."
-                className="w-full pl-8 pr-8 py-1.5 text-xs bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                className={`w-full pl-8 pr-8 py-1.5 text-xs border rounded-lg focus:outline-none ${
+                  isDark
+                    ? 'bg-[#0B1020] border-[#232B4A] text-[#E7EBF5] placeholder:text-[#8D97B5] focus:border-[#8FA6E8]'
+                    : 'bg-[#FAF8F4] border-[#CFC8BC] text-[#16213A] placeholder:text-[#5F6576] focus:border-[#1F3863]'
+                }`}
               />
               {blueprintQuery && (
                 <button
                   type="button"
                   onClick={() => setBlueprintQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer ${mutedInk}`}
                   aria-label="Clear blueprint search"
                 >
                   <X className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -818,14 +1025,16 @@ export function TheBrainView() {
               )}
             </div>
 
-            <div className="inline-flex rounded-lg bg-zinc-100 dark:bg-[#18181B] p-1 border border-zinc-200 dark:border-white/[0.08]">
+            <div className={`inline-flex rounded-lg p-1 border ${recessedBox}`}>
               <button
                 type="button"
                 onClick={() => setBlueprintTab('pillars')}
-                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer ${
+                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer whitespace-nowrap ${
                   blueprintTab === 'pillars'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400'
+                    ? isDark
+                      ? 'bg-[#8FA6E8] text-[#0B1020]'
+                      : 'bg-[#1F3863] text-white'
+                    : mutedInk
                 }`}
               >
                 6 Capability Pillars
@@ -833,10 +1042,12 @@ export function TheBrainView() {
               <button
                 type="button"
                 onClick={() => setBlueprintTab('verticals')}
-                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer ${
+                className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer whitespace-nowrap ${
                   blueprintTab === 'verticals'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400'
+                    ? isDark
+                      ? 'bg-[#8FA6E8] text-[#0B1020]'
+                      : 'bg-[#1F3863] text-white'
+                    : mutedInk
                 }`}
               >
                 8 Agentic Verticals
@@ -850,25 +1061,25 @@ export function TheBrainView() {
             {filteredPillars.map((pillar) => (
               <article
                 key={pillar.id}
-                className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E10] p-4 flex flex-col justify-between"
+                className={`rounded-[10px] border p-4 flex flex-col justify-between ${recessedBox}`}
               >
                 <div>
                   <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">{pillar.code}</span>
-                    <span className="uppercase text-zinc-500 dark:text-zinc-400">{pillar.engine} engine</span>
+                    <span className={`font-bold ${brandInk}`}>{pillar.code}</span>
+                    <span className={mutedInk}>{pillar.engine} engine</span>
                   </div>
-                  <h3 className="font-bold text-sm sm:text-base text-zinc-950 dark:text-zinc-50 mt-1">
+                  <h3 className="font-bold text-sm sm:text-base mt-1">
                     {pillar.title}
                   </h3>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mt-1.5">
+                  <p className={`text-xs leading-relaxed mt-1.5 ${bodyInk}`}>
                     {pillar.summary}
                   </p>
-                  <div className="mt-3 text-[11px] font-mono text-emerald-700 dark:text-emerald-400">
+                  <div className={`mt-3 text-[11px] font-mono ${greenInk}`}>
                     {pillar.metrics.join(' · ')}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-white/[0.08] flex flex-wrap gap-1.5">
+                <div className={`mt-4 pt-3 border-t flex flex-wrap gap-1.5 ${isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'}`}>
                   {pillar.apps.map((appId) => {
                     const app = appMap[appId];
                     if (!app) return null;
@@ -880,8 +1091,12 @@ export function TheBrainView() {
                         onClick={() => toggleApp(appId)}
                         className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors cursor-pointer ${
                           active
-                            ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/50'
-                            : 'bg-white dark:bg-[#111315] text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-white/[0.1] hover:border-emerald-500/40'
+                            ? isDark
+                              ? 'bg-[#0F2A22] text-[#6FCB9F] border-[#6FCB9F]/50 font-bold'
+                              : 'bg-[#EBF6F0] text-[#1C6E46] border-[#1C6E46]/50 font-bold'
+                            : isDark
+                              ? 'bg-[#141A32] text-[#E7EBF5] border-[#232B4A] hover:border-[#8FA6E8]'
+                              : 'bg-[#FFFFFF] text-[#16213A] border-[#E4DFD6] hover:border-[#1F3863]'
                         }`}
                       >
                         {active ? '✓ ' : '+ '}
@@ -898,35 +1113,41 @@ export function TheBrainView() {
             {filteredVerticals.map((v) => (
               <article
                 key={v.id}
-                className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E10] p-4 space-y-2.5"
+                className={`rounded-[10px] border p-4 space-y-2.5 ${recessedBox}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-bold text-sm text-zinc-950 dark:text-zinc-50">{v.name}</h3>
-                  <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">
+                  <h3 className="font-bold text-sm">{v.name}</h3>
+                  <span className={`text-[10px] font-mono ${greenInk}`}>
                     {v.proof}
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                  <div className="bg-white dark:bg-[#111315] rounded-lg p-2.5 border border-zinc-200 dark:border-white/[0.08]">
-                    <div className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+                  <div className={`rounded-lg p-2.5 border ${surfaceCard}`}>
+                    <div className={`text-[10px] font-mono font-bold ${brandInk}`}>
                       1. Think
                     </div>
-                    <p className="text-zinc-600 dark:text-zinc-300 mt-1 leading-snug">{v.think}</p>
+                    <p className={`mt-1 leading-snug ${bodyInk}`}>{v.think}</p>
                   </div>
-                  <div className="bg-white dark:bg-[#111315] rounded-lg p-2.5 border border-zinc-200 dark:border-white/[0.08]">
-                    <div className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+                  <div className={`rounded-lg p-2.5 border ${surfaceCard}`}>
+                    <div className={`text-[10px] font-mono font-bold ${greenInk}`}>
                       2. Learn
                     </div>
-                    <p className="text-zinc-600 dark:text-zinc-300 mt-1 leading-snug">{v.learn}</p>
+                    <p className={`mt-1 leading-snug ${bodyInk}`}>{v.learn}</p>
                   </div>
-                  <div className="bg-white dark:bg-[#111315] rounded-lg p-2.5 border border-zinc-200 dark:border-white/[0.08]">
-                    <div className="text-[10px] font-mono font-bold text-zinc-900 dark:text-zinc-100 uppercase">
+                  <div className={`rounded-lg p-2.5 border ${surfaceCard}`}>
+                    <div className="text-[10px] font-mono font-bold">
                       3. Solve
                     </div>
-                    <p className="text-zinc-600 dark:text-zinc-300 mt-1 leading-snug">{v.solve}</p>
+                    <p className={`mt-1 leading-snug ${bodyInk}`}>{v.solve}</p>
                   </div>
                 </div>
-                <div className="text-[11px] font-mono text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                <div
+                  className={`text-[11px] font-mono rounded-lg px-2.5 py-1.5 border ${
+                    isDark
+                      ? 'bg-[#2A2112] border-[#E0B063]/35 text-[#E0B063]'
+                      : 'bg-[#FDF5E6] border-[#8A5C10]/30 text-[#8A5C10]'
+                  }`}
+                >
                   HITL Trigger: {v.hitlTrigger}
                 </div>
               </article>

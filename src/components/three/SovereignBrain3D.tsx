@@ -5,6 +5,7 @@ const LazySovereignBrain3DCanvas = React.lazy(() => import('./SovereignBrain3DCa
 
 interface SovereignBrain3DProps {
   compact?: boolean;
+  polarity?: 'light' | 'dark';
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
 }
@@ -14,10 +15,14 @@ interface ErrorBoundaryState {
 }
 
 class ThreeErrorBoundary extends Component<
-  { children: React.ReactNode; onSelectHub?: (hubId: string) => void },
+  { children: React.ReactNode; polarity?: 'light' | 'dark'; onSelectHub?: (hubId: string) => void },
   ErrorBoundaryState
 > {
-  constructor(props: { children: React.ReactNode; onSelectHub?: (hubId: string) => void }) {
+  constructor(props: {
+    children: React.ReactNode;
+    polarity?: 'light' | 'dark';
+    onSelectHub?: (hubId: string) => void;
+  }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -28,13 +33,30 @@ class ThreeErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      const isLight = this.props.polarity === 'light';
       return (
-        <div className="w-full min-h-[420px] rounded-xl bg-[#07130F] text-white p-6 flex flex-col justify-center items-center text-center">
-          <div className="text-xs font-mono uppercase tracking-wider text-[#6EE7B7] mb-1">
+        <div
+          className={`w-full min-h-[420px] rounded-[10px] p-6 flex flex-col justify-center items-center text-center ${
+            isLight
+              ? 'bg-[#F2EFE9] text-[#16213A]'
+              : 'bg-[#0B1020] text-[#E7EBF5]'
+          }`}
+        >
+          <div
+            className={`text-xs font-mono font-semibold mb-1 ${
+              isLight ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
+            }`}
+          >
             3D WebGL Renderer Unavailable
           </div>
-          <h3 className="text-base font-bold">Spenta Sovereign Neural Core (Interactive Fallback)</h3>
-          <p className="text-xs text-slate-300 mt-1 max-w-md">
+          <h3 className="text-base font-bold">
+            Spenta Sovereign Neural Core (Interactive Fallback)
+          </h3>
+          <p
+            className={`text-xs mt-1 max-w-md ${
+              isLight ? 'text-[#4A5163]' : 'text-[#C3CCE4]'
+            }`}
+          >
             Select any of the 8 Sovereign Brain hubs below to inspect capabilities and toggle modules.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 w-full max-w-2xl">
@@ -43,10 +65,20 @@ class ThreeErrorBoundary extends Component<
                 key={hub.id}
                 type="button"
                 onClick={() => this.props.onSelectHub?.(hub.id)}
-                className="p-2.5 rounded-lg bg-[#0C1F18] border border-emerald-800/60 hover:border-[#1EB56A] text-left cursor-pointer"
+                className={`p-2.5 rounded-lg border text-left cursor-pointer transition-colors ${
+                  isLight
+                    ? 'bg-[#FFFFFF] border-[#E4DFD6] hover:border-[#1F3863] text-[#16213A]'
+                    : 'bg-[#141A32] border-[#232B4A] hover:border-[#8FA6E8] text-[#E7EBF5]'
+                }`}
               >
-                <div className="text-[10px] font-mono text-[#6EE7B7]">HUB {hub.num}</div>
-                <div className="text-xs font-semibold text-white mt-0.5">{hub.label}</div>
+                <div
+                  className={`text-[10px] font-mono font-bold ${
+                    isLight ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
+                  }`}
+                >
+                  HUB {hub.num}
+                </div>
+                <div className="text-xs font-semibold mt-0.5">{hub.label}</div>
               </button>
             ))}
           </div>
@@ -58,12 +90,23 @@ class ThreeErrorBoundary extends Component<
 }
 
 export function SovereignBrain3D(props: SovereignBrain3DProps) {
+  const isLight = props.polarity === 'light';
   return (
-    <ThreeErrorBoundary onSelectHub={props.onSelectHub}>
+    <ThreeErrorBoundary polarity={props.polarity} onSelectHub={props.onSelectHub}>
       <Suspense
         fallback={
-          <div className="w-full h-full min-h-[420px] rounded-xl bg-[#07130F] text-slate-300 flex flex-col items-center justify-center gap-2 font-mono text-xs">
-            <div className="w-8 h-8 rounded-full border-2 border-[#1EB56A] border-t-transparent animate-spin" />
+          <div
+            className={`w-full h-full min-h-[420px] rounded-[10px] flex flex-col items-center justify-center gap-2 font-mono text-xs ${
+              isLight
+                ? 'bg-[#F2EFE9] text-[#4A5163]'
+                : 'bg-[#0B1020] text-[#C3CCE4]'
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full border-2 border-t-transparent animate-spin ${
+                isLight ? 'border-[#1F3863]' : 'border-[#8FA6E8]'
+              }`}
+            />
             <span>Initializing 3D Sovereign Neural Core…</span>
           </div>
         }

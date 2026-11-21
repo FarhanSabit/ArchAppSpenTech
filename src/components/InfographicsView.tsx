@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Code2,
   Download,
   GitBranch,
+  Image as ImageIcon,
   ImageOff,
   Layers,
   Maximize2,
+  Moon,
   Printer,
+  Sun,
   X,
   ZoomIn,
   ZoomOut,
@@ -16,9 +20,14 @@ import captivePlate from '../assets/images/spenta_captive_ecosystem_plate_179517
 import financialsPlate from '../assets/images/spenta_financials_plate_1795170783795.jpg';
 import { useStack } from '../store/StackContext';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
+import {
+  InteractiveInfographicPlate,
+  OitsPlateId,
+  exportPlateSvg,
+} from './InteractiveInfographicPlates';
 
 interface InfographicPlate {
-  id: 'ai-brain' | 'l1-l6-stack' | 'captive-ecosystem' | 'financial-edge';
+  id: OitsPlateId;
   legacyId: string;
   plateNumber: string;
   tag: string;
@@ -27,6 +36,7 @@ interface InfographicPlate {
   highlights: string[];
   imageUrl: string;
   filename: string;
+  svgFilename: string;
 }
 
 const INFOGRAPHIC_PLATES: InfographicPlate[] = [
@@ -41,6 +51,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['Zero Cloud PII Egress', '0.88 Confidence HITL Gate', 'San Jose · Australia · Dhaka'],
     imageUrl: aiBrainPlate,
     filename: 'spenta-plate-01-sovereign-ai-brain.jpg',
+    svgFilename: 'spenta-plate-01-oitsdhaka-brain.svg',
   },
   {
     id: 'l1-l6-stack',
@@ -53,6 +64,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['Tier 1–4 ($3.2K–$15.3K)', 'Tier 3 Baseline $7.5K–$8.5K', '<50ms Edge Inference'],
     imageUrl: l1L6Plate,
     filename: 'spenta-plate-02-l1-l6-sovereign-stack.jpg',
+    svgFilename: 'spenta-plate-02-oitsdhaka-l1-l6-stack.svg',
   },
   {
     id: 'captive-ecosystem',
@@ -65,6 +77,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['65+ Retail Showrooms', '80 BaaS Stations / 480 EVs', 'Live Sister-Entity Proof'],
     imageUrl: captivePlate,
     filename: 'spenta-plate-03-captive-ecosystem-synergies.jpg',
+    svgFilename: 'spenta-plate-03-oitsdhaka-captive-synergies.svg',
   },
   {
     id: 'financial-edge',
@@ -77,15 +90,34 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['$500K SAFE · $4.5M Cap', '6.38× 5-Yr Net Return', '40%–60% Cost Advantage'],
     imageUrl: financialsPlate,
     filename: 'spenta-plate-04-financial-trajectory-dual-shore.jpg',
+    svgFilename: 'spenta-plate-04-oitsdhaka-financial-edge.svg',
   },
 ];
 
 export function InfographicsView() {
-  const { pendingNavFocus, clearPendingNavFocus } = useStack();
+  const { theme, pendingNavFocus, clearPendingNavFocus } = useStack();
   const [viewMode, setViewMode] = useState<'all' | 'pathway' | 'plates'>('all');
+  const [platePolarity, setPlatePolarity] = useState<'light' | 'dark'>(theme);
+  const [globalRenderMode, setGlobalRenderMode] = useState<'code' | 'static'>('code');
+  const [plateModeOverrides, setPlateModeOverrides] = useState<
+    Partial<Record<OitsPlateId, 'code' | 'static'>>
+  >({});
   const [lightboxItem, setLightboxItem] = useState<InfographicPlate | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  const svgRefs: Record<OitsPlateId, React.RefObject<SVGSVGElement | null>> = {
+    'ai-brain': useRef<SVGSVGElement | null>(null),
+    'l1-l6-stack': useRef<SVGSVGElement | null>(null),
+    'captive-ecosystem': useRef<SVGSVGElement | null>(null),
+    'financial-edge': useRef<SVGSVGElement | null>(null),
+  };
+  const lightboxSvgRef = useRef<SVGSVGElement | null>(null);
+
+  // Sync local OITS Dhaka polarity whenever the user flips the global portal theme
+  useEffect(() => {
+    setPlatePolarity(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'infographic') {
@@ -109,7 +141,29 @@ export function InfographicsView() {
     return () => window.removeEventListener('keydown', onKey);
   }, [lightboxItem]);
 
-  const downloadPlate = (plate: InfographicPlate) => {
+  const getPlateMode = (id: OitsPlateId): 'code' | 'static' =>
+    plateModeOverrides[id] ?? globalRenderMode;
+
+  const setAllPlatesMode = (mode: 'code' | 'static') => {
+    setGlobalRenderMode(mode);
+    setPlateModeOverrides({});
+  };
+
+  const toggleSinglePlateMode = (id: OitsPlateId) => {
+    const current = getPlateMode(id);
+    setPlateModeOverrides((prev) => ({
+      ...prev,
+      [id]: current === 'code' ? 'static' : 'code',
+    }));
+  };
+
+  const downloadPlate = (plate: InfographicPlate, fromLightbox = false) => {
+    const mode = getPlateMode(plate.id);
+    if (mode === 'code') {
+      const targetSvg = fromLightbox ? lightboxSvgRef.current : svgRefs[plate.id].current;
+      exportPlateSvg(targetSvg, plate.svgFilename);
+      return;
+    }
     const link = document.createElement('a');
     link.href = plate.imageUrl;
     link.download = plate.filename;
@@ -118,71 +172,168 @@ export function InfographicsView() {
     document.body.removeChild(link);
   };
 
+  const isDark = platePolarity === 'dark';
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      {/* OITS Dhaka Editorial Header */}
+      <section
+        className={`rounded-[10px] border p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors ${
+          isDark
+            ? 'bg-[#0F1529] border-[#232B4A] text-[#E7EBF5]'
+            : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#16213A]'
+        }`}
+      >
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
-            CODE-DRAWN INTERACTIVE PATHWAY &amp; BOARDROOM VISUAL PLATES
+          <div
+            className={`text-[11px] font-mono font-semibold ${
+              isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]'
+            }`}
+          >
+            OITS Dhaka Swiss Editorial Edition · Interactive Code Plates &amp; Branching Pathway
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
-            Infographics — Interactive Architecture Pathway &amp; Visual Gallery
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-balance">
+            Infographics — Code-Drawn Architectural Plates &amp; Interactive Pathway
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-2xl">
-            Explore the code-drawn OITS Dhaka × roadmap.sh branching architecture diagram with live Stack Composer sync, or inspect and download high-resolution 16:9 investor presentation plates.
+          <p
+            className={`text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed ${
+              isDark ? 'text-[#C3CCE4]' : 'text-[#4A5163]'
+            }`}
+          >
+            Inspect all four executive plates as live, clickable OITS Dhaka vector schematics synced directly to your Stack Composer—or toggle to the original static JPG raster plates at any time.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 no-print">
+          {/* View Mode Filter */}
           <div
             role="group"
             aria-label="Infographics display mode"
-            className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+            className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
+              isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
+            }`}
+          >
+            {(
+              [
+                { id: 'all', label: 'All Views', icon: null },
+                { id: 'pathway', label: 'Pathway', icon: GitBranch },
+                { id: 'plates', label: '4 Plates', icon: Layers },
+              ] as const
+            ).map((opt) => {
+              const active = viewMode === opt.id;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setViewMode(opt.id)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    active
+                      ? isDark
+                        ? 'bg-[#8FA6E8] text-[#0B1020]'
+                        : 'bg-[#1F3863] text-white'
+                      : isDark
+                        ? 'text-[#8D97B5] hover:text-[#E7EBF5]'
+                        : 'text-[#4A5163] hover:text-[#16213A]'
+                  }`}
+                >
+                  {Icon && <Icon className="w-3.5 h-3.5" strokeWidth={1.6} />}
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Code SVG vs Static JPG Global Toggle */}
+          <div
+            role="group"
+            aria-label="Plate render mode"
+            className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
+              isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
+            }`}
           >
             <button
               type="button"
-              onClick={() => setViewMode('all')}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                viewMode === 'all'
-                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+              onClick={() => setAllPlatesMode('code')}
+              aria-pressed={globalRenderMode === 'code'}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                globalRenderMode === 'code'
+                  ? isDark
+                    ? 'bg-[#6FCB9F] text-[#0B1020]'
+                    : 'bg-[#1C6E46] text-white'
+                  : isDark
+                    ? 'text-[#8D97B5] hover:text-[#E7EBF5]'
+                    : 'text-[#4A5163] hover:text-[#16213A]'
               }`}
             >
-              All Views
+              <Code2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Interactive Code</span>
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('pathway')}
+              onClick={() => setAllPlatesMode('static')}
+              aria-pressed={globalRenderMode === 'static'}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                viewMode === 'pathway'
-                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                globalRenderMode === 'static'
+                  ? isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020]'
+                    : 'bg-[#1F3863] text-white'
+                  : isDark
+                    ? 'text-[#8D97B5] hover:text-[#E7EBF5]'
+                    : 'text-[#4A5163] hover:text-[#16213A]'
               }`}
             >
-              <GitBranch className="w-3.5 h-3.5" strokeWidth={1.6} />
-              <span>Interactive Pathway</span>
+              <ImageIcon className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Static JPG</span>
+            </button>
+          </div>
+
+          {/* Local OITS Dhaka Stone Light / Nocturnal Dark Polarity Toggle */}
+          <div
+            role="group"
+            aria-label="OITS Dhaka plate theme polarity"
+            className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
+              isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setPlatePolarity('light')}
+              aria-pressed={!isDark}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                !isDark
+                  ? 'bg-[#1F3863] text-white'
+                  : 'text-[#8D97B5] hover:text-[#E7EBF5]'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Stone</span>
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('plates')}
+              onClick={() => setPlatePolarity('dark')}
+              aria-pressed={isDark}
               className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                viewMode === 'plates'
-                  ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                isDark
+                  ? 'bg-[#8FA6E8] text-[#0B1020]'
+                  : 'text-[#4A5163] hover:text-[#16213A]'
               }`}
             >
-              <Layers className="w-3.5 h-3.5" strokeWidth={1.6} />
-              <span>4 Visual Plates</span>
+              <Moon className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Nocturnal</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+              isDark
+                ? 'bg-[#E7EBF5] text-[#0B1020] hover:bg-white'
+                : 'bg-[#16213A] text-white hover:bg-[#1F3863]'
+            }`}
           >
-            <Printer className="w-4 h-4" strokeWidth={1.5} />
+            <Printer className="w-3.5 h-3.5" strokeWidth={1.6} />
             <span>Print Gallery</span>
           </button>
         </div>
@@ -190,125 +341,241 @@ export function InfographicsView() {
 
       {/* Live Code-Drawn OITS Dhaka × roadmap.sh Interactive Architecture Pathway */}
       {(viewMode === 'all' || viewMode === 'pathway') && (
-        <InteractiveArchitecturePathway defaultExpandedTrunks={['trunk-core', 'trunk-ops']} />
+        <InteractiveArchitecturePathway
+          defaultExpandedTrunks={['trunk-core', 'trunk-ops']}
+          syncedPolarity={platePolarity}
+          onPolarityChange={setPlatePolarity}
+        />
       )}
 
-      {/* 2x2 Responsive Static 16:9 Plate Grid */}
+      {/* 2x2 OITS Dhaka Interactive Code / Static JPG Plate Grid */}
       {(viewMode === 'all' || viewMode === 'plates') && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {INFOGRAPHIC_PLATES.map((plate) => {
-          const isBroken = Boolean(failedImages[plate.id]);
-          return (
-            <article
-              key={plate.id}
-              className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-hidden flex flex-col transition-colors hover:border-emerald-500/40"
-            >
-              <div className="px-5 py-4 border-b border-zinc-200/80 dark:border-white/[0.08] flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.14em]">
-                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                      {plate.plateNumber}
-                    </span>
-                    <span className="text-zinc-300 dark:text-zinc-700">·</span>
-                    <span className="text-zinc-500 dark:text-zinc-400">{plate.tag}</span>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {INFOGRAPHIC_PLATES.map((plate) => {
+            const mode = getPlateMode(plate.id);
+            const isBroken = Boolean(failedImages[plate.id]);
+
+            return (
+              <article
+                key={plate.id}
+                className={`rounded-[10px] border overflow-hidden flex flex-col transition-colors ${
+                  isDark
+                    ? 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5]'
+                    : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#16213A]'
+                }`}
+              >
+                <div
+                  className={`px-5 py-4 border-b flex items-start justify-between gap-3 ${
+                    isDark ? 'border-[#232B4A] bg-[#0F1529]' : 'border-[#E4DFD6] bg-[#FAF8F4]'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                      <span
+                        className={`font-bold ${isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]'}`}
+                      >
+                        {plate.plateNumber}
+                      </span>
+                      <span className={isDark ? 'text-[#34416E]' : 'text-[#CFC8BC]'}>·</span>
+                      <span className={isDark ? 'text-[#8D97B5]' : 'text-[#5F6576]'}>
+                        {plate.tag}
+                      </span>
+                      <span className={isDark ? 'text-[#34416E]' : 'text-[#CFC8BC]'}>·</span>
+                      <span
+                        className={
+                          mode === 'code'
+                            ? isDark
+                              ? 'text-[#6FCB9F] font-semibold'
+                              : 'text-[#1C6E46] font-semibold'
+                            : isDark
+                              ? 'text-[#8D97B5]'
+                              : 'text-[#5F6576]'
+                        }
+                      >
+                        {mode === 'code' ? 'Interactive Vector SVG' : 'Static JPG Plate'}
+                      </span>
+                    </div>
+                    <h2 className="font-bold text-sm sm:text-base mt-1 leading-snug text-balance">
+                      {plate.title}
+                    </h2>
+                    <p
+                      className={`text-xs mt-1 leading-relaxed ${
+                        isDark ? 'text-[#C3CCE4]' : 'text-[#4A5163]'
+                      }`}
+                    >
+                      {plate.subtitle}
+                    </p>
                   </div>
-                  <h2 className="font-bold text-sm sm:text-base text-zinc-950 dark:text-zinc-50 mt-1 leading-snug">
-                    {plate.title}
-                  </h2>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
-                    {plate.subtitle}
-                  </p>
+
+                  <div className="flex items-center gap-1.5 shrink-0 no-print">
+                    <button
+                      type="button"
+                      onClick={() => toggleSinglePlateMode(plate.id)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                        isDark
+                          ? 'bg-[#141A32] border-[#2E3862] text-[#E7EBF5] hover:border-[#8FA6E8]'
+                          : 'bg-[#FFFFFF] border-[#CFC8BC] text-[#16213A] hover:border-[#1F3863]'
+                      }`}
+                      title={mode === 'code' ? 'Switch to static JPG plate' : 'Switch to interactive code plate'}
+                    >
+                      {mode === 'code' ? (
+                        <>
+                          <ImageIcon className="w-3.5 h-3.5" strokeWidth={1.6} />
+                          <span>JPG</span>
+                        </>
+                      ) : (
+                        <>
+                          <Code2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+                          <span>Code</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => downloadPlate(plate)}
+                      className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                        isDark
+                          ? 'border-[#2E3862] text-[#C3CCE4] hover:border-[#8FA6E8] hover:text-white'
+                          : 'border-[#CFC8BC] text-[#4A5163] hover:border-[#1F3863] hover:text-[#16213A]'
+                      }`}
+                      title={mode === 'code' ? 'Export interactive SVG' : 'Download high-res JPG'}
+                      aria-label={`Download ${plate.title}`}
+                    >
+                      <Download className="w-4 h-4" strokeWidth={1.5} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setZoom(1);
+                        setLightboxItem(plate);
+                      }}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isDark
+                          ? 'bg-[#8FA6E8] text-[#0B1020] hover:bg-[#7FA6FF]'
+                          : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
+                      }`}
+                      title="Inspect full-screen"
+                      aria-label={`Inspect ${plate.title} in lightbox`}
+                    >
+                      <Maximize2 className="w-4 h-4" strokeWidth={1.5} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0 no-print">
-                  <button
-                    type="button"
-                    onClick={() => downloadPlate(plate)}
-                    className="p-2 rounded-lg border border-zinc-200 dark:border-white/[0.1] text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:border-emerald-500/50 transition-colors cursor-pointer"
-                    title="Download high-resolution plate"
-                    aria-label={`Download ${plate.title}`}
+                {/* Interactive Code-Drawn SVG Plate OR Static JPG Raster Plate */}
+                {mode === 'code' ? (
+                  <InteractiveInfographicPlate
+                    plateId={plate.id}
+                    polarity={platePolarity}
+                    svgRef={svgRefs[plate.id]}
+                  />
+                ) : (
+                  <div
+                    onClick={() => {
+                      setZoom(1);
+                      setLightboxItem(plate);
+                    }}
+                    className="relative aspect-video bg-[#09090B] overflow-hidden cursor-zoom-in group"
                   >
-                    <Download className="w-4 h-4" strokeWidth={1.5} />
-                  </button>
+                    {!isBroken ? (
+                      <img
+                        src={plate.imageUrl}
+                        alt={plate.title}
+                        loading="lazy"
+                        onError={() => setFailedImages((prev) => ({ ...prev, [plate.id]: true }))}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.015]"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-[#0B1020]">
+                        <ImageOff className="w-7 h-7 text-[#8FA6E8] mb-2" strokeWidth={1.5} />
+                        <div className="text-xs font-mono text-[#8FA6E8]">
+                          {plate.plateNumber} · {plate.tag}
+                        </div>
+                        <div className="text-sm font-bold text-white mt-1 max-w-md">
+                          {plate.title}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quiet Unboxed Footer Metadata Strip */}
+                <div
+                  className={`px-5 py-2.5 border-t flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono ${
+                    isDark
+                      ? 'border-[#232B4A] bg-[#0B1020] text-[#8D97B5]'
+                      : 'border-[#E4DFD6] bg-[#FAF8F4] text-[#5F6576]'
+                  }`}
+                >
+                  <span>{plate.highlights.join(' · ')}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setZoom(1);
                       setLightboxItem(plate);
                     }}
-                    className="p-2 rounded-lg bg-zinc-100 dark:bg-white/[0.06] text-zinc-800 dark:text-zinc-200 hover:bg-emerald-500 hover:text-zinc-950 transition-colors cursor-pointer"
-                    title="Inspect full-screen"
-                    aria-label={`Zoom ${plate.title}`}
+                    className={`font-semibold hover:underline cursor-pointer no-print ${
+                      isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]'
+                    }`}
                   >
-                    <Maximize2 className="w-4 h-4" strokeWidth={1.5} />
+                    Open Interactive Lightbox →
                   </button>
                 </div>
-              </div>
-
-              {/* 16:9 High-Res Presentation Plate Frame */}
-              <div
-                onClick={() => {
-                  setZoom(1);
-                  setLightboxItem(plate);
-                }}
-                className="relative aspect-video bg-[#09090B] overflow-hidden cursor-zoom-in group"
-              >
-                {!isBroken ? (
-                  <img
-                    src={plate.imageUrl}
-                    alt={plate.title}
-                    loading="lazy"
-                    onError={() => setFailedImages((prev) => ({ ...prev, [plate.id]: true }))}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.015]"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-obsidian-grid">
-                    <ImageOff className="w-7 h-7 text-emerald-500 mb-2" strokeWidth={1.5} />
-                    <div className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
-                      {plate.plateNumber} · {plate.tag}
-                    </div>
-                    <div className="text-sm font-bold text-white mt-1 max-w-md">{plate.title}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer Metadata Strip */}
-              <div className="px-5 py-2.5 border-t border-zinc-200/80 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0C0E10] flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
-                <span>{plate.highlights.join(' · ')}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setZoom(1);
-                    setLightboxItem(plate);
-                  }}
-                  className="text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer no-print"
-                >
-                  Open Lightbox →
-                </button>
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })}
         </div>
       )}
 
-      {/* Full-Screen Zoom Lightbox */}
+      {/* Full-Screen Interactive Lightbox (Supports both Code SVG & Static JPG) */}
       {lightboxItem && (
         <div
-          className="fixed inset-0 z-50 bg-zinc-950/92 backdrop-blur-sm flex flex-col p-3 sm:p-6"
+          className="fixed inset-0 z-50 bg-[#0B1020]/94 backdrop-blur-sm flex flex-col p-3 sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label={lightboxItem.title}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 text-white mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-[#E7EBF5] mb-4">
             <div className="min-w-0">
-              <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-[0.14em]">
-                {lightboxItem.plateNumber} · {lightboxItem.tag}
+              <div className="text-[10px] font-mono text-[#8FA6E8]">
+                {lightboxItem.plateNumber} · {lightboxItem.tag} ·{' '}
+                {getPlateMode(lightboxItem.id) === 'code'
+                  ? 'Interactive Vector Plate'
+                  : 'Static JPG Plate'}
               </div>
               <h3 className="text-sm sm:text-lg font-bold truncate">{lightboxItem.title}</h3>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => toggleSinglePlateMode(lightboxItem.id)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#141A32] border border-[#2E3862] hover:border-[#8FA6E8] text-xs font-semibold text-[#E7EBF5] cursor-pointer whitespace-nowrap"
+              >
+                {getPlateMode(lightboxItem.id) === 'code' ? (
+                  <>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>View Static JPG</span>
+                  </>
+                ) : (
+                  <>
+                    <Code2 className="w-3.5 h-3.5" />
+                    <span>View Interactive Code</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPlatePolarity((v) => (v === 'light' ? 'dark' : 'light'))}
+                className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg bg-[#141A32] border border-[#2E3862] hover:border-[#8FA6E8] text-xs font-semibold text-[#E7EBF5] cursor-pointer whitespace-nowrap"
+              >
+                {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                <span>{isDark ? 'Stone' : 'Nocturnal'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.max(0.75, Number((z - 0.25).toFixed(2))))}
@@ -317,7 +584,7 @@ export function InfographicsView() {
               >
                 <ZoomOut className="w-4 h-4" strokeWidth={1.5} />
               </button>
-              <span className="font-mono text-xs w-12 text-center tabular-nums text-zinc-200">
+              <span className="font-mono text-xs w-12 text-center tabular-nums text-[#C3CCE4]">
                 {Math.round(zoom * 100)}%
               </span>
               <button
@@ -330,16 +597,18 @@ export function InfographicsView() {
               </button>
               <button
                 type="button"
-                onClick={() => downloadPlate(lightboxItem)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs cursor-pointer"
+                onClick={() => downloadPlate(lightboxItem, true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#6FCB9F] hover:bg-[#82D7AE] text-[#0B1020] font-semibold text-xs cursor-pointer whitespace-nowrap"
               >
                 <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
-                <span className="hidden sm:inline">Save Plate</span>
+                <span className="hidden sm:inline">
+                  {getPlateMode(lightboxItem.id) === 'code' ? 'Export SVG' : 'Save JPG'}
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setLightboxItem(null)}
-                className="p-2 rounded-lg bg-white/10 hover:bg-[#E11D48] text-white cursor-pointer"
+                className="p-2 rounded-lg bg-white/10 hover:bg-[#BF000F] text-white cursor-pointer"
                 aria-label="Close lightbox"
               >
                 <X className="w-4 h-4" strokeWidth={1.75} />
@@ -348,7 +617,7 @@ export function InfographicsView() {
           </div>
 
           <div
-            className="flex-1 overflow-auto rounded-2xl bg-[#09090B] border border-white/10 p-3 sm:p-5 flex items-center justify-center"
+            className="flex-1 overflow-auto rounded-xl bg-[#0F1529] border border-[#232B4A] p-3 sm:p-5 flex items-center justify-center"
             onClick={(e) => {
               if (e.target === e.currentTarget) setLightboxItem(null);
             }}
@@ -356,15 +625,25 @@ export function InfographicsView() {
             <div
               style={{
                 width: `${Math.round(zoom * 100)}%`,
-                maxWidth: `${Math.round(zoom * 1280)}px`,
+                maxWidth: `${Math.round(zoom * 1160)}px`,
               }}
               className="transition-all duration-150"
             >
-              <img
-                src={lightboxItem.imageUrl}
-                alt={lightboxItem.title}
-                className="w-full h-auto rounded-xl border border-white/10 shadow-2xl"
-              />
+              {getPlateMode(lightboxItem.id) === 'code' ? (
+                <div className="rounded-xl overflow-hidden border border-[#2E3862] shadow-2xl">
+                  <InteractiveInfographicPlate
+                    plateId={lightboxItem.id}
+                    polarity={platePolarity}
+                    svgRef={lightboxSvgRef}
+                  />
+                </div>
+              ) : (
+                <img
+                  src={lightboxItem.imageUrl}
+                  alt={lightboxItem.title}
+                  className="w-full h-auto rounded-xl border border-white/10 shadow-2xl"
+                />
+              )}
             </div>
           </div>
         </div>

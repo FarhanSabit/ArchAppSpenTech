@@ -8,12 +8,13 @@ import { useStack } from '../../store/StackContext';
 
 interface SovereignBrain3DCanvasProps {
   compact?: boolean;
+  polarity?: 'light' | 'dark';
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
 }
 
 type CameraPreset = 'overview' | 'operations' | 'experience' | 'top';
-type MaterialFinish = 'obsidian' | 'heritage';
+type MaterialFinish = 'heritage-light' | 'heritage-dark' | 'obsidian';
 
 interface HubNodeMeta {
   hubId: string;
@@ -41,16 +42,48 @@ interface ProjectedCallout {
 const _packetPos = new THREE.Vector3();
 const _worldPos = new THREE.Vector3();
 const _projVec = new THREE.Vector3();
-const _emeraldColor = new THREE.Color('#1EB56A');
-const _amberColor = new THREE.Color('#F59E0B');
-const _obsidianBg = new THREE.Color('#07130F');
-const _heritageBg = new THREE.Color('#0E162B');
-const _obsidianRim = new THREE.Color('#14B8A6');
-const _heritageRim = new THREE.Color('#7FA6FF');
-const _obsidianMetal = new THREE.Color('#D1FAE5');
-const _heritageMetal = new THREE.Color('#DCE5FA');
-const _obsidianGlass = new THREE.Color('#0D2F22');
-const _heritageGlass = new THREE.Color('#1F3863');
+
+// Semantic OPA gate colors
+const _passLightColor = new THREE.Color('#1C6E46');
+const _passDarkColor = new THREE.Color('#6FCB9F');
+const _passObsidianColor = new THREE.Color('#1EB56A');
+const _holdLightColor = new THREE.Color('#B45309');
+const _holdDarkColor = new THREE.Color('#E0B063');
+
+// Three-way Studio Finish Palettes (Warm Stone Light, Nocturnal Navy Dark, Obsidian Ti)
+const _bgHeritageLight = new THREE.Color('#F2EFE9');
+const _bgHeritageDark = new THREE.Color('#0B1020');
+const _bgObsidian = new THREE.Color('#07130F');
+
+const _rimHeritageLight = new THREE.Color('#3B66B0');
+const _rimHeritageDark = new THREE.Color('#7FA6FF');
+const _rimObsidian = new THREE.Color('#14B8A6');
+
+const _hemiSkyLight = new THREE.Color('#FFFFFF');
+const _hemiGroundLight = new THREE.Color('#D7D0C4');
+const _hemiSkyDark = new THREE.Color('#9BB4F0');
+const _hemiGroundDark = new THREE.Color('#090E1C');
+const _hemiSkyObsidian = new THREE.Color('#99F6E4');
+const _hemiGroundObsidian = new THREE.Color('#051A13');
+
+const _metalHeritageLight = new THREE.Color('#1F3863');
+const _metalHeritageDark = new THREE.Color('#B8C9F5');
+const _metalObsidian = new THREE.Color('#D1FAE5');
+
+const _glassLeftLight = new THREE.Color('#DCE6F5');
+const _glassRightLight = new THREE.Color('#D4ECE4');
+const _glassLeftDark = new THREE.Color('#1C3159');
+const _glassRightDark = new THREE.Color('#143839');
+const _glassLeftObsidian = new THREE.Color('#0D2F22');
+const _glassRightObsidian = new THREE.Color('#0B2C2B');
+
+const _pedestalLight = new THREE.Color('#E6E1D8');
+const _pedestalDark = new THREE.Color('#141C36');
+const _pedestalObsidian = new THREE.Color('#0F231B');
+
+const _packetLight = new THREE.Color('#1F3863');
+const _packetDark = new THREE.Color('#8FA6E8');
+const _packetObsidian = new THREE.Color('#A7F3D0');
 
 const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
   overview: { pos: [0, 2.35, 10.2], target: [0, -0.1, 0] },
@@ -66,10 +99,10 @@ function createProceduralCircuitTexture(maxAnisotropy: number): THREE.CanvasText
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#091A14';
+  ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, size, size);
 
-  ctx.strokeStyle = 'rgba(30, 181, 106, 0.26)';
+  ctx.strokeStyle = 'rgba(31, 56, 99, 0.24)';
   ctx.lineWidth = 2;
   for (let r = 46; r <= 236; r += 38) {
     ctx.beginPath();
@@ -77,7 +110,7 @@ function createProceduralCircuitTexture(maxAnisotropy: number): THREE.CanvasText
     ctx.stroke();
   }
 
-  ctx.strokeStyle = 'rgba(20, 184, 166, 0.24)';
+  ctx.strokeStyle = 'rgba(28, 110, 70, 0.22)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 16; i++) {
     const a = (i / 16) * Math.PI * 2;
@@ -86,7 +119,7 @@ function createProceduralCircuitTexture(maxAnisotropy: number): THREE.CanvasText
     ctx.lineTo(size / 2 + Math.cos(a) * 238, size / 2 + Math.sin(a) * 238);
     ctx.stroke();
 
-    ctx.fillStyle = i % 2 === 0 ? '#1EB56A' : '#14B8A6';
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(31, 56, 99, 0.55)' : 'rgba(28, 110, 70, 0.55)';
     ctx.beginPath();
     ctx.arc(size / 2 + Math.cos(a) * 198, size / 2 + Math.sin(a) * 198, 3.2, 0, Math.PI * 2);
     ctx.fill();
@@ -139,9 +172,9 @@ function createContactShadowTexture(): THREE.CanvasTexture {
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   const grad = ctx.createRadialGradient(size / 2, size / 2, 12, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, 'rgba(0, 0, 0, 0.72)');
-  grad.addColorStop(0.5, 'rgba(2, 10, 8, 0.32)');
-  grad.addColorStop(1, 'rgba(7, 19, 15, 0)');
+  grad.addColorStop(0, 'rgba(11, 16, 32, 0.58)');
+  grad.addColorStop(0.5, 'rgba(22, 33, 58, 0.24)');
+  grad.addColorStop(1, 'rgba(22, 33, 58, 0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
@@ -152,6 +185,7 @@ function createContactShadowTexture(): THREE.CanvasTexture {
 
 export default function SovereignBrain3DCanvas({
   compact = false,
+  polarity = 'dark',
   onSelectHub,
   selectedHubId = null,
 }: SovereignBrain3DCanvasProps) {
@@ -162,7 +196,9 @@ export default function SovereignBrain3DCanvas({
   const [contextLost, setContextLost] = useState(false);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [activePreset, setActivePreset] = useState<CameraPreset>('overview');
-  const [materialFinish, setMaterialFinish] = useState<MaterialFinish>('obsidian');
+  const [materialFinish, setMaterialFinish] = useState<MaterialFinish>(
+    polarity === 'light' ? 'heritage-light' : 'heritage-dark',
+  );
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
@@ -172,6 +208,14 @@ export default function SovereignBrain3DCanvas({
   const pendingPulseHubRef = useRef<string | null>(null);
   const targetCamPosRef = useRef<THREE.Vector3 | null>(null);
   const targetLookAtRef = useRef<THREE.Vector3 | null>(null);
+
+  // Sync OITS Heritage Light <-> Nocturnal Dark finish automatically with parent polarity toggle
+  useEffect(() => {
+    setMaterialFinish((prev) => {
+      if (prev === 'obsidian') return prev;
+      return polarity === 'light' ? 'heritage-light' : 'heritage-dark';
+    });
+  }, [polarity]);
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -252,7 +296,6 @@ export default function SovereignBrain3DCanvas({
     const container = mountRef.current;
     if (!container) return;
 
-    // Detect software WebGL from GPU renderer string
     const isSoftwareGl = (() => {
       try {
         const probeCanvas = document.createElement('canvas');
@@ -283,7 +326,7 @@ export default function SovereignBrain3DCanvas({
     renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(container.clientWidth || 640, container.clientHeight || 460);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 1.1;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -297,9 +340,14 @@ export default function SovereignBrain3DCanvas({
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
 
     const scene = new THREE.Scene();
-    const bgColor = new THREE.Color('#07130F');
-    scene.background = bgColor;
-    const fog = new THREE.FogExp2('#07130F', 0.04);
+    const initialBg =
+      finishRef.current === 'heritage-light'
+        ? _bgHeritageLight.clone()
+        : finishRef.current === 'obsidian'
+          ? _bgObsidian.clone()
+          : _bgHeritageDark.clone();
+    scene.background = initialBg;
+    const fog = new THREE.FogExp2(initialBg.getHex(), 0.036);
     scene.fog = fog;
 
     // Mandatory Studio PBR Environment Reflection for Brushed Metal & Frosted Glass
@@ -344,10 +392,10 @@ export default function SovereignBrain3DCanvas({
     controls.addEventListener('end', onControlEnd);
 
     // 3-Point Warm/Cool Studio Rig
-    const hemiLight = new THREE.HemisphereLight('#99F6E4', '#051A13', 0.8);
+    const hemiLight = new THREE.HemisphereLight('#9BB4F0', '#090E1C', 0.95);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight('#FFF7ED', 1.95);
+    const keyLight = new THREE.DirectionalLight('#FFF8F0', 1.9);
     keyLight.position.set(6, 9, 7);
     if (!isSoftwareGl) {
       keyLight.castShadow = true;
@@ -361,11 +409,11 @@ export default function SovereignBrain3DCanvas({
     }
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight('#14B8A6', 1.35);
+    const rimLight = new THREE.DirectionalLight('#7FA6FF', 1.35);
     rimLight.position.set(-7, 4, -6);
     scene.add(rimLight);
 
-    const coreLight = new THREE.PointLight('#1EB56A', 2.5, 14);
+    const coreLight = new THREE.PointLight('#6FCB9F', 2.2, 14);
     coreLight.position.set(0, 0.2, 0);
     scene.add(coreLight);
 
@@ -373,7 +421,6 @@ export default function SovereignBrain3DCanvas({
     const materials: THREE.Material[] = [];
     const textures: THREE.Texture[] = [];
 
-    // Procedural Textures (Brushed Metal Grain + Circuit Pedestal + Radial Contact Shadow)
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     const circuitTex = createProceduralCircuitTexture(maxAniso);
     const brushedGrainTex = createBrushedMetalGrainTexture(maxAniso);
@@ -383,15 +430,16 @@ export default function SovereignBrain3DCanvas({
     // Grounded Brushed-Titanium Circuit Pedestal + Contact Shadow
     const pedestalGeo = new THREE.CylinderGeometry(3.6, 4.1, 0.22, 48);
     const pedestalMat = new THREE.MeshStandardMaterial({
+      color: '#141C36',
       map: circuitTex,
       roughness: 0.56,
-      metalness: 0.42,
+      metalness: 0.35,
     });
     const pedestalBevelGeo = new THREE.TorusGeometry(3.65, 0.06, 14, 64);
     const pedestalBevelMat = new THREE.MeshPhysicalMaterial({
-      color: '#D1FAE5',
-      emissive: '#065F46',
-      emissiveIntensity: 0.4,
+      color: '#B8C9F5',
+      emissive: '#1F3863',
+      emissiveIntensity: 0.35,
       roughness: 0.22,
       metalness: 0.92,
       anisotropy: 0.8,
@@ -404,7 +452,7 @@ export default function SovereignBrain3DCanvas({
       map: contactShadowTex,
       transparent: true,
       depthWrite: false,
-      opacity: 0.55,
+      opacity: 0.45,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
@@ -429,8 +477,7 @@ export default function SovereignBrain3DCanvas({
     const rootGroup = new THREE.Group();
     scene.add(rootGroup);
 
-    // Composite Multi-Part Sovereign Neural Core:
-    // Frosted Optical Glass Hemispheres + Glowing Inner Crystalline Cores + Anisotropic Brushed Titanium Ribs + L1–L6 Spine
+    // Composite Multi-Part Sovereign Neural Core
     const brainCoreGroup = new THREE.Group();
     rootGroup.add(brainCoreGroup);
 
@@ -439,16 +486,16 @@ export default function SovereignBrain3DCanvas({
     const collarRibGeo = new THREE.TorusGeometry(1.44, 0.034, 12, 56);
     geometries.push(hemiOuterGeo, hemiInnerGeo, collarRibGeo);
 
-    // Left Hemisphere — Operations Engine (Frosted Optical Glass + Brushed Metal Rib)
+    // Left Hemisphere — Operations Engine
     const leftHemiGroup = new THREE.Group();
     leftHemiGroup.position.x = -0.35;
     leftHemiGroup.scale.set(0.84, 1.06, 0.92);
     const leftGlassMat = new THREE.MeshPhysicalMaterial({
-      color: '#0D2F22',
-      emissive: '#10B981',
+      color: '#1C3159',
+      emissive: '#1F3863',
       emissiveIntensity: 0.24,
-      roughness: 0.24,
-      metalness: 0.08,
+      roughness: 0.22,
+      metalness: 0.06,
       transmission: isSoftwareGl ? 0 : 0.68,
       ior: 1.52,
       thickness: 1.2,
@@ -460,15 +507,15 @@ export default function SovereignBrain3DCanvas({
       flatShading: true,
     });
     const leftInnerCoreMat = new THREE.MeshStandardMaterial({
-      color: '#10B981',
-      emissive: '#10B981',
-      emissiveIntensity: 0.85,
+      color: '#1F3863',
+      emissive: '#3B66B0',
+      emissiveIntensity: 0.8,
       roughness: 0.3,
-      metalness: 0.2,
+      metalness: 0.25,
       flatShading: true,
     });
     const leftRibMat = new THREE.MeshPhysicalMaterial({
-      color: '#D1FAE5',
+      color: '#B8C9F5',
       roughness: 0.2,
       metalness: 0.94,
       anisotropy: 0.8,
@@ -487,16 +534,16 @@ export default function SovereignBrain3DCanvas({
     leftHemiGroup.add(leftInnerMesh, leftGlassMesh, leftRib);
     brainCoreGroup.add(leftHemiGroup);
 
-    // Right Hemisphere — Experience Engine (Frosted Optical Glass + Brushed Metal Rib)
+    // Right Hemisphere — Experience Engine
     const rightHemiGroup = new THREE.Group();
     rightHemiGroup.position.x = 0.35;
     rightHemiGroup.scale.set(0.84, 1.06, 0.92);
     const rightGlassMat = new THREE.MeshPhysicalMaterial({
-      color: '#0B2C2B',
-      emissive: '#0D9488',
-      emissiveIntensity: 0.28,
-      roughness: 0.24,
-      metalness: 0.08,
+      color: '#143839',
+      emissive: '#1C6E46',
+      emissiveIntensity: 0.24,
+      roughness: 0.22,
+      metalness: 0.06,
       transmission: isSoftwareGl ? 0 : 0.68,
       ior: 1.52,
       thickness: 1.2,
@@ -508,15 +555,15 @@ export default function SovereignBrain3DCanvas({
       flatShading: true,
     });
     const rightInnerCoreMat = new THREE.MeshStandardMaterial({
-      color: '#14B8A6',
-      emissive: '#0D9488',
-      emissiveIntensity: 0.9,
+      color: '#1C6E46',
+      emissive: '#1C6E46',
+      emissiveIntensity: 0.82,
       roughness: 0.3,
-      metalness: 0.2,
+      metalness: 0.25,
       flatShading: true,
     });
     const rightRibMat = new THREE.MeshPhysicalMaterial({
-      color: '#CCFBF1',
+      color: '#B8C9F5',
       roughness: 0.2,
       metalness: 0.94,
       anisotropy: 0.8,
@@ -535,13 +582,13 @@ export default function SovereignBrain3DCanvas({
     rightHemiGroup.add(rightInnerMesh, rightGlassMesh, rightRib);
     brainCoreGroup.add(rightHemiGroup);
 
-    // L1-L6 Vertical Sovereign Stack Core Spine (6 Precision Brushed-Titanium Rings)
+    // L1–L6 Vertical Sovereign Stack Core Spine
     const spineRingGeo = new THREE.TorusGeometry(0.44, 0.036, 12, 32);
     geometries.push(spineRingGeo);
     const spineMat = new THREE.MeshPhysicalMaterial({
-      color: '#ECFDF5',
-      emissive: '#1EB56A',
-      emissiveIntensity: 0.55,
+      color: '#B8C9F5',
+      emissive: '#1F3863',
+      emissiveIntensity: 0.45,
       roughness: 0.18,
       metalness: 0.92,
       anisotropy: 0.85,
@@ -557,7 +604,7 @@ export default function SovereignBrain3DCanvas({
       brainCoreGroup.add(r);
     }
 
-    // Orbiting OPA 0.88 HITL Governance Ring (Brushed Anodized Titanium)
+    // Orbiting OPA 0.88 HITL Governance Ring
     const opaRingGroup = new THREE.Group();
     rootGroup.add(opaRingGroup);
     const opaTorusGeo = new THREE.TorusGeometry(2.48, 0.048, 14, 72);
@@ -565,11 +612,11 @@ export default function SovereignBrain3DCanvas({
     geometries.push(opaTorusGeo, opaGateGeo);
 
     const opaRingMat = new THREE.MeshPhysicalMaterial({
-      color: '#1EB56A',
-      emissive: '#1EB56A',
-      emissiveIntensity: 0.65,
-      roughness: 0.2,
-      metalness: 0.9,
+      color: '#1C6E46',
+      emissive: '#1C6E46',
+      emissiveIntensity: 0.52,
+      roughness: 0.22,
+      metalness: 0.88,
       anisotropy: 0.75,
       clearcoat: 0.4,
       bumpMap: brushedGrainTex,
@@ -593,7 +640,6 @@ export default function SovereignBrain3DCanvas({
     }
 
     // 8 Orbiting Composite Domain Hub Assemblies
-    // 5 parts each: Frosted glass outer octahedron + glowing inner crystal + brushed-metal bevel collar + top/bottom machined caps + shockwave ripple ring
     const hubGlassGeo = new THREE.OctahedronGeometry(0.36, 0);
     const hubInnerGeo = new THREE.OctahedronGeometry(0.19, 0);
     const hubCollarGeo = new THREE.TorusGeometry(0.49, 0.036, 12, 32);
@@ -628,28 +674,28 @@ export default function SovereignBrain3DCanvas({
         emissiveIntensity: 0.22,
         roughness: 0.22,
         metalness: 0.05,
-        transmission: isSoftwareGl ? 0 : 0.72,
+        transmission: isSoftwareGl ? 0 : 0.7,
         ior: 1.5,
         thickness: 0.9,
         clearcoat: 1.0,
         clearcoatRoughness: 0.12,
         transparent: true,
-        opacity: isSoftwareGl ? 0.62 : 0.94,
+        opacity: isSoftwareGl ? 0.65 : 0.94,
         depthWrite: !isSoftwareGl,
       });
 
       const innerCoreMat = new THREE.MeshStandardMaterial({
         color: '#FFFFFF',
         emissive: hub.accent,
-        emissiveIntensity: 0.95,
+        emissiveIntensity: 0.85,
         roughness: 0.25,
         metalness: 0.15,
       });
 
       const collarMat = new THREE.MeshPhysicalMaterial({
-        color: '#E2E8F0',
+        color: '#B8C9F5',
         emissive: hub.accent,
-        emissiveIntensity: 0.26,
+        emissiveIntensity: 0.22,
         roughness: 0.22,
         metalness: 0.92,
         anisotropy: 0.82,
@@ -659,7 +705,7 @@ export default function SovereignBrain3DCanvas({
       });
 
       const capMat = new THREE.MeshPhysicalMaterial({
-        color: '#112520',
+        color: '#1F3863',
         roughness: 0.28,
         metalness: 0.88,
         anisotropy: 0.7,
@@ -717,7 +763,7 @@ export default function SovereignBrain3DCanvas({
       const lineMat = new THREE.LineBasicMaterial({
         color: hub.accent,
         transparent: true,
-        opacity: 0.36,
+        opacity: 0.42,
       });
       materials.push(lineMat);
       const line = new THREE.Line(lineGeo, lineMat);
@@ -743,7 +789,7 @@ export default function SovereignBrain3DCanvas({
     const packetCount = BRAIN_HUBS.length * 4;
     const packetGeo = new THREE.SphereGeometry(0.068, 8, 8);
     geometries.push(packetGeo);
-    const packetMat = new THREE.MeshBasicMaterial({ color: '#A7F3D0' });
+    const packetMat = new THREE.MeshBasicMaterial({ color: '#8FA6E8' });
     materials.push(packetMat);
     const packetMesh = new THREE.InstancedMesh(packetGeo, packetMat, packetCount);
     packetMesh.frustumCulled = false;
@@ -824,7 +870,6 @@ export default function SovereignBrain3DCanvas({
     });
     resizeObserver.observe(container);
 
-    // WebGL2 Fence-Sync afterDraw pacing for software WebGL
     let frameId = 0;
     let disposed = false;
     let lastTime = performance.now();
@@ -862,7 +907,6 @@ export default function SovereignBrain3DCanvas({
       lastTime = now;
       elapsed += dt;
 
-      // Smooth exponential camera preset transition
       if (targetCamPosRef.current && targetLookAtRef.current) {
         const alpha = 1 - Math.exp(-5.5 * dt);
         camera.position.lerp(targetCamPosRef.current, alpha);
@@ -873,16 +917,68 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
-      // Smooth Material Finish Interpolation (Obsidian Titanium <-> OITS Heritage Stone & Navy)
-      const isHeritage = finishRef.current === 'heritage';
-      const finishAlpha = 1 - Math.exp(-5 * dt);
-      bgColor.lerp(isHeritage ? _heritageBg : _obsidianBg, finishAlpha);
-      fog.color.copy(bgColor);
-      rimLight.color.lerp(isHeritage ? _heritageRim : _obsidianRim, finishAlpha);
-      leftRibMat.color.lerp(isHeritage ? _heritageMetal : _obsidianMetal, finishAlpha);
-      rightRibMat.color.lerp(isHeritage ? _heritageMetal : _obsidianMetal, finishAlpha);
-      pedestalBevelMat.color.lerp(isHeritage ? _heritageMetal : _obsidianMetal, finishAlpha);
-      leftGlassMat.color.lerp(isHeritage ? _heritageGlass : _obsidianGlass, finishAlpha);
+      // Smooth Three-Way Studio Finish Interpolation (Heritage Stone Light <-> Heritage Nocturnal <-> Obsidian Ti)
+      const finish = finishRef.current;
+      const isStoneLight = finish === 'heritage-light';
+      const isObsidian = finish === 'obsidian';
+      const fAlpha = 1 - Math.exp(-5.5 * dt);
+
+      const targetBg = isStoneLight
+        ? _bgHeritageLight
+        : isObsidian
+          ? _bgObsidian
+          : _bgHeritageDark;
+      const targetRim = isStoneLight
+        ? _rimHeritageLight
+        : isObsidian
+          ? _rimObsidian
+          : _rimHeritageDark;
+      const targetMetal = isStoneLight
+        ? _metalHeritageLight
+        : isObsidian
+          ? _metalObsidian
+          : _metalHeritageDark;
+      const targetGlassL = isStoneLight
+        ? _glassLeftLight
+        : isObsidian
+          ? _glassLeftObsidian
+          : _glassLeftDark;
+      const targetGlassR = isStoneLight
+        ? _glassRightLight
+        : isObsidian
+          ? _glassRightObsidian
+          : _glassRightDark;
+      const targetPedestal = isStoneLight
+        ? _pedestalLight
+        : isObsidian
+          ? _pedestalObsidian
+          : _pedestalDark;
+      const targetPacket = isStoneLight
+        ? _packetLight
+        : isObsidian
+          ? _packetObsidian
+          : _packetDark;
+
+      initialBg.lerp(targetBg, fAlpha);
+      fog.color.copy(initialBg);
+      rimLight.color.lerp(targetRim, fAlpha);
+      hemiLight.color.lerp(
+        isStoneLight ? _hemiSkyLight : isObsidian ? _hemiSkyObsidian : _hemiSkyDark,
+        fAlpha,
+      );
+      hemiLight.groundColor.lerp(
+        isStoneLight ? _hemiGroundLight : isObsidian ? _hemiGroundObsidian : _hemiGroundDark,
+        fAlpha,
+      );
+      hemiLight.intensity = THREE.MathUtils.damp(hemiLight.intensity, isStoneLight ? 1.35 : 0.85, 5, dt);
+      leftRibMat.color.lerp(targetMetal, fAlpha);
+      rightRibMat.color.lerp(targetMetal, fAlpha);
+      spineMat.color.lerp(targetMetal, fAlpha);
+      pedestalBevelMat.color.lerp(targetMetal, fAlpha);
+      pedestalMat.color.lerp(targetPedestal, fAlpha);
+      leftGlassMat.color.lerp(targetGlassL, fAlpha);
+      rightGlassMat.color.lerp(targetGlassR, fAlpha);
+      packetMat.color.lerp(targetPacket, fAlpha);
 
       const currentSelected = new Set(selectedIdsRef.current);
       const activeHubs = new Set<string>();
@@ -891,17 +987,26 @@ export default function SovereignBrain3DCanvas({
       });
 
       const passHitl = hitlRef.current >= 0.88;
-      const targetRingColor = passHitl ? _emeraldColor : _amberColor;
+      const targetRingColor = passHitl
+        ? isStoneLight
+          ? _passLightColor
+          : isObsidian
+            ? _passObsidianColor
+            : _passDarkColor
+        : isStoneLight
+          ? _holdLightColor
+          : _holdDarkColor;
+
       const colorStep = 1 - Math.exp(-6 * dt);
       opaRingMat.color.lerp(targetRingColor, colorStep);
       opaRingMat.emissive.lerp(targetRingColor, colorStep);
       coreLight.color.lerp(targetRingColor, colorStep);
+      coreLight.intensity = THREE.MathUtils.damp(coreLight.intensity, isStoneLight ? 1.15 : 2.35, 5, dt);
 
       brainCoreGroup.rotation.y += dt * 0.16;
       opaRingGroup.rotation.y -= dt * (passHitl ? 0.28 : 0.62);
       opaRingGroup.rotation.z = Math.sin(elapsed * 0.5) * 0.08;
 
-      // Consume pending click/selection shockwave trigger
       const triggerPulseId = pendingPulseHubRef.current;
       if (triggerPulseId) {
         pendingPulseHubRef.current = null;
@@ -923,7 +1028,6 @@ export default function SovereignBrain3DCanvas({
           node.rippleMesh.visible = true;
         }
 
-        // Expanding radial emissive shockwave ripple animation
         if (node.rippleTimer > 0) {
           node.rippleTimer = Math.max(0, node.rippleTimer - dt * 1.45);
           const progress = 1 - node.rippleTimer;
@@ -945,29 +1049,31 @@ export default function SovereignBrain3DCanvas({
         node.group.position.y = node.basePos.y + Math.sin(elapsed * 1.4 + idx) * 0.11;
         node.group.rotation.y += dt * (isFocus ? 1.15 : isActive ? 0.78 : 0.3);
 
-        // Tactile emissive radiance pulse feedback
-        const pulseWave = isFocus ? 0.25 * Math.sin(elapsed * 5.2 + idx) : 0;
+        node.collarMat.color.lerp(targetMetal, fAlpha);
+
+        const pulseWave = isFocus ? 0.24 * Math.sin(elapsed * 5.2 + idx) : 0;
+        const lightDamp = isStoneLight ? 0.55 : 1.0;
         node.glassShellMat.emissiveIntensity = THREE.MathUtils.damp(
           node.glassShellMat.emissiveIntensity,
-          (isFocus ? 0.85 : isActive ? 0.48 : 0.14) + pulseWave,
+          ((isFocus ? 0.8 : isActive ? 0.45 : 0.14) + pulseWave) * lightDamp,
           7,
           dt,
         );
         node.innerCoreMat.emissiveIntensity = THREE.MathUtils.damp(
           node.innerCoreMat.emissiveIntensity,
-          (isFocus ? 2.1 : isActive ? 1.3 : 0.45) + pulseWave,
+          ((isFocus ? 2.0 : isActive ? 1.25 : 0.45) + pulseWave) * lightDamp,
           7,
           dt,
         );
         node.collarMat.emissiveIntensity = THREE.MathUtils.damp(
           node.collarMat.emissiveIntensity,
-          isFocus ? 0.95 : isActive ? 0.5 : 0.1,
+          (isFocus ? 0.85 : isActive ? 0.42 : 0.1) * lightDamp,
           7,
           dt,
         );
         node.lineMat.opacity = THREE.MathUtils.damp(
           node.lineMat.opacity,
-          isFocus ? 0.95 : isActive ? 0.72 : 0.18,
+          isFocus ? 0.95 : isActive ? 0.74 : 0.24,
           6,
           dt,
         );
@@ -977,7 +1083,7 @@ export default function SovereignBrain3DCanvas({
           const t = (elapsed * speed + p * 0.25 + idx * 0.11) % 1;
           node.curve.getPoint(t, _packetPos);
           dummy.position.copy(_packetPos);
-          const s = isFocus ? 1.25 : isActive ? 1.0 : 0.32;
+          const s = isFocus ? 1.25 : isActive ? 1.0 : 0.36;
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
           packetMesh.setMatrixAt(instIdx++, dummy.matrix);
@@ -988,7 +1094,6 @@ export default function SovereignBrain3DCanvas({
       controls.update();
       renderer.render(scene, camera);
 
-      // Project hovered 3D hub world position into clamped 2D viewport callout coords
       if (hoveredNodeRef && !isDraggingOrbit && now - lastCalloutSync > 45) {
         lastCalloutSync = now;
         const targetNode = hoveredNodeRef as HubNodeMeta;
@@ -1039,15 +1144,24 @@ export default function SovereignBrain3DCanvas({
   }, [compact]);
 
   const hitlPass = hitlConfidence >= 0.88;
+  const isLightHud = materialFinish === 'heritage-light';
 
   if (contextLost) {
     return (
-      <div className="w-full h-full min-h-[420px] bg-[#07130F] text-white rounded-xl p-6 flex flex-col justify-center items-center text-center">
-        <div className="text-xs font-mono uppercase tracking-wider text-[#6EE7B7] mb-2">
+      <div
+        className={`w-full h-full min-h-[420px] rounded-[10px] p-6 flex flex-col justify-center items-center text-center ${
+          isLightHud ? 'bg-[#F2EFE9] text-[#16213A]' : 'bg-[#0B1020] text-[#E7EBF5]'
+        }`}
+      >
+        <div
+          className={`text-xs font-mono font-bold mb-2 ${
+            isLightHud ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
+          }`}
+        >
           WebGL 2D Fallback Mode
         </div>
         <h3 className="text-lg font-bold">Spenta 3D Sovereign Neural Core</h3>
-        <p className="text-xs text-slate-300 max-w-md mt-2">
+        <p className={`text-xs max-w-md mt-2 ${isLightHud ? 'text-[#4A5163]' : 'text-[#C3CCE4]'}`}>
           Hardware WebGL context is unavailable in this viewport. Inspect and compose all 8 hubs below.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 w-full max-w-2xl">
@@ -1059,12 +1173,16 @@ export default function SovereignBrain3DCanvas({
                 type="button"
                 onClick={() => onSelectHub?.(hub.id)}
                 className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
-                  active
-                    ? 'bg-emerald-950 border-[#1EB56A] text-white'
-                    : 'bg-[#0C1F18] border-emerald-900/60 text-slate-300'
+                  isLightHud
+                    ? active
+                      ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#16213A]'
+                      : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163]'
+                    : active
+                      ? 'bg-[#0F2A22] border-[#6FCB9F] text-[#E7EBF5]'
+                      : 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4]'
                 }`}
               >
-                <div className="text-[10px] font-mono text-[#6EE7B7]">HUB {hub.num}</div>
+                <div className="text-[10px] font-mono font-bold">HUB {hub.num}</div>
                 <div className="text-xs font-semibold mt-0.5">{hub.label}</div>
               </button>
             );
@@ -1074,26 +1192,51 @@ export default function SovereignBrain3DCanvas({
     );
   }
 
+  // Solid-surface HUD styling (zero backdrop-filter over WebGL)
+  const hudShell = isLightHud
+    ? 'bg-[#FAF8F4]/95 border-[#CFC8BC] text-[#16213A]'
+    : materialFinish === 'obsidian'
+      ? 'bg-[#07130F]/95 border-emerald-800/70 text-white'
+      : 'bg-[#0F1529]/95 border-[#2E3862] text-[#E7EBF5]';
+
+  const hudInactiveBtn = isLightHud
+    ? 'bg-[#FFFFFF] text-[#4A5163] hover:text-[#16213A] border border-[#E4DFD6]'
+    : materialFinish === 'obsidian'
+      ? 'bg-[#0E241C] text-slate-300 hover:text-white'
+      : 'bg-[#141A32] text-[#C3CCE4] hover:text-white border border-[#232B4A]';
+
   return (
-    <div className="relative w-full h-full min-h-[450px] bg-[#07130F] rounded-xl overflow-hidden select-none">
+    <div
+      className={`relative w-full h-full min-h-[450px] rounded-[10px] overflow-hidden select-none ${
+        isLightHud ? 'bg-[#F2EFE9]' : materialFinish === 'obsidian' ? 'bg-[#07130F]' : 'bg-[#0B1020]'
+      }`}
+    >
       {/* Isolated Stable WebGL Canvas Container */}
       <div ref={mountRef} className="w-full h-full min-h-[450px]" />
 
       {/* Minimal Top-Left Spec Badge (Zero Side-Flank Occlusion, Solid Surface) */}
       <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap items-center gap-2">
-        <div className="bg-[#07130F]/95 border border-emerald-800/70 rounded-lg px-3 py-1.5 text-white">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-[#6EE7B7]">
+        <div className={`border rounded-lg px-3 py-1.5 ${hudShell}`}>
+          <div
+            className={`text-[10px] font-mono font-semibold tabular-nums ${
+              isLightHud ? 'text-[#1F3863]' : materialFinish === 'obsidian' ? 'text-[#6EE7B7]' : 'text-[#8FA6E8]'
+            }`}
+          >
             3D Neural Core · {activeHubIds.size}/8 Hubs · {selectedIds.length} Apps
           </div>
         </div>
         <div
           className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-semibold tabular-nums ${
             hitlPass
-              ? 'bg-[#07130F]/95 border-[#1EB56A] text-[#6EE7B7]'
-              : 'bg-[#07130F]/95 border-[#F59E0B] text-[#FCD34D]'
+              ? isLightHud
+                ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#1C6E46]'
+                : 'bg-[#0F2A22] border-[#6FCB9F] text-[#6FCB9F]'
+              : isLightHud
+                ? 'bg-[#FDF5E6] border-[#8A5C10] text-[#8A5C10]'
+                : 'bg-[#2A2112] border-[#E0B063] text-[#E0B063]'
           }`}
         >
-          OPA {hitlConfidence.toFixed(2)} · {hitlPass ? 'AUTO-COMMIT' : 'HITL AUDIT'}
+          OPA {hitlConfidence.toFixed(2)} · {hitlPass ? 'Auto-Commit' : 'HITL Audit'}
         </div>
       </div>
 
@@ -1103,24 +1246,34 @@ export default function SovereignBrain3DCanvas({
           className="absolute pointer-events-none z-20 -translate-x-1/2 -translate-y-full transition-transform duration-100"
           style={{ left: `${projectedCallout.x}px`, top: `${projectedCallout.y}px` }}
         >
-          <div className="w-[228px] rounded-lg bg-[#091511] border border-[#1EB56A]/80 px-3 py-2 text-white shadow-lg">
+          <div
+            className={`w-[232px] rounded-lg border px-3 py-2 shadow-lg ${
+              isLightHud
+                ? 'bg-[#FFFFFF] border-[#1F3863] text-[#16213A]'
+                : 'bg-[#0F1529] border-[#8FA6E8] text-[#E7EBF5]'
+            }`}
+          >
             <div className="flex items-center justify-between gap-2 text-[10px] font-mono">
-              <span className="text-[#6EE7B7] font-bold">
+              <span className={isLightHud ? 'text-[#1F3863] font-bold' : 'text-[#8FA6E8] font-bold'}>
                 HUB {hoveredCalloutHub.hub.num} · {hoveredCalloutHub.hub.keyLayers.join('/')}
               </span>
-              <span className="text-slate-300 tabular-nums">
+              <span className="opacity-80 tabular-nums">
                 {hoveredCalloutHub.activeCount}/{hoveredCalloutHub.totalApps} active
               </span>
             </div>
-            <div className="text-xs font-bold text-white mt-0.5 truncate">
+            <div className="text-xs font-bold mt-0.5 truncate">
               {hoveredCalloutHub.hub.label}
             </div>
-            <div className="text-[10px] text-slate-300 mt-0.5 leading-snug line-clamp-2">
+            <div className="text-[10px] opacity-80 mt-0.5 leading-snug line-clamp-2">
               {hoveredCalloutHub.hub.summary}
             </div>
-            <div className="mt-1.5 pt-1 border-t border-white/10 text-[9.5px] font-mono text-[#6EE7B7] flex items-center justify-between">
+            <div
+              className={`mt-1.5 pt-1 border-t text-[9.5px] font-mono flex items-center justify-between ${
+                isLightHud ? 'border-[#E4DFD6] text-[#1C6E46]' : 'border-[#232B4A] text-[#6FCB9F]'
+              }`}
+            >
               <span>Brushed Ti · Frosted Glass</span>
-              <span>Click to pulse</span>
+              <span>Click to inspect</span>
             </div>
           </div>
         </div>
@@ -1131,14 +1284,14 @@ export default function SovereignBrain3DCanvas({
         <button
           type="button"
           onClick={() => setDockCollapsed((v) => !v)}
-          className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-t-lg bg-[#07130F]/95 border border-b-0 border-emerald-800/70 text-[10px] font-mono text-slate-300 hover:text-white cursor-pointer"
+          className={`pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-t-lg border border-b-0 text-[10px] font-mono cursor-pointer ${hudShell}`}
         >
           {dockCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           <span>{dockCollapsed ? 'Show Controls (H)' : 'Hide Controls (H)'}</span>
         </button>
 
         {!dockCollapsed && (
-          <div className="pointer-events-auto w-full bg-[#07130F]/95 border border-emerald-800/70 rounded-xl px-3.5 py-2.5 text-white space-y-2">
+          <div className={`pointer-events-auto w-full border rounded-xl px-3.5 py-2.5 space-y-2 ${hudShell}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1">
                 {(['overview', 'operations', 'experience', 'top'] as const).map((preset) => (
@@ -1148,8 +1301,10 @@ export default function SovereignBrain3DCanvas({
                     onClick={() => applyCameraPreset(preset)}
                     className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase font-semibold transition-colors cursor-pointer ${
                       activePreset === preset
-                        ? 'bg-[#1EB56A] text-[#07130F]'
-                        : 'bg-[#0E241C] text-slate-300 hover:text-white'
+                        ? isLightHud
+                          ? 'bg-[#1F3863] text-white'
+                          : 'bg-[#8FA6E8] text-[#0B1020]'
+                        : hudInactiveBtn
                     }`}
                   >
                     {preset}
@@ -1158,7 +1313,7 @@ export default function SovereignBrain3DCanvas({
                 <button
                   type="button"
                   onClick={() => applyCameraPreset('overview')}
-                  className="p-1 rounded-md bg-[#0E241C] text-slate-300 hover:text-white cursor-pointer"
+                  className={`p-1 rounded-md cursor-pointer ${hudInactiveBtn}`}
                   title="Reset camera"
                   aria-label="Reset camera"
                 >
@@ -1166,41 +1321,54 @@ export default function SovereignBrain3DCanvas({
                 </button>
               </div>
 
-              {/* Tactile PBR Finish Switcher */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setMaterialFinish('obsidian')}
-                  className={`px-2 py-1 rounded-md font-mono text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                    materialFinish === 'obsidian'
-                      ? 'bg-[#1EB56A] text-[#07130F]'
-                      : 'bg-[#0E241C] text-slate-300 hover:text-white'
-                  }`}
-                >
-                  Obsidian Ti
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMaterialFinish('heritage')}
-                  className={`px-2 py-1 rounded-md font-mono text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                    materialFinish === 'heritage'
-                      ? 'bg-[#8FA6E8] text-[#0B1020]'
-                      : 'bg-[#0E241C] text-slate-300 hover:text-white'
-                  }`}
-                >
-                  Heritage Navy
-                </button>
+              {/* Three-Way Tactile PBR Finish Switcher */}
+              <div className="flex flex-wrap items-center gap-1">
+                {(
+                  [
+                    { id: 'heritage-light', label: 'Stone Studio' },
+                    { id: 'heritage-dark', label: 'Nocturnal Navy' },
+                    { id: 'obsidian', label: 'Obsidian Ti' },
+                  ] as const
+                ).map((fin) => (
+                  <button
+                    key={fin.id}
+                    type="button"
+                    onClick={() => setMaterialFinish(fin.id)}
+                    className={`px-2 py-1 rounded-md font-mono text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                      materialFinish === fin.id
+                        ? fin.id === 'heritage-light'
+                          ? 'bg-[#1F3863] text-white'
+                          : fin.id === 'obsidian'
+                            ? 'bg-[#1EB56A] text-[#07130F]'
+                            : 'bg-[#8FA6E8] text-[#0B1020]'
+                        : hudInactiveBtn
+                    }`}
+                  >
+                    {fin.label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-emerald-900/50">
+            <div
+              className={`flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t ${
+                isLightHud ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
+              }`}
+            >
               {inspectedHub ? (
-                <div className="text-[11px] font-mono text-[#6EE7B7] truncate">
-                  HUB {inspectedHub.num}: <strong className="text-white">{inspectedHub.label}</strong>
+                <div
+                  className={`text-[11px] font-mono truncate ${
+                    isLightHud ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
+                  }`}
+                >
+                  HUB {inspectedHub.num}:{' '}
+                  <strong className={isLightHud ? 'text-[#16213A]' : 'text-white'}>
+                    {inspectedHub.label}
+                  </strong>
                 </div>
               ) : (
-                <div className="text-[10px] font-mono text-slate-400">
-                  Hover node for 3D callout · Click hub to pulse &amp; toggle apps
+                <div className="text-[10px] font-mono opacity-75">
+                  Hover node for 3D callout · Click hub to sync profile &amp; toggle apps
                 </div>
               )}
 
@@ -1216,10 +1384,12 @@ export default function SovereignBrain3DCanvas({
                           pendingPulseHubRef.current = inspectedHub.id;
                           toggleApp(app.id);
                         }}
-                        className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                        className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer whitespace-nowrap ${
                           isSelected
-                            ? 'bg-[#1EB56A] text-[#07130F] border-[#1EB56A] font-bold'
-                            : 'bg-[#0E241C] text-slate-200 border-emerald-800 hover:border-[#1EB56A]'
+                            ? isLightHud
+                              ? 'bg-[#1C6E46] text-white border-[#1C6E46] font-bold'
+                              : 'bg-[#6FCB9F] text-[#0B1020] border-[#6FCB9F] font-bold'
+                            : hudInactiveBtn
                         }`}
                       >
                         {isSelected ? '✓ ' : '+ '}

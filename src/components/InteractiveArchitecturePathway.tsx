@@ -1,14 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Download,
   GitBranch,
   Layers,
   Moon,
+  Pause,
+  Play,
   Plus,
   RotateCcw,
+  Server,
+  Shield,
   Sun,
   X,
 } from 'lucide-react';
@@ -19,6 +25,220 @@ import {
 } from '../data/spentaManifest';
 import { downloadMarkdownFile } from '../data/promptThemeStudioData';
 import { useStack } from '../store/StackContext';
+
+export type DeploymentProviderId = 'on-prem' | 'private-vpc' | 'air-gapped';
+
+interface DeploymentProfileSpec {
+  id: DeploymentProviderId;
+  shortLabel: string;
+  title: string;
+  transport: string;
+  enclaveBoundary: string;
+  latencyBudget: string;
+  costPosture: string;
+  tradeOffGuidance: string;
+  failurePitfall: string;
+}
+
+const DEPLOYMENT_PROFILES: Record<DeploymentProviderId, DeploymentProfileSpec> = {
+  'on-prem': {
+    id: 'on-prem',
+    shortLabel: 'Sovereign On-Prem',
+    title: 'Customer-Owned On-Premises Appliance (Tier 1–4)',
+    transport: 'Local Loopback NVLink + 10GbE LAN mTLS',
+    enclaveBoundary: 'AMD SEV-SNP / Intel TDX on Client Rack (0 bytes cloud egress)',
+    latencyBudget: '<35ms LAN · <50ms Edge',
+    costPosture: 'One-time CapEx ($3.2K–$15.3K) · Zero GPU token burn',
+    tradeOffGuidance:
+      'Maximizes regulatory sovereignty (BB ICT v4.0 / HIPAA) and eliminates per-token OpEx; requires scheduled local NVMe snapshot replication.',
+    failurePitfall:
+      'Pitfall: Single-PSU workstation power loss halts live OCR queues. Mitigation: Dual-node active/passive failover + encrypted local NAS backup.',
+  },
+  'private-vpc': {
+    id: 'private-vpc',
+    shortLabel: 'Private VPC',
+    title: 'Dedicated Single-Tenant Sovereign VPC',
+    transport: 'WireGuard mTLS Mesh + PrivateLink Peering',
+    enclaveBoundary: 'Confidential Compute VM + Customer-Managed KMS Keys (BYOK)',
+    latencyBudget: '45–95ms Regional Backbone',
+    costPosture: 'Reserved Dedicated GPU OpEx + Zero Multi-Tenant Bleed',
+    tradeOffGuidance:
+      'Enables elastic multi-region bursting for distributed retail chains (65+ showrooms) while retaining encrypted single-tenant isolation.',
+    failurePitfall:
+      'Pitfall: Cross-AZ egress spikes or misconfigured NAT routes leaking embeddings. Mitigation: Strict OPA egress deny-by-default & private endpoint DNS lock.',
+  },
+  'air-gapped': {
+    id: 'air-gapped',
+    shortLabel: 'Air-Gapped Enclave',
+    title: 'Zero-Internet Air-Gapped Defense & Core Banking Enclave',
+    transport: 'Unidirectional Hardware Data Diode + Signed Offline Bundles',
+    enclaveBoundary: 'Physical Faraday / HSM Hardware Root-of-Trust (No External NIC)',
+    latencyBudget: '<28ms Deterministic Enclave Bus',
+    costPosture: 'Dedicated Dual-Redundant CapEx + Quarterly Signed Model Drops',
+    tradeOffGuidance:
+      'Eliminates remote exfiltration surface entirely for defense, sovereign health registries, and Tier-1 banking cores.',
+    failurePitfall:
+      'Pitfall: Model drift or stale AML/clinical ontologies without internet sync. Mitigation: Cryptographically signed SHA-256 offline weight & policy cassettes.',
+  },
+};
+
+interface WalkthroughHop {
+  stepNumber: number;
+  trunkId: string;
+  branchId: string;
+  title: string;
+  payloadSummary: string;
+  latencyTarget: string;
+  pitfallMitigation: string;
+}
+
+interface RequestWalkthroughTrace {
+  id: 'banking-icr' | 'hospital-hl7' | 'xltd-baas';
+  label: string;
+  subtitle: string;
+  hops: WalkthroughHop[];
+}
+
+const REQUEST_TRACES: RequestWalkthroughTrace[] = [
+  {
+    id: 'banking-icr',
+    label: 'Banking ICR → 0.88 OPA Gate',
+    subtitle: 'Handwritten Bangla/EN SME loan packet processed inside client firewall',
+    hops: [
+      {
+        stepNumber: 1,
+        trunkId: 'trunk-core',
+        branchId: 'branch-layer-L1',
+        title: 'Ingress & Local TLS Termination (L1/L2)',
+        payloadSummary: '300 DPI multi-page loan PDF + NID scan ingested via branch scanner queue.',
+        latencyTarget: '140ms',
+        pitfallMitigation: 'Strip EXIF/PII metadata outside enclave; enforce zero external DNS egress.',
+      },
+      {
+        stepNumber: 2,
+        trunkId: 'trunk-ops',
+        branchId: 'branch-app-icr_ops',
+        title: 'LLaMA 3.2 Vision + LayoutLMv3 Extraction',
+        payloadSummary: '14 structured collateral, guarantor & handwritten Bangla fields extracted locally.',
+        latencyTarget: '18.4s (<30s SLA)',
+        pitfallMitigation: 'Quantized INT4/FP8 batching prevents VRAM OOM on 96GB Tier-3 baselines.',
+      },
+      {
+        stepNumber: 3,
+        trunkId: 'trunk-governance',
+        branchId: 'branch-opa-gate',
+        title: '0.88 Confidence OPA Circuit Breaker',
+        payloadSummary: 'Field-level score evaluated (0.94 Pass vs 0.81 Hold) against opa.bfsi.icr_v4.',
+        latencyTarget: '24ms',
+        pitfallMitigation: 'Any signature smudge <0.88 halts auto-commit and routes to React verifier.',
+      },
+      {
+        stepNumber: 4,
+        trunkId: 'trunk-core',
+        branchId: 'branch-layer-L5',
+        title: 'Immutable PostgreSQL / Kafka Core Commit',
+        payloadSummary: 'Signed SHA-256 inference hash + extracted JSON written to core banking ledger.',
+        latencyTarget: '38ms',
+        pitfallMitigation: 'Idempotency key prevents duplicate loan disbursements on retry.',
+      },
+      {
+        stepNumber: 5,
+        trunkId: 'trunk-hardware',
+        branchId: 'branch-tier-3',
+        title: 'On-Prem Tier-3 Enclave Attestation',
+        payloadSummary: 'Audit trail archived to local encrypted NVMe/NAS with zero cloud bytes sent.',
+        latencyTarget: '12ms',
+        pitfallMitigation: 'Daily offline snapshot verification prevents silent ledger corruption.',
+      },
+    ],
+  },
+  {
+    id: 'hospital-hl7',
+    label: 'Hospital HL7 Shift Handover',
+    subtitle: 'Clinical ERP + Handwritten Rx OCR + Nurse Rostering inside hospital LAN',
+    hops: [
+      {
+        stepNumber: 1,
+        trunkId: 'trunk-ops',
+        branchId: 'branch-app-healthcare_erp',
+        title: 'HL7/FHIR Ward Vitals & Rx Intake',
+        payloadSummary: 'Aggregates 24-bed ICU vitals stream, lab flags, and handwritten discharge scripts.',
+        latencyTarget: '110ms',
+        pitfallMitigation: 'Strict HL7 v2/FHIR schema validation drops malformed telemetry before LLM prompt.',
+      },
+      {
+        stepNumber: 2,
+        trunkId: 'trunk-core',
+        branchId: 'branch-layer-L3',
+        title: 'Local Clinical LLM Synthesis (L3)',
+        payloadSummary: 'Generates prioritized shift handover brief with drug-interaction warnings.',
+        latencyTarget: '1.9s',
+        pitfallMitigation: 'Corrective RAG grounds dosage checks solely against approved hospital formulary.',
+      },
+      {
+        stepNumber: 3,
+        trunkId: 'trunk-governance',
+        branchId: 'branch-opa-gate',
+        title: 'Clinical Safety 0.88 HITL Gate',
+        payloadSummary: 'Flags ambiguous dosage (0.81 confidence) for attending MD sign-off queue.',
+        latencyTarget: '19ms',
+        pitfallMitigation: 'Zero silent clinical auto-commits when confidence drops below 0.88.',
+      },
+      {
+        stepNumber: 4,
+        trunkId: 'trunk-core',
+        branchId: 'branch-layer-L6',
+        title: 'Omni-Channel Clinician Handoff UI (L6)',
+        payloadSummary: 'Delivers verified handover checklist to nursing tablet with highlighted Rx crops.',
+        latencyTarget: '45ms',
+        pitfallMitigation: 'RBAC ward scoping prevents cross-department patient PHI exposure.',
+      },
+    ],
+  },
+  {
+    id: 'xltd-baas',
+    label: 'X Ltd <50ms EV Battery Swap',
+    subtitle: 'Sub-50ms Wasm/MQTT edge inference across 80 BaaS stations & 480 EVs',
+    hops: [
+      {
+        stepNumber: 1,
+        trunkId: 'trunk-governance',
+        branchId: 'branch-xltd-mobility',
+        title: 'BaaS Cabinet & EV BMS Telemetry Burst',
+        payloadSummary: 'Cell voltage, thermal gradient, and rider RFID streamed over local MQTT broker.',
+        latencyTarget: '9ms',
+        pitfallMitigation: 'Edge store-and-forward ring buffer survives 4G backhaul blackouts.',
+      },
+      {
+        stepNumber: 2,
+        trunkId: 'trunk-exp',
+        branchId: 'branch-app-iot_edge',
+        title: 'Wasm Quantized Edge Anomaly Scoring',
+        payloadSummary: 'Local Green AI model predicts cell degradation & selects optimal charged bay.',
+        latencyTarget: '22ms (<50ms SLA)',
+        pitfallMitigation: 'Thermal threshold hardware interlock overrides software if cell >58°C.',
+      },
+      {
+        stepNumber: 3,
+        trunkId: 'trunk-core',
+        branchId: 'branch-layer-L1',
+        title: 'Sovereign IIoT Gateway Actuation (L1)',
+        payloadSummary: 'Unlocks verified battery bay and signs swap telemetry event.',
+        latencyTarget: '11ms',
+        pitfallMitigation: 'Mutual TLS device certificates block spoofed cabinet unlock commands.',
+      },
+      {
+        stepNumber: 4,
+        trunkId: 'trunk-hardware',
+        branchId: 'branch-tier-4',
+        title: 'Tier-4 Branch Node ESG Carbon Sync',
+        payloadSummary: 'Commits Scope 2/3 carbon savings to regional X Ltd fleet ledger.',
+        latencyTarget: '34ms',
+        pitfallMitigation: 'Idempotent batch replay prevents double-counted carbon offset credits.',
+      },
+    ],
+  },
+];
 
 export interface PathwayComposition {
   id: string;
@@ -65,9 +285,11 @@ interface HoveredTipState {
 interface InteractiveArchitecturePathwayProps {
   compact?: boolean;
   defaultExpandedTrunks?: string[];
+  syncedPolarity?: 'light' | 'dark';
+  onPolarityChange?: (next: 'light' | 'dark') => void;
 }
 
-function buildPathwayTree(): PathwayTrunkNode[] {
+function buildPathwayTree(profile: DeploymentProfileSpec): PathwayTrunkNode[] {
   const opsApps = SPENTA_APPS.filter((a) => a.engine === 'operations');
   const expApps = SPENTA_APPS.filter((a) => a.engine === 'experience' || a.engine === 'fusion');
 
@@ -76,16 +298,16 @@ function buildPathwayTree(): PathwayTrunkNode[] {
       id: 'trunk-core',
       index: '01',
       title: 'Sovereign Fusion Core (L1–L6)',
-      subtitle: 'Hardware-enforced isolation spine from edge IIoT to Omni-Channel UI',
-      metric: '6 Layers · 0% PII Egress',
+      subtitle: `${profile.enclaveBoundary} · ${profile.transport}`,
+      metric: `6 Layers · ${profile.latencyBudget}`,
       summary:
-        'Vertical sovereign kernel isolating every model weight, vector store, and enterprise ledger inside customer-owned enclaves.',
+        'Vertical sovereign kernel isolating every model weight, vector store, and enterprise ledger inside customer-controlled boundaries.',
       accentTone: 'navy',
       branches: SOVEREIGN_STACK_LAYERS.map((layer) => ({
         id: `branch-layer-${layer.id}`,
         code: layer.id,
         title: layer.title,
-        role: layer.subtitle,
+        role: `${layer.subtitle} (${profile.shortLabel})`,
         metric: layer.slaMetric,
         summary: layer.summary,
         layers: [layer.id],
@@ -94,7 +316,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
             id: `${layer.id}-proto-${i}`,
             code: `${layer.id}.P${i + 1}`,
             label: p,
-            detail: `Transport & runtime protocol enforced at ${layer.id}.`,
+            detail: `Transport enforced under ${profile.shortLabel}: ${profile.transport}.`,
             metric: layer.slaMetric,
             kind: 'protocol' as const,
           })),
@@ -102,7 +324,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
             id: `${layer.id}-sec-${i}`,
             code: `${layer.id}.S${i + 1}`,
             label: c,
-            detail: `Sovereign security boundary validated by automated attestation.`,
+            detail: `Boundary attested via ${profile.enclaveBoundary}.`,
             metric: 'Attested',
             kind: 'capability' as const,
           })),
@@ -141,7 +363,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
             id: `${app.id}-syn-${sIdx}`,
             code: `SYN`,
             label: `Integrates → ${SPENTA_APPS.find((x) => x.id === synId)?.shortName ?? synId}`,
-            detail: 'Native zero-ETL event bus integration across Spenta Sovereign OS.',
+            detail: `Zero-ETL event bus integration routed over ${profile.transport}.`,
             metric: 'Native Bus',
             kind: 'synergy' as const,
             linkedAppId: synId,
@@ -181,7 +403,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
             id: `${app.id}-syn-${sIdx}`,
             code: `SYN`,
             label: `Integrates → ${SPENTA_APPS.find((x) => x.id === synId)?.shortName ?? synId}`,
-            detail: 'Bidirectional telemetry and workflow trigger across Spenta Core.',
+            detail: `Bidirectional telemetry and workflow trigger over ${profile.transport}.`,
             metric: 'Native Bus',
             kind: 'synergy' as const,
             linkedAppId: synId,
@@ -193,7 +415,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
       id: 'trunk-hardware',
       index: '04',
       title: 'On-Prem Server Matrix & Dual-Shore Delivery',
-      subtitle: '4 Sovereign Hardware Tiers ($3.2K–$15.3K) + 20-FTE Dhaka R&D Hub',
+      subtitle: `${profile.costPosture} · 20-FTE Dhaka R&D Hub`,
       metric: '4 Tiers · $11.50/hr Pod',
       summary:
         'Predictable CapEx server appliances eliminating variable cloud GPU burn, paired with dual-shore San Jose · Australia · Dhaka engineering pods.',
@@ -218,7 +440,7 @@ function buildPathwayTree(): PathwayTrunkNode[] {
             id: `tier-${tier.id}-st`,
             code: 'NVMe',
             label: `Storage: ${tier.storage}`,
-            detail: 'Air-gapped local model weights, vector index, and encrypted audit ledger.',
+            detail: `Configured for ${profile.shortLabel} with encrypted audit ledger.`,
             metric: tier.capex,
             kind: 'hardware',
           },
@@ -332,11 +554,24 @@ function buildPathwayTree(): PathwayTrunkNode[] {
   ];
 }
 
-function buildPathwayMarkdownExport(tree: PathwayTrunkNode[]): string {
+function buildPathwayMarkdownExport(
+  tree: PathwayTrunkNode[],
+  profile: DeploymentProfileSpec,
+  trace: RequestWalkthroughTrace,
+): string {
   const lines: string[] = [
     '# Spenta Sovereign OS — Interactive OITS Dhaka × roadmap.sh Architecture Pathway',
     '',
-    '> Code-drawn branching blueprint covering L1–L6 Core, 13 Composable Modules, 4 On-Prem Hardware Tiers, and 0.88 OPA HITL Governance.',
+    `> **Active Deployment Topology**: ${profile.title}`,
+    `> **Transport**: ${profile.transport} | **Enclave**: ${profile.enclaveBoundary} | **Latency Budget**: ${profile.latencyBudget}`,
+    `> **Trade-Off**: ${profile.tradeOffGuidance}`,
+    `> **Pitfall & Mitigation**: ${profile.failurePitfall}`,
+    '',
+    `## Active Request Walkthrough: ${trace.label}`,
+    ...trace.hops.map(
+      (h) =>
+        `${h.stepNumber}. **${h.title}** (${h.latencyTarget}) — ${h.payloadSummary} *Mitigation*: ${h.pitfallMitigation}`,
+    ),
     '',
   ];
   tree.forEach((trunk) => {
@@ -357,12 +592,38 @@ function buildPathwayMarkdownExport(tree: PathwayTrunkNode[]): string {
 export function InteractiveArchitecturePathway({
   compact = false,
   defaultExpandedTrunks = ['trunk-core', 'trunk-ops'],
+  syncedPolarity,
+  onPolarityChange,
 }: InteractiveArchitecturePathwayProps) {
-  const { selectedIds, toggleApp, hitlConfidence, stackMetrics } = useStack();
-  const tree = useMemo(() => buildPathwayTree(), []);
+  const { theme, selectedIds, toggleApp, hitlConfidence, stackMetrics } = useStack();
 
-  // Scoped OITS Dhaka polarity: Warm Stone Light (#FAF8F4) default vs Nocturnal Navy (#0B1020)
-  const [polarity, setPolarity] = useState<'light' | 'dark'>('light');
+  // Deployment Provider Swapping (system-design-explainer.vercel.app)
+  const [providerId, setProviderId] = useState<DeploymentProviderId>('on-prem');
+  const activeProfile = DEPLOYMENT_PROFILES[providerId];
+  const tree = useMemo(() => buildPathwayTree(activeProfile), [activeProfile]);
+
+  // Hop-by-Hop Request Walkthrough Player (systemdesignprimer.vercel.app)
+  const [activeTraceId, setActiveTraceId] = useState<RequestWalkthroughTrace['id']>('banking-icr');
+  const [activeHopIdx, setActiveHopIdx] = useState<number>(-1); // -1 = idle
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+
+  const activeTrace = useMemo(
+    () => REQUEST_TRACES.find((t) => t.id === activeTraceId) ?? REQUEST_TRACES[0],
+    [activeTraceId],
+  );
+  const currentHop = activeHopIdx >= 0 ? activeTrace.hops[activeHopIdx] ?? null : null;
+
+  // Scoped OITS Dhaka polarity synced to portal theme or parent
+  const [localPolarity, setLocalPolarity] = useState<'light' | 'dark'>(syncedPolarity ?? theme);
+  useEffect(() => {
+    setLocalPolarity(syncedPolarity ?? theme);
+  }, [syncedPolarity, theme]);
+
+  const setPolarity = (next: 'light' | 'dark') => {
+    setLocalPolarity(next);
+    onPolarityChange?.(next);
+  };
+
   const [expandedTrunks, setExpandedTrunks] = useState<string[]>(defaultExpandedTrunks);
   const [expandedBranches, setExpandedBranches] = useState<string[]>([
     'branch-layer-L5',
@@ -374,7 +635,69 @@ export function InteractiveArchitecturePathway({
   const [hoveredTip, setHoveredTip] = useState<HoveredTipState | null>(null);
   const [exportedFlag, setExportedFlag] = useState(false);
 
-  const isDark = polarity === 'dark';
+  // Sync tree expansion & inspector whenever the active walkthrough hop advances
+  useEffect(() => {
+    if (!currentHop) return;
+    setExpandedTrunks((prev) =>
+      prev.includes(currentHop.trunkId) ? prev : [...prev, currentHop.trunkId],
+    );
+    setExpandedBranches((prev) =>
+      prev.includes(currentHop.branchId) ? prev : [...prev, currentHop.branchId],
+    );
+    setInspectedBranchId(currentHop.branchId);
+  }, [currentHop]);
+
+  // Clean autoplay timer cleared on pause, manual step, or unmount
+  useEffect(() => {
+    if (!isPlaying) return;
+    const timer = window.setInterval(() => {
+      setActiveHopIdx((prev) => {
+        const next = prev + 1;
+        if (next >= activeTrace.hops.length) {
+          setIsPlaying(false);
+          return activeTrace.hops.length - 1;
+        }
+        return next;
+      });
+    }, 2600);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, activeTrace.hops.length]);
+
+  const handleSelectTrace = (id: RequestWalkthroughTrace['id']) => {
+    setIsPlaying(false);
+    setActiveTraceId(id);
+    setActiveHopIdx(0);
+  };
+
+  const handleTogglePlay = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      return;
+    }
+    if (activeHopIdx < 0 || activeHopIdx >= activeTrace.hops.length - 1) {
+      setActiveHopIdx(0);
+    }
+    setIsPlaying(true);
+  };
+
+  const handleStepPrev = () => {
+    setIsPlaying(false);
+    setActiveHopIdx((prev) => (prev <= 0 ? 0 : prev - 1));
+  };
+
+  const handleStepNext = () => {
+    setIsPlaying(false);
+    setActiveHopIdx((prev) =>
+      prev < 0 ? 0 : Math.min(activeTrace.hops.length - 1, prev + 1),
+    );
+  };
+
+  const handleResetWalkthrough = () => {
+    setIsPlaying(false);
+    setActiveHopIdx(-1);
+  };
+
+  const isDark = localPolarity === 'dark';
 
   const inspectedContext = useMemo(() => {
     if (!inspectedBranchId) return null;
@@ -409,6 +732,8 @@ export function InteractiveArchitecturePathway({
   };
 
   const resetPathway = () => {
+    setIsPlaying(false);
+    setActiveHopIdx(-1);
     setExpandedTrunks(defaultExpandedTrunks);
     setExpandedBranches(['branch-layer-L5', 'branch-app-healthcare_erp']);
     setInspectedBranchId('branch-app-healthcare_erp');
@@ -416,8 +741,8 @@ export function InteractiveArchitecturePathway({
 
   const handleExportPathwayMd = () => {
     downloadMarkdownFile(
-      'spenta-oitsdhaka-roadmap-architecture-pathway.md',
-      buildPathwayMarkdownExport(tree),
+      `spenta-pathway-${providerId}-${activeTrace.id}.md`,
+      buildPathwayMarkdownExport(tree, activeProfile, activeTrace),
     );
     setExportedFlag(true);
     window.setTimeout(() => setExportedFlag(false), 1800);
@@ -450,33 +775,34 @@ export function InteractiveArchitecturePathway({
   const brandStroke = isDark ? '#7FA6FF' : '#1F3863';
   const inactiveStroke = isDark ? '#2E3862' : '#CFC8BC';
   const activeGreen = isDark ? '#6FCB9F' : '#1C6E46';
+  const hopAmber = isDark ? '#E0B063' : '#8A5C10';
 
   return (
     <section
-      className={`rounded-xl border transition-colors duration-200 overflow-hidden ${canvasClass}`}
+      className={`rounded-[10px] border transition-colors duration-200 overflow-hidden ${canvasClass}`}
       aria-label="Interactive OITS Dhaka and roadmap.sh Architecture Pathway"
     >
       {/* Top Editorial Header Bar */}
       <div
-        className={`px-4 sm:px-6 py-4 border-b flex flex-col lg:flex-row lg:items-center justify-between gap-3 ${bandClass}`}
+        className={`px-4 sm:px-6 py-4 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-3 ${bandClass}`}
       >
         <div className="space-y-1">
           <div className={`flex flex-wrap items-center gap-2 text-[11px] font-mono ${mutedText}`}>
             <span className={isDark ? 'text-[#8FA6E8] font-semibold' : 'text-[#1F3863] font-semibold'}>
-              PLATE 00 · CODE-DRAWN INTERACTIVE INFOGRAPHIC
+              PLATE 00 · CODE-DRAWN INTERACTIVE PATHWAY
             </span>
             <span aria-hidden="true">·</span>
-            <span>OITS Dhaka Editorial Theme × roadmap.sh Branch UX</span>
+            <span>OITS Dhaka × roadmap.sh × Provider Swap &amp; Trace Player</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">
               {selectedIds.length}/13 Modules Active · OPA {hitlConfidence.toFixed(2)}
             </span>
           </div>
           <h3 className="text-base sm:text-lg font-extrabold tracking-tight text-balance">
-            Interactive Sovereign Architecture Pathway &amp; Expandable Composition Tree
+            Interactive Sovereign Architecture Pathway &amp; Request Walkthrough
           </h3>
           <p className={`text-xs max-w-3xl leading-relaxed ${secondaryText}`}>
-            Hover any node to inspect contextual telemetry, click any pillar to branch into its sub-components, and click any sub-component to reveal its underlying compositions or toggle it directly into your Stack Composer.
+            Swap deployment topologies (On-Prem, Private VPC, Air-Gap), step through live multi-hop request traces, and click any pillar or branch to expand its compositions and sync with your Stack Composer.
           </p>
         </div>
 
@@ -560,15 +886,173 @@ export function InteractiveArchitecturePathway({
         </div>
       </div>
 
-      {/* Live Contextual Hover Tooltip Strip (Always Visible, Zero Viewport Clipping) */}
+      {/* Deployment Provider Switcher + Hop-by-Hop Walkthrough Transport Bar */}
       <div
-        className={`px-4 sm:px-6 py-2.5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
-          isDark
-            ? 'bg-[#141A32]/70 border-[#232B4A]'
-            : 'bg-[#FFFFFF] border-[#E4DFD6]'
+        className={`px-4 sm:px-6 py-3 border-b grid grid-cols-1 xl:grid-cols-12 gap-3 items-center ${
+          isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#FAF8F4] border-[#E4DFD6]'
         }`}
       >
-        {hoveredTip ? (
+        {/* Deployment Provider Swap (system-design-explainer pattern) */}
+        <div className="xl:col-span-5 flex flex-wrap items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase ${mutedText}`}>
+            <Server className="w-3.5 h-3.5" strokeWidth={1.6} />
+            <span>Topology:</span>
+          </span>
+          <div
+            role="group"
+            aria-label="Deployment provider topology"
+            className={`inline-flex flex-wrap items-center gap-1 p-1 rounded-lg border ${
+              isDark ? 'bg-[#0F1529] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
+            }`}
+          >
+            {(['on-prem', 'private-vpc', 'air-gapped'] as const).map((pid) => {
+              const prof = DEPLOYMENT_PROFILES[pid];
+              const active = providerId === pid;
+              return (
+                <button
+                  key={pid}
+                  type="button"
+                  onClick={() => setProviderId(pid)}
+                  aria-pressed={active}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    active
+                      ? isDark
+                        ? 'bg-[#6FCB9F] text-[#0B1020]'
+                        : 'bg-[#1C6E46] text-white'
+                      : isDark
+                        ? 'text-[#C3CCE4] hover:text-white'
+                        : 'text-[#4A5163] hover:text-[#16213A]'
+                  }`}
+                >
+                  {prof.shortLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Hop-by-Hop Request Walkthrough Player (systemdesignprimer pattern) */}
+        <div className="xl:col-span-7 flex flex-wrap items-center xl:justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-1">
+            {REQUEST_TRACES.map((tr) => {
+              const selected = tr.id === activeTraceId;
+              return (
+                <button
+                  key={tr.id}
+                  type="button"
+                  onClick={() => handleSelectTrace(tr.id)}
+                  className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    selected
+                      ? isDark
+                        ? 'bg-[#161D3A] border-[#8FA6E8] text-[#8FA6E8]'
+                        : 'bg-[#EEF3FB] border-[#1F3863] text-[#1F3863]'
+                      : isDark
+                        ? 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4] hover:border-[#7FA6FF]'
+                        : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163] hover:border-[#1F3863]'
+                  }`}
+                >
+                  {tr.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            className={`inline-flex items-center gap-1 p-1 rounded-lg border shrink-0 ${
+              isDark ? 'bg-[#0F1529] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                isPlaying
+                  ? isDark
+                    ? 'bg-[#E0B063] text-[#0B1020]'
+                    : 'bg-[#8A5C10] text-white'
+                  : isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020]'
+                    : 'bg-[#1F3863] text-white'
+              }`}
+            >
+              {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              <span>{isPlaying ? 'Pause' : 'Walkthrough'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleStepPrev}
+              aria-label="Previous walkthrough hop"
+              className={`p-1 rounded-md cursor-pointer ${secondaryText}`}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-mono text-[10px] font-bold px-1 tabular-nums">
+              {activeHopIdx >= 0 ? `${activeHopIdx + 1}/${activeTrace.hops.length}` : `0/${activeTrace.hops.length}`}
+            </span>
+            <button
+              type="button"
+              onClick={handleStepNext}
+              aria-label="Next walkthrough hop"
+              className={`p-1 rounded-md cursor-pointer ${secondaryText}`}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            {activeHopIdx >= 0 && (
+              <button
+                type="button"
+                onClick={handleResetWalkthrough}
+                aria-label="Reset walkthrough"
+                title="Stop and clear active trace"
+                className={`p-1 rounded-md cursor-pointer ${mutedText}`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Active Hop Telemetry Banner OR Contextual Hover Tooltip Strip */}
+      <div
+        className={`px-4 sm:px-6 py-2.5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+          currentHop
+            ? isDark
+              ? 'bg-[#2A2112]/70 border-[#E0B063]/40'
+              : 'bg-[#FDF5E6] border-[#8A5C10]/30'
+            : isDark
+              ? 'bg-[#141A32]/70 border-[#232B4A]'
+              : 'bg-[#FFFFFF] border-[#E4DFD6]'
+        }`}
+      >
+        {currentHop ? (
+          <>
+            <div className="min-w-0 flex flex-wrap items-center gap-2">
+              <span
+                className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 tabular-nums"
+                style={{
+                  backgroundColor: hopAmber,
+                  color: isDark ? '#0B1020' : '#FFFFFF',
+                }}
+              >
+                HOP {currentHop.stepNumber}/{activeTrace.hops.length}
+              </span>
+              <span className="font-bold">{currentHop.title}</span>
+              <span className={mutedText} aria-hidden="true">
+                ·
+              </span>
+              <span className={secondaryText}>{currentHop.payloadSummary}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0 font-mono text-[10.5px] tabular-nums">
+              <span style={{ color: activeGreen }} className="font-bold">
+                Target {currentHop.latencyTarget}
+              </span>
+              <span className={mutedText}>·</span>
+              <span className={`truncate max-w-[260px] ${secondaryText}`} title={currentHop.pitfallMitigation}>
+                {currentHop.pitfallMitigation}
+              </span>
+            </div>
+          </>
+        ) : hoveredTip ? (
           <>
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <span
@@ -594,9 +1078,12 @@ export function InteractiveArchitecturePathway({
         ) : (
           <div className={`flex flex-wrap items-center justify-between w-full gap-2 ${mutedText}`}>
             <span className="inline-flex items-center gap-1.5">
-              <GitBranch className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              <Shield className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
               <span>
-                Hover any architectural block for instant telemetry · Click pillars and sub-components to branch deeper
+                <strong className={isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}>
+                  {activeProfile.shortLabel}:
+                </strong>{' '}
+                {activeProfile.transport} · {activeProfile.latencyBudget}
               </span>
             </span>
             <span className="font-mono text-[11px] tabular-nums">
@@ -619,9 +1106,9 @@ export function InteractiveArchitecturePathway({
         >
           {/* Top Orthogonal Architectural Flow Bar (SVG Code-Drawn Overview) */}
           <div className={`rounded-lg border p-3.5 ${bandClass}`}>
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <span className={`font-mono text-[10px] tracking-[0.12em] uppercase ${mutedText}`}>
-                ORTHOGONAL SYSTEM SPINE (CLICK ANY PILLAR TO TOGGLE BRANCHES)
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+              <span className={`font-mono text-[10px] tracking-[0.08em] ${mutedText}`}>
+                Orthogonal System Spine · {activeProfile.shortLabel} (Click any pillar to toggle branches)
               </span>
               <span className={`font-mono text-[10px] tabular-nums ${mutedText}`}>
                 {expandedTrunks.length}/5 Pillars Expanded
@@ -645,6 +1132,7 @@ export function InteractiveArchitecturePathway({
               {tree.map((trunk, idx) => {
                 const x = 10 + idx * 174;
                 const isExpanded = expandedTrunks.includes(trunk.id);
+                const isHopTrunk = currentHop?.trunkId === trunk.id;
                 const activeCount = trunk.branches.filter(
                   (b) => b.appId && selectedIds.includes(b.appId),
                 ).length;
@@ -665,14 +1153,14 @@ export function InteractiveArchitecturePathway({
                     onMouseLeave={() => setHoveredTip(null)}
                     className="cursor-pointer"
                   >
-                    {idx > 0 && isExpanded && (
+                    {idx > 0 && (isExpanded || isHopTrunk) && (
                       <line
                         x1={x - 16}
                         y1="39"
                         x2={x}
                         y2="39"
-                        stroke={brandStroke}
-                        strokeWidth="2"
+                        stroke={isHopTrunk ? hopAmber : brandStroke}
+                        strokeWidth="2.2"
                       />
                     )}
                     <rect
@@ -682,32 +1170,48 @@ export function InteractiveArchitecturePathway({
                       height="58"
                       rx="8"
                       fill={
-                        isExpanded
+                        isHopTrunk
                           ? isDark
-                            ? '#161D3A'
-                            : '#EEF3FB'
-                          : isDark
-                            ? '#141A32'
-                            : '#FFFFFF'
+                            ? '#2A2112'
+                            : '#FDF5E6'
+                          : isExpanded
+                            ? isDark
+                              ? '#161D3A'
+                              : '#EEF3FB'
+                            : isDark
+                              ? '#141A32'
+                              : '#FFFFFF'
                       }
                       stroke={
-                        activeCount > 0
-                          ? activeGreen
-                          : isExpanded
-                            ? brandStroke
-                            : inactiveStroke
+                        isHopTrunk
+                          ? hopAmber
+                          : activeCount > 0
+                            ? activeGreen
+                            : isExpanded
+                              ? brandStroke
+                              : inactiveStroke
                       }
-                      strokeWidth={isExpanded ? 1.8 : 1.15}
+                      strokeWidth={isHopTrunk ? 2.2 : isExpanded ? 1.8 : 1.15}
                     />
                     <text
                       x={x + 12}
                       y="27"
-                      fill={isExpanded ? brandStroke : isDark ? '#8D97B5' : '#5F6576'}
+                      fill={
+                        isHopTrunk
+                          ? hopAmber
+                          : isExpanded
+                            ? brandStroke
+                            : isDark
+                              ? '#8D97B5'
+                              : '#5F6576'
+                      }
                       fontSize="9.5"
                       fontWeight="700"
                       fontFamily="IBM Plex Mono, JetBrains Mono, monospace"
                     >
-                      {trunk.index}. {isExpanded ? 'EXPANDED' : 'BRANCH +'}
+                      {isHopTrunk
+                        ? `HOP ${currentHop.stepNumber} ACTIVE`
+                        : `${trunk.index}. ${isExpanded ? 'EXPANDED' : 'BRANCH +'}`}
                     </text>
                     <text
                       x={x + 12}
@@ -738,6 +1242,7 @@ export function InteractiveArchitecturePathway({
           <div className="space-y-3.5">
             {tree.map((trunk) => {
               const isTrunkOpen = expandedTrunks.includes(trunk.id);
+              const isHopTrunk = currentHop?.trunkId === trunk.id;
               const activeAppsInTrunk = trunk.branches.filter(
                 (b) => b.appId && selectedIds.includes(b.appId),
               ).length;
@@ -760,23 +1265,31 @@ export function InteractiveArchitecturePathway({
                     onMouseLeave={() => setHoveredTip(null)}
                     aria-expanded={isTrunkOpen}
                     className={`w-full text-left rounded-[10px] border px-4 py-3.5 transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer ${
-                      isTrunkOpen
+                      isHopTrunk
                         ? isDark
-                          ? 'bg-[#161D3A] border-[#7FA6FF]'
-                          : 'bg-[#EEF3FB] border-[#1F3863]'
-                        : cardClass
+                          ? 'bg-[#2A2112]/70 border-[#E0B063]'
+                          : 'bg-[#FDF5E6] border-[#8A5C10]'
+                        : isTrunkOpen
+                          ? isDark
+                            ? 'bg-[#161D3A] border-[#7FA6FF]'
+                            : 'bg-[#EEF3FB] border-[#1F3863]'
+                          : cardClass
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <span
                         className={`font-mono text-xs font-bold px-2 py-1 rounded-md shrink-0 tabular-nums ${
-                          isTrunkOpen
+                          isHopTrunk
                             ? isDark
-                              ? 'bg-[#8FA6E8] text-[#0B1020]'
-                              : 'bg-[#1F3863] text-white'
-                            : isDark
-                              ? 'bg-[#0F1529] text-[#8FA6E8]'
-                              : 'bg-[#F2EFE9] text-[#1F3863]'
+                              ? 'bg-[#E0B063] text-[#0B1020]'
+                              : 'bg-[#8A5C10] text-white'
+                            : isTrunkOpen
+                              ? isDark
+                                ? 'bg-[#8FA6E8] text-[#0B1020]'
+                                : 'bg-[#1F3863] text-white'
+                              : isDark
+                                ? 'bg-[#0F1529] text-[#8FA6E8]'
+                                : 'bg-[#F2EFE9] text-[#1F3863]'
                         }`}
                       >
                         {trunk.index}
@@ -815,45 +1328,50 @@ export function InteractiveArchitecturePathway({
                   {/* Expanded Sub-Component Branches with SVG Orthogonal Tree Rails */}
                   {isTrunkOpen && (
                     <div className="pl-3 sm:pl-6 relative">
-                      {/* Vertical SVG Connector Rail */}
                       <div
                         aria-hidden="true"
                         className="absolute left-3 sm:left-6 top-0 bottom-3 w-px"
-                        style={{ backgroundColor: brandStroke, opacity: 0.45 }}
+                        style={{ backgroundColor: isHopTrunk ? hopAmber : brandStroke, opacity: 0.45 }}
                       />
 
                       <div className="pl-4 sm:pl-5 grid grid-cols-1 md:grid-cols-2 gap-2.5">
                         {trunk.branches.map((branch) => {
                           const isBranchOpen = expandedBranches.includes(branch.id);
                           const isInspected = inspectedBranchId === branch.id;
+                          const isHopBranch = currentHop?.branchId === branch.id;
                           const isInStack = branch.appId ? selectedIds.includes(branch.appId) : false;
 
                           return (
                             <div key={branch.id} className="relative space-y-2">
-                              {/* Horizontal Branch Connector Tick */}
                               <span
                                 aria-hidden="true"
                                 className="hidden md:block absolute -left-5 top-5 w-5 h-px"
                                 style={{
-                                  backgroundColor: isInStack
-                                    ? activeGreen
-                                    : isInspected
-                                      ? brandStroke
-                                      : inactiveStroke,
+                                  backgroundColor: isHopBranch
+                                    ? hopAmber
+                                    : isInStack
+                                      ? activeGreen
+                                      : isInspected
+                                        ? brandStroke
+                                        : inactiveStroke,
                                 }}
                               />
 
                               <div
                                 className={`rounded-[10px] border transition-all duration-150 ${
-                                  isInspected
+                                  isHopBranch
                                     ? isDark
-                                      ? 'bg-[#141A32] border-[#7FA6FF] shadow-sm'
-                                      : 'bg-[#FFFFFF] border-[#1F3863] shadow-sm'
-                                    : isInStack
+                                      ? 'bg-[#2A2112]/80 border-[#E0B063] shadow-sm'
+                                      : 'bg-[#FDF5E6] border-[#8A5C10] shadow-sm'
+                                    : isInspected
                                       ? isDark
-                                        ? 'bg-[#141A32] border-[#6FCB9F]/60'
-                                        : 'bg-[#FFFFFF] border-[#1C6E46]/60'
-                                      : cardClass
+                                        ? 'bg-[#141A32] border-[#7FA6FF] shadow-sm'
+                                        : 'bg-[#FFFFFF] border-[#1F3863] shadow-sm'
+                                      : isInStack
+                                        ? isDark
+                                          ? 'bg-[#141A32] border-[#6FCB9F]/60'
+                                          : 'bg-[#FFFFFF] border-[#1C6E46]/60'
+                                        : cardClass
                                 }`}
                               >
                                 <div className="p-3 flex items-start justify-between gap-2">
@@ -876,16 +1394,20 @@ export function InteractiveArchitecturePathway({
                                     <div className="flex items-center gap-1.5 font-mono text-[10px]">
                                       <span
                                         className={
-                                          isInStack
+                                          isHopBranch
                                             ? isDark
-                                              ? 'text-[#6FCB9F] font-bold'
-                                              : 'text-[#1C6E46] font-bold'
-                                            : isDark
-                                              ? 'text-[#8FA6E8] font-bold'
-                                              : 'text-[#1F3863] font-bold'
+                                              ? 'text-[#E0B063] font-bold'
+                                              : 'text-[#8A5C10] font-bold'
+                                            : isInStack
+                                              ? isDark
+                                                ? 'text-[#6FCB9F] font-bold'
+                                                : 'text-[#1C6E46] font-bold'
+                                              : isDark
+                                                ? 'text-[#8FA6E8] font-bold'
+                                                : 'text-[#1F3863] font-bold'
                                         }
                                       >
-                                        {branch.code}
+                                        {isHopBranch ? `HOP ${currentHop.stepNumber} · ${branch.code}` : branch.code}
                                       </span>
                                       <span className={mutedText} aria-hidden="true">
                                         ·
@@ -961,7 +1483,7 @@ export function InteractiveArchitecturePathway({
                                         : 'border-[#ECE8E0] bg-[#FAF8F4]/70'
                                     }`}
                                   >
-                                    <div className={`font-mono text-[9.5px] uppercase tracking-wider ${mutedText}`}>
+                                    <div className={`font-mono text-[9.5px] ${mutedText}`}>
                                       Sub-Components &amp; Compositions ({branch.compositions.length})
                                     </div>
                                     {branch.compositions.map((comp) => (
@@ -1040,7 +1562,7 @@ export function InteractiveArchitecturePathway({
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2 pb-3 border-b border-current/10">
                 <div className="min-w-0">
-                  <div className={`font-mono text-[10px] uppercase tracking-[0.12em] ${mutedText}`}>
+                  <div className={`font-mono text-[10px] ${mutedText}`}>
                     {inspectedContext.trunk.index}. {inspectedContext.trunk.title}
                   </div>
                   <h4 className="text-base font-extrabold tracking-tight mt-0.5 leading-snug">
@@ -1079,9 +1601,33 @@ export function InteractiveArchitecturePathway({
                   <div className="font-bold mt-0.5 truncate">
                     {inspectedContext.branch.proofClient ??
                       inspectedContext.branch.layers?.join(' · ') ??
-                      'Sovereign Core'}
+                      activeProfile.shortLabel}
                   </div>
                 </div>
+              </div>
+
+              {/* Deployment Trade-Off & Failure Pitfall Callout (system-design-explainer) */}
+              <div
+                className={`rounded-lg border p-3 space-y-1.5 text-[11px] ${
+                  isDark
+                    ? 'bg-[#141A32] border-[#2E3862]'
+                    : 'bg-[#FFFFFF] border-[#CFC8BC]'
+                }`}
+              >
+                <div
+                  className={`flex items-center gap-1.5 font-mono text-[10px] font-bold ${
+                    isDark ? 'text-[#E0B063]' : 'text-[#8A5C10]'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
+                  <span>Deployment Trade-Off &amp; Pitfall ({activeProfile.shortLabel})</span>
+                </div>
+                <p className={`leading-relaxed ${secondaryText}`}>
+                  {activeProfile.tradeOffGuidance}
+                </p>
+                <p className={`font-mono text-[10.5px] leading-snug ${mutedText}`}>
+                  {activeProfile.failurePitfall}
+                </p>
               </div>
 
               {/* Stack Composer Sync Action if Linked to a Spenta Module */}
@@ -1102,7 +1648,7 @@ export function InteractiveArchitecturePathway({
                   {selectedIds.includes(inspectedContext.branch.appId) ? (
                     <>
                       <Check className="w-3.5 h-3.5" strokeWidth={2.25} />
-                      <span>Included in Your Stack Composer (Click to Remove)</span>
+                      <span>Included in Stack Composer (Click to Remove)</span>
                     </>
                   ) : (
                     <>
@@ -1115,7 +1661,7 @@ export function InteractiveArchitecturePathway({
 
               {/* Detailed Composition Checklist */}
               <div className="space-y-2">
-                <div className={`flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider ${mutedText}`}>
+                <div className={`flex items-center gap-1.5 font-mono text-[10px] ${mutedText}`}>
                   <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>
                     Branch Compositions ({inspectedContext.branch.compositions.length})
@@ -1166,7 +1712,7 @@ export function InteractiveArchitecturePathway({
               <GitBranch className={`w-6 h-6 ${mutedText}`} strokeWidth={1.5} />
               <div className="text-sm font-bold">Select Any Branch Node</div>
               <p className={`text-xs max-w-xs leading-relaxed ${secondaryText}`}>
-                Click any architectural sub-component on the left to inspect its protocols, capabilities, native synergies, and live Stack Composer binding.
+                Click any architectural sub-component on the left—or press Walkthrough—to inspect protocols, failure mitigations, and live Stack Composer bindings.
               </p>
             </div>
           )}
@@ -1176,7 +1722,7 @@ export function InteractiveArchitecturePathway({
               isDark ? 'border-[#232B4A] text-[#8D97B5]' : 'border-[#E4DFD6] text-[#5F6576]'
             }`}
           >
-            <span>OITS Dhaka Stone × roadmap.sh UX</span>
+            <span>{activeProfile.shortLabel}</span>
             <span className="tabular-nums">13 Apps · 6 Layers · 4 Tiers</span>
           </div>
         </aside>
