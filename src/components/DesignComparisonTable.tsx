@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Copy, ExternalLink, Table2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, Moon, Sun, Table2 } from 'lucide-react';
+import { useStack } from '../store/StackContext';
 
 export type DesignPillar = 'visual-style' | 'typography' | 'spacing' | 'color-palette';
 
@@ -181,17 +182,21 @@ function buildMarkdownTable(rows: ComparisonRow[]): string {
   return `${header}\n${body}`;
 }
 
-function SwatchRow({ hexes }: { hexes: string[] }) {
+function SwatchRow({ hexes, isDark }: { hexes: string[]; isDark: boolean }) {
   return (
     <div className="flex items-center gap-1.5 mt-2">
       {hexes.map((hex) => (
         <span
           key={hex}
           title={hex}
-          className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400"
+          className={`inline-flex items-center gap-1 text-[10px] font-mono ${
+            isDark ? 'text-zinc-400' : 'text-zinc-500'
+          }`}
         >
           <span
-            className="w-3 h-3 rounded-xs border border-black/15 dark:border-white/20 shrink-0"
+            className={`w-3 h-3 rounded-xs border shrink-0 ${
+              isDark ? 'border-white/20' : 'border-black/15'
+            }`}
             style={{ backgroundColor: hex }}
           />
         </span>
@@ -209,8 +214,12 @@ export function DesignComparisonTable({
   heading = 'Design & Theme Benchmark Comparison',
   kicker = 'Visual Style · Typography · Spacing · Color Palette',
 }: DesignComparisonTableProps) {
+  const { theme: portalTheme } = useStack();
   const [activePillar, setActivePillar] = useState<'all' | DesignPillar>('all');
+  const [tableTheme, setTableTheme] = useState<'light' | 'dark'>(portalTheme);
   const [copied, setCopied] = useState(false);
+
+  const isTableDark = tableTheme === 'dark';
 
   const visibleRows = useMemo(() => {
     if (activePillar === 'all') return COMPARISON_ROWS;
@@ -265,6 +274,42 @@ export function DesignComparisonTable({
             })}
           </div>
 
+          {/* Scoped Comparison View Light / Dark Mode Toggle */}
+          <div
+            role="group"
+            aria-label="Comparison table color mode"
+            className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]"
+          >
+            <button
+              type="button"
+              aria-pressed={!isTableDark}
+              onClick={() => setTableTheme('light')}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                !isTableDark
+                  ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-zinc-50 shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+              }`}
+              title="Preview comparison table in Light Mode"
+            >
+              <Sun className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              <span>Light</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={isTableDark}
+              onClick={() => setTableTheme('dark')}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                isTableDark
+                  ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+              }`}
+              title="Preview comparison table in Dark Mode"
+            >
+              <Moon className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              <span>Dark</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleCopyMarkdown}
@@ -280,58 +325,98 @@ export function DesignComparisonTable({
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-hidden">
+      <div
+        className={`rounded-xl border overflow-hidden transition-colors duration-200 ${
+          isTableDark
+            ? 'border-white/[0.1] bg-[#111315] text-zinc-100'
+            : 'border-zinc-200 bg-white text-zinc-900'
+        }`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse min-w-[880px]">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0C0E10]">
+              <tr
+                className={`border-b transition-colors duration-200 ${
+                  isTableDark
+                    ? 'border-white/[0.08] bg-[#0C0E10]'
+                    : 'border-zinc-200 bg-zinc-50'
+                }`}
+              >
                 <th
                   scope="col"
-                  className="sticky left-0 z-10 bg-zinc-50 dark:bg-[#0C0E10] px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 w-[190px] border-r border-zinc-200 dark:border-white/[0.06]"
+                  className={`sticky left-0 z-10 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-wider w-[190px] border-r transition-colors duration-200 ${
+                    isTableDark
+                      ? 'bg-[#0C0E10] text-zinc-400 border-white/[0.06]'
+                      : 'bg-zinc-50 text-zinc-500 border-zinc-200'
+                  }`}
                 >
                   Design Criterion
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className="font-bold text-emerald-700 dark:text-emerald-400">
+                  <div
+                    className={`font-bold ${
+                      isTableDark ? 'text-emerald-400' : 'text-emerald-700'
+                    }`}
+                  >
                     Odoo (Spenta OS)
                   </div>
-                  <div className="text-[11px] font-normal text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  <div
+                    className={`text-[11px] font-normal mt-0.5 ${
+                      isTableDark ? 'text-zinc-400' : 'text-zinc-500'
+                    }`}
+                  >
                     Current Portal · spenta.tech
                   </div>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className="font-bold text-zinc-950 dark:text-zinc-100">OITS Web</div>
+                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
+                    OITS Web
+                  </div>
                   <a
                     href="https://oits-web-v2-5i7a.vercel.app/"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-normal text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 mt-0.5"
+                    className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
+                      isTableDark
+                        ? 'text-zinc-400 hover:text-emerald-400'
+                        : 'text-zinc-500 hover:text-emerald-600'
+                    }`}
                   >
                     <span>oits-web-v2</span>
                     <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
                   </a>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className="font-bold text-zinc-950 dark:text-zinc-100">
+                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
                     MMIS Intel Dashboards
                   </div>
                   <a
                     href="https://mmis-intel-dashboards-v2.vercel.app/"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-normal text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 mt-0.5"
+                    className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
+                      isTableDark
+                        ? 'text-zinc-400 hover:text-emerald-400'
+                        : 'text-zinc-500 hover:text-emerald-600'
+                    }`}
                   >
                     <span>mmis-intel-dashboards-v2</span>
                     <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
                   </a>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className="font-bold text-zinc-950 dark:text-zinc-100">OITS Dhaka</div>
+                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
+                    OITS Dhaka
+                  </div>
                   <a
                     href="https://www.oitsdhaka.com/"
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-normal text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 mt-0.5"
+                    className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
+                      isTableDark
+                        ? 'text-zinc-400 hover:text-emerald-400'
+                        : 'text-zinc-500 hover:text-emerald-600'
+                    }`}
                   >
                     <span>oitsdhaka.com</span>
                     <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
@@ -340,36 +425,72 @@ export function DesignComparisonTable({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-zinc-200 dark:divide-white/[0.06]">
+            <tbody
+              className={`divide-y ${
+                isTableDark ? 'divide-white/[0.06]' : 'divide-zinc-200'
+              }`}
+            >
               {visibleRows.map((row) => (
                 <tr
                   key={row.id}
-                  className="hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors"
+                  className={`transition-colors ${
+                    isTableDark ? 'hover:bg-white/[0.025]' : 'hover:bg-zinc-50/90'
+                  }`}
                 >
                   <th
                     scope="row"
-                    className="sticky left-0 z-10 bg-white dark:bg-[#111315] px-4 py-3 text-left font-semibold text-zinc-950 dark:text-zinc-100 border-r border-zinc-200 dark:border-white/[0.06] align-top"
+                    className={`sticky left-0 z-10 px-4 py-3 text-left font-semibold border-r align-top transition-colors duration-200 ${
+                      isTableDark
+                        ? 'bg-[#111315] text-zinc-100 border-white/[0.06]'
+                        : 'bg-white text-zinc-950 border-zinc-200'
+                    }`}
                   >
                     <div>{row.dimension}</div>
-                    <div className="text-[10px] font-mono font-normal text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <div
+                      className={`text-[10px] font-mono font-normal mt-0.5 ${
+                        isTableDark ? 'text-zinc-400' : 'text-zinc-500'
+                      }`}
+                    >
                       {row.pillarLabel}
                     </div>
                   </th>
-                  <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100 font-medium leading-relaxed align-top bg-emerald-500/[0.03] dark:bg-emerald-500/[0.04]">
+                  <td
+                    className={`px-4 py-3 font-medium leading-relaxed align-top ${
+                      isTableDark
+                        ? 'text-zinc-100 bg-emerald-500/[0.05]'
+                        : 'text-zinc-900 bg-emerald-500/[0.04]'
+                    }`}
+                  >
                     <div>{row.odoo}</div>
-                    {row.swatches && <SwatchRow hexes={row.swatches.odoo} />}
+                    {row.swatches && <SwatchRow hexes={row.swatches.odoo} isDark={isTableDark} />}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 leading-relaxed align-top">
+                  <td
+                    className={`px-4 py-3 leading-relaxed align-top ${
+                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                    }`}
+                  >
                     <div>{row.oitsWeb}</div>
-                    {row.swatches && <SwatchRow hexes={row.swatches.oitsWeb} />}
+                    {row.swatches && (
+                      <SwatchRow hexes={row.swatches.oitsWeb} isDark={isTableDark} />
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 leading-relaxed align-top">
+                  <td
+                    className={`px-4 py-3 leading-relaxed align-top ${
+                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                    }`}
+                  >
                     <div>{row.mmis}</div>
-                    {row.swatches && <SwatchRow hexes={row.swatches.mmis} />}
+                    {row.swatches && <SwatchRow hexes={row.swatches.mmis} isDark={isTableDark} />}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 leading-relaxed align-top">
+                  <td
+                    className={`px-4 py-3 leading-relaxed align-top ${
+                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                    }`}
+                  >
                     <div>{row.oitsDhaka}</div>
-                    {row.swatches && <SwatchRow hexes={row.swatches.oitsDhaka} />}
+                    {row.swatches && (
+                      <SwatchRow hexes={row.swatches.oitsDhaka} isDark={isTableDark} />
+                    )}
                   </td>
                 </tr>
               ))}
