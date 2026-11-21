@@ -1,4 +1,5 @@
 import { ThemeReferenceSpec } from '../data/promptThemeStudioData';
+import { DeploymentProfileSpec } from '../data/deploymentProfiles';
 
 export interface ThemeOverridePatch {
   brandHex?: string;
@@ -51,12 +52,20 @@ export function buildCustomThemeTokenCss(
   spec: ThemeReferenceSpec,
   polarity: 'light' | 'dark',
   overrides?: ThemeOverridePatch,
+  deploymentProfile?: DeploymentProfileSpec,
 ): string {
   const t = resolveEffectiveThemeTokens(spec, polarity, overrides);
   const padMain = t.density === 'compact' ? '12px' : t.density === 'editorial' ? '24px' : '16px';
   const gapGrid = t.density === 'compact' ? '8px' : t.density === 'editorial' ? '16px' : '12px';
+  const infraComment = deploymentProfile
+    ? `\n * Infrastructure Target: ${deploymentProfile.shortLabel} (${deploymentProfile.latencyBudget})\n * Transport: ${deploymentProfile.transport}\n * Enclave: ${deploymentProfile.enclaveBoundary}`
+    : '';
+  const infraVars = deploymentProfile
+    ? `\n  --infra-target: "${deploymentProfile.switcherLabel}";\n  --infra-latency-budget: "${deploymentProfile.latencyBudget}";`
+    : '';
 
-  return `/* ${spec.name} (${polarity.toUpperCase()}) — Generated Design Mode Tokens */
+  return `/* ${spec.name} (${polarity.toUpperCase()}) — Generated Design Mode Tokens${infraComment}
+ */
 :root${polarity === 'dark' ? '.dark' : ''} {
   --bg-canvas: ${t.canvas};
   --bg-surface: ${t.surface};
@@ -80,7 +89,7 @@ export function buildCustomThemeTokenCss(
   --radius-control: ${t.radiusControl};
   --space-surface: ${padMain};
   --space-gap: ${gapGrid};
-  --elevation-card: ${t.shadow};
+  --elevation-card: ${t.shadow};${infraVars}
 }
 
 @theme inline {
@@ -98,6 +107,7 @@ export function buildVirtualThemeIframeSrcDoc(
   spec: ThemeReferenceSpec,
   polarity: 'light' | 'dark',
   overrides?: ThemeOverridePatch,
+  deploymentProfile?: DeploymentProfileSpec,
 ): string {
   const tokens = resolveEffectiveThemeTokens(spec, polarity, overrides);
   const isSidebar = spec.navLayout === 'sidebar-workbench';
@@ -167,14 +177,17 @@ export function buildVirtualThemeIframeSrcDoc(
           ? 'Institutional Systems & Sovereign Architecture'
           : 'Composable Sovereign AI Operating System';
 
+  const targetTag = deploymentProfile ? deploymentProfile.switcherLabel.toUpperCase() : 'ON-PREM';
+  const targetLatency = deploymentProfile ? deploymentProfile.latencyBudget : '<35ms LAN';
+
   const heroEyebrow =
     spec.id === 'oits-web-v2'
-      ? '01. CLOUD & ENGINEERING MATRIX'
+      ? `01. CLOUD & ENGINEERING · ${targetTag}`
       : spec.id === 'mmis-v2'
-        ? 'EXECUTIVE INTELLIGENCE SUITE'
+        ? `EXECUTIVE INTELLIGENCE · ${targetTag}`
         : spec.id === 'oitsdhaka'
-          ? '01. ARCHITECTURAL BLUEPRINT · DHAKA HUB'
-          : 'L1–L6 SOVEREIGN COMMAND · 13 MODULES';
+          ? `01. ARCHITECTURAL BLUEPRINT · ${targetTag}`
+          : `L1–L6 SOVEREIGN COMMAND · ${targetTag}`;
 
   const navShellHtml = isSidebar
     ? `
@@ -214,15 +227,15 @@ export function buildVirtualThemeIframeSrcDoc(
     ? `
       <div class="editorial-band">
         <div class="band-head">
-          <span class="mono-label">CODE-DRAWN ARCHITECTURE SCHEMATIC</span>
-          <span class="mono-label">0.88 OPA GATE</span>
+          <span class="mono-label">CODE-DRAWN ARCHITECTURE · ${escapeHtml(targetTag)}</span>
+          <span class="mono-label">${escapeHtml(targetLatency)}</span>
         </div>
         <svg viewBox="0 0 420 58" class="schematic-svg" role="img" aria-label="Editorial architectural flow">
           <line x1="88" y1="29" x2="152" y2="29" stroke="${tokens.brand}" stroke-width="1.25" />
           <line x1="268" y1="29" x2="332" y2="29" stroke="${tokens.brand}" stroke-width="1.25" stroke-dasharray="3 2" />
           <rect x="6" y="11" width="82" height="36" rx="6" fill="${tokens.surface}" stroke="${tokens.border}" stroke-width="1.2" />
           <text x="47" y="27" text-anchor="middle" fill="${tokens.mutedInk}" font-size="7" font-family="monospace">01. CORE</text>
-          <text x="47" y="39" text-anchor="middle" fill="${tokens.ink}" font-size="8.5" font-weight="700">L1–L6 Stack</text>
+          <text x="47" y="39" text-anchor="middle" fill="${tokens.ink}" font-size="8.5" font-weight="700">${escapeHtml(targetTag)}</text>
           <rect x="152" y="11" width="116" height="36" rx="6" fill="${tokens.accentSoft}" stroke="${tokens.brand}" stroke-width="1.4" />
           <text x="210" y="27" text-anchor="middle" fill="${tokens.brand}" font-size="7" font-family="monospace">02. GOVERNANCE</text>
           <text x="210" y="39" text-anchor="middle" fill="${tokens.ink}" font-size="8.5" font-weight="700">0.88 HITL Gate</text>

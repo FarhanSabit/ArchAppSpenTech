@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
@@ -16,6 +17,8 @@ import {
   Palette,
   RotateCcw,
   Search,
+  Server,
+  Shield,
   SlidersHorizontal,
   Smartphone,
   Sun,
@@ -43,6 +46,12 @@ import {
   buildCustomThemeTokenCss,
   buildVirtualThemeIframeSrcDoc,
 } from '../utils/virtualThemeIframeHtml';
+import {
+  DEPLOYMENT_PROFILES,
+  DEPLOYMENT_TARGET_ORDER,
+} from '../data/deploymentProfiles';
+import { SERVER_TIERS } from '../data/spentaManifest';
+import { useStack } from '../store/StackContext';
 import { DesignComparisonTable } from './DesignComparisonTable';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
 import { ReferoPatternExplorer } from './ReferoPatternExplorer';
@@ -74,6 +83,17 @@ type ViewportSize = 'desktop' | 'tablet' | 'mobile';
 type WorkbenchMode = 'preview' | 'split' | 'code';
 
 export function PromptThemeStudio() {
+  const {
+    deploymentTarget,
+    deploymentProfile,
+    setDeploymentTarget,
+    coreLayerConfigs,
+    stackMetrics,
+    selectedApps,
+    exportStackJson,
+    setActiveTab,
+  } = useStack();
+
   // P0/P1/P2 prompt deck state
   const [priorityFilter, setPriorityFilter] = useState<'All' | PromptPriority>('All');
   const [promptQuery, setPromptQuery] = useState('');
@@ -146,13 +166,25 @@ export function PromptThemeStudio() {
   };
 
   const singleIframeSrcDoc = useMemo(
-    () => buildVirtualThemeIframeSrcDoc(activeTheme, previewPolarity, activeOverrides),
-    [activeTheme, previewPolarity, activeOverrides],
+    () =>
+      buildVirtualThemeIframeSrcDoc(
+        activeTheme,
+        previewPolarity,
+        activeOverrides,
+        deploymentProfile,
+      ),
+    [activeTheme, previewPolarity, activeOverrides, deploymentProfile],
   );
 
   const liveTokenCssCode = useMemo(
-    () => buildCustomThemeTokenCss(activeTheme, previewPolarity, activeOverrides),
-    [activeTheme, previewPolarity, activeOverrides],
+    () =>
+      buildCustomThemeTokenCss(
+        activeTheme,
+        previewPolarity,
+        activeOverrides,
+        deploymentProfile,
+      ),
+    [activeTheme, previewPolarity, activeOverrides, deploymentProfile],
   );
 
   const gridIframeDocs = useMemo(
@@ -164,10 +196,22 @@ export function PromptThemeStudio() {
           spec,
           iframePolarities[spec.id],
           themeOverrides[spec.id],
+          deploymentProfile,
         ),
       })),
-    [iframePolarities, themeOverrides],
+    [iframePolarities, themeOverrides, deploymentProfile],
   );
+
+  const coreMetadataSummary = useMemo(() => {
+    const layers = Object.values(coreLayerConfigs);
+    const airGappedCount = layers.filter((l) => l.isolationMode === 'Air-Gapped On-Prem').length;
+    const vpcCount = layers.filter((l) => l.isolationMode === 'Private Sovereign VPC').length;
+    const teeCount = layers.filter((l) => l.teeEnabled).length;
+    const strictOpaCount = layers.filter((l) => l.policyMode === 'Strict OPA (>= 0.88 HITL)').length;
+    return { airGappedCount, vpcCount, teeCount, strictOpaCount };
+  }, [coreLayerConfigs]);
+
+  const activeServerTier = SERVER_TIERS[stackMetrics.tier];
 
   const filteredPrompts = useMemo(() => {
     const q = promptQuery.trim().toLowerCase();
@@ -369,6 +413,127 @@ export function PromptThemeStudio() {
               )}
               <span>{downloadedKey === 'bundle-full' ? 'Downloaded Pack' : 'Download Full Pack (.md)'}</span>
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Deployment Configuration Switcher & Live Project Architecture Metadata */}
+      <section
+        aria-label="Deployment configuration switcher and project architecture metadata"
+        className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-hidden"
+      >
+        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="inline-flex items-center gap-1.5 font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+                <Server className="w-3.5 h-3.5" strokeWidth={1.65} />
+                <span>Deployment Configuration</span>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>Updates L1–L6 Core isolation, Pathway topology, virtual previews &amp; JSON manifests</span>
+            </div>
+            <h3 className="text-base font-bold text-zinc-950 dark:text-zinc-50 tracking-tight">
+              {deploymentProfile.title}
+            </h3>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div
+              role="group"
+              aria-label="Infrastructure target environment"
+              className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+            >
+              {DEPLOYMENT_TARGET_ORDER.map((targetId) => {
+                const prof = DEPLOYMENT_PROFILES[targetId];
+                const active = deploymentTarget === targetId;
+                return (
+                  <button
+                    key={targetId}
+                    type="button"
+                    onClick={() => setDeploymentTarget(targetId, 'Studio Workspace')}
+                    aria-pressed={active}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      active
+                        ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    {prof.switcherLabel}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => exportStackJson({ exportedFrom: 'Studio Deployment Switcher' })}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" strokeWidth={1.6} />
+              <span>Export Manifest (.json)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('Spenta Core')}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <span>Inspect L1–L6 Core</span>
+              <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
+            </button>
+          </div>
+        </div>
+
+        {/* Live Updated Project Architecture Metadata Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 dark:divide-white/[0.07]">
+          <div className="p-4 space-y-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              Transport &amp; Latency Budget
+            </div>
+            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50 tabular-nums">
+              {deploymentProfile.latencyBudget}
+            </div>
+            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+              {deploymentProfile.transport}
+            </div>
+          </div>
+
+          <div className="p-4 space-y-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              Enclave &amp; Egress Boundary
+            </div>
+            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50">
+              {deploymentProfile.egressPolicy}
+            </div>
+            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+              {deploymentProfile.enclaveBoundary}
+            </div>
+          </div>
+
+          <div className="p-4 space-y-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              Active L1–L6 Core Metadata
+            </div>
+            <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 font-mono tabular-nums">
+              {coreMetadataSummary.teeCount}/6 TEE · {coreMetadataSummary.strictOpaCount}/6 Strict OPA
+            </div>
+            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono tabular-nums">
+              {coreMetadataSummary.airGappedCount} Air-Gapped · {coreMetadataSummary.vpcCount} VPC ·{' '}
+              {activeServerTier.code} ({selectedApps.length} Apps)
+            </div>
+          </div>
+
+          <div className="p-4 space-y-1">
+            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+              <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={1.6} />
+              <span>Compliance &amp; Cost Posture</span>
+            </div>
+            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50">
+              {deploymentProfile.compliancePosture}
+            </div>
+            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+              {deploymentProfile.costPosture}
+            </div>
           </div>
         </div>
       </section>

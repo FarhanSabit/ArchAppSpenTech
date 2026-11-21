@@ -9,11 +9,18 @@ import {
   STARTER_RECIPES,
 } from '../data/spentaManifest';
 
+import {
+  DEPLOYMENT_PROFILES,
+  DeploymentProfileSpec,
+  DeploymentTargetId,
+} from '../data/deploymentProfiles';
+
 const STACK_STORAGE_KEY = 'spenta_sovereign_stack_v1';
 const PROPOSALS_STORAGE_KEY = 'spenta_saved_proposals_v1';
 const CORE_CONFIG_STORAGE_KEY = 'spenta_core_layer_configs_v1';
 const CORE_AUDIT_STORAGE_KEY = 'spenta_core_audit_log_v1';
 const THEME_STORAGE_KEY = 'spenta_theme_v1';
+const DEPLOYMENT_TARGET_STORAGE_KEY = 'spenta_deployment_target_v1';
 const DEFAULT_SELECTED_IDS = ['icr_ops', 'genai_bi', 'mis_erp', 'cyber_sla'];
 
 export type ThemeMode = 'dark' | 'light';
@@ -184,6 +191,9 @@ interface StackContextValue {
   exportStackJson: (extra?: Record<string, unknown>) => void;
   buildExecutiveBrief: () => string;
   buildMailtoHref: (subject?: string, bodyExtra?: string) => string;
+  deploymentTarget: DeploymentTargetId;
+  deploymentProfile: DeploymentProfileSpec;
+  setDeploymentTarget: (target: DeploymentTargetId, actor?: string) => void;
   coreLayerConfigs: Record<CoreLayerId, LayerConfig>;
   coreAuditLog: CoreAuditEntry[];
   updateCoreLayerConfig: (
@@ -267,6 +277,16 @@ function loadStoredTheme(): ThemeMode {
   return 'dark';
 }
 
+function loadStoredDeploymentTarget(): DeploymentTargetId {
+  try {
+    const raw = window.localStorage.getItem(DEPLOYMENT_TARGET_STORAGE_KEY);
+    if (raw === 'on-prem' || raw === 'private-vpc' || raw === 'air-gapped') return raw;
+  } catch {
+    // ignore storage errors
+  }
+  return 'on-prem';
+}
+
 export function StackProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<ThemeMode>(() => loadStoredTheme());
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
@@ -278,10 +298,15 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   const [autoNotice, setAutoNotice] = useState<string | null>(null);
   const [hitlConfidence, setHitlConfidence] = useState<number>(0.91);
   const [savedProposals, setSavedProposals] = useState<SavedProposal[]>(() => loadStoredProposals());
+  const [deploymentTarget, setDeploymentTargetState] = useState<DeploymentTargetId>(() =>
+    loadStoredDeploymentTarget(),
+  );
   const [coreLayerConfigs, setCoreLayerConfigs] = useState<Record<CoreLayerId, LayerConfig>>(() =>
     loadStoredCoreConfigs(),
   );
   const [coreAuditLog, setCoreAuditLog] = useState<CoreAuditEntry[]>(() => loadStoredAuditLog());
+
+  const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
@@ -338,6 +363,14 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       // ignore storage quota errors
     }
   }, [coreAuditLog]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DEPLOYMENT_TARGET_STORAGE_KEY, deploymentTarget);
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [deploymentTarget]);
 
   useEffect(() => {
     if (!autoNotice) return;
@@ -451,6 +484,12 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     const lines = [
       'SPENTA SOVEREIGN OS — COMPOSED ARCHITECTURE BRIEF',
       '================================================',
+      `Infrastructure Target: ${deploymentProfile.title} (${deploymentProfile.switcherLabel})`,
+      `  Transport: ${deploymentProfile.transport}`,
+      `  Enclave Boundary: ${deploymentProfile.enclaveBoundary}`,
+      `  Latency Budget: ${deploymentProfile.latencyBudget}`,
+      `  Egress & Compliance: ${deploymentProfile.egressPolicy} | ${deploymentProfile.compliancePosture}`,
+      '',
       `Selected Modules (${selectedApps.length}/13):`,
       ...selectedApps.map(
         (a, i) =>
@@ -463,7 +502,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         : ['  - Standalone deployment']),
       '',
       `Active Sovereign Layers: ${Array.from(stackMetrics.activeLayers).sort().join(', ') || 'None'}`,
-      `Recommended On-Prem Server: ${tierSpec.code} — ${tierSpec.name}`,
+      `Recommended Server Baseline: ${tierSpec.code} — ${tierSpec.name}`,
       `  Hardware: ${tierSpec.hardware} (${tierSpec.vramRam})`,
       `  Est. CapEx: ${tierSpec.capex} | Throughput: ${tierSpec.speed}`,
       '',
@@ -481,10 +520,22 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       platform: 'Spenta Sovereign OS',
       exportedAt: new Date().toISOString(),
       contact: SPENTA_CONTACT_EMAIL,
+      infrastructureTarget: {
+        id: deploymentProfile.id,
+        label: deploymentProfile.switcherLabel,
+        title: deploymentProfile.title,
+        transport: deploymentProfile.transport,
+        enclaveBoundary: deploymentProfile.enclaveBoundary,
+        latencyBudget: deploymentProfile.latencyBudget,
+        egressPolicy: deploymentProfile.egressPolicy,
+        compliancePosture: deploymentProfile.compliancePosture,
+        costPosture: deploymentProfile.costPosture,
+      },
       selectedCount: selectedApps.length,
       estimatedBuildScopeUsd: stackMetrics.totalSetupUsd,
       blendedConservativeGmPct: Number(stackMetrics.blendedGmPct.toFixed(1)),
       activeSovereignLayers: Array.from(stackMetrics.activeLayers).sort(),
+      coreLayerConfigs,
       recommendedServerTier: tierSpec,
       verifiedSynergyPairs: stackMetrics.synergyPairs,
       modules: selectedApps.map((a) => ({
@@ -505,7 +556,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `spenta-sovereign-stack-${selectedApps.length}apps.json`;
+    link.download = `spenta-sovereign-stack-${deploymentProfile.id}-${selectedApps.length}apps.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -610,6 +661,35 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     updateCoreLayerConfig(layerId, baseline, `Reset ${layerId} to Sovereign Baseline`, actor);
   };
 
+  const setDeploymentTarget: StackContextValue['setDeploymentTarget'] = (
+    target,
+    actor = 'Studio Architect',
+  ) => {
+    if (target === deploymentTarget) return;
+    const prevProfile = DEPLOYMENT_PROFILES[deploymentTarget];
+    const nextProfile = DEPLOYMENT_PROFILES[target];
+    setDeploymentTargetState(target);
+    setCoreLayerConfigs({
+      L1: { ...nextProfile.layerPresets.L1 },
+      L2: { ...nextProfile.layerPresets.L2 },
+      L3: { ...nextProfile.layerPresets.L3 },
+      L4: { ...nextProfile.layerPresets.L4 },
+      L5: { ...nextProfile.layerPresets.L5 },
+      L6: { ...nextProfile.layerPresets.L6 },
+    });
+    logCoreAuditEvent({
+      actor,
+      layer: 'Hardware',
+      action: 'Switched Infrastructure Target Environment',
+      field: 'Deployment Topology & L1–L6 Presets',
+      previousValue: prevProfile.shortLabel,
+      newValue: `${nextProfile.shortLabel} (${nextProfile.latencyBudget})`,
+    });
+    setAutoNotice(
+      `Infrastructure target switched to ${nextProfile.shortLabel} — L1–L6 architecture metadata updated`,
+    );
+  };
+
   const clearCoreAuditLog = () => {
     setCoreAuditLog([]);
   };
@@ -648,6 +728,9 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         exportStackJson,
         buildExecutiveBrief,
         buildMailtoHref,
+        deploymentTarget,
+        deploymentProfile,
+        setDeploymentTarget,
         coreLayerConfigs,
         coreAuditLog,
         updateCoreLayerConfig,

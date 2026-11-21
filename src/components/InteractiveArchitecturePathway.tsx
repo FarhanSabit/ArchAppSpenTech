@@ -3,14 +3,11 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Download,
   GitBranch,
   Layers,
   Moon,
-  Pause,
-  Play,
   Plus,
   RotateCcw,
   Server,
@@ -23,81 +20,21 @@ import {
   SOVEREIGN_STACK_LAYERS,
   SPENTA_APPS,
 } from '../data/spentaManifest';
+import {
+  DEPLOYMENT_PROFILES,
+  DEPLOYMENT_TARGET_ORDER,
+  DeploymentProfileSpec,
+  DeploymentProviderId,
+} from '../data/deploymentProfiles';
 import { downloadMarkdownFile } from '../data/promptThemeStudioData';
 import { useStack } from '../store/StackContext';
+import {
+  PathwayHopPlayback,
+  PlaybackSpeed,
+  RequestWalkthroughTrace,
+} from './PathwayHopPlayback';
 
-export type DeploymentProviderId = 'on-prem' | 'private-vpc' | 'air-gapped';
-
-interface DeploymentProfileSpec {
-  id: DeploymentProviderId;
-  shortLabel: string;
-  title: string;
-  transport: string;
-  enclaveBoundary: string;
-  latencyBudget: string;
-  costPosture: string;
-  tradeOffGuidance: string;
-  failurePitfall: string;
-}
-
-const DEPLOYMENT_PROFILES: Record<DeploymentProviderId, DeploymentProfileSpec> = {
-  'on-prem': {
-    id: 'on-prem',
-    shortLabel: 'Sovereign On-Prem',
-    title: 'Customer-Owned On-Premises Appliance (Tier 1–4)',
-    transport: 'Local Loopback NVLink + 10GbE LAN mTLS',
-    enclaveBoundary: 'AMD SEV-SNP / Intel TDX on Client Rack (0 bytes cloud egress)',
-    latencyBudget: '<35ms LAN · <50ms Edge',
-    costPosture: 'One-time CapEx ($3.2K–$15.3K) · Zero GPU token burn',
-    tradeOffGuidance:
-      'Maximizes regulatory sovereignty (BB ICT v4.0 / HIPAA) and eliminates per-token OpEx; requires scheduled local NVMe snapshot replication.',
-    failurePitfall:
-      'Pitfall: Single-PSU workstation power loss halts live OCR queues. Mitigation: Dual-node active/passive failover + encrypted local NAS backup.',
-  },
-  'private-vpc': {
-    id: 'private-vpc',
-    shortLabel: 'Private VPC',
-    title: 'Dedicated Single-Tenant Sovereign VPC',
-    transport: 'WireGuard mTLS Mesh + PrivateLink Peering',
-    enclaveBoundary: 'Confidential Compute VM + Customer-Managed KMS Keys (BYOK)',
-    latencyBudget: '45–95ms Regional Backbone',
-    costPosture: 'Reserved Dedicated GPU OpEx + Zero Multi-Tenant Bleed',
-    tradeOffGuidance:
-      'Enables elastic multi-region bursting for distributed retail chains (65+ showrooms) while retaining encrypted single-tenant isolation.',
-    failurePitfall:
-      'Pitfall: Cross-AZ egress spikes or misconfigured NAT routes leaking embeddings. Mitigation: Strict OPA egress deny-by-default & private endpoint DNS lock.',
-  },
-  'air-gapped': {
-    id: 'air-gapped',
-    shortLabel: 'Air-Gapped Enclave',
-    title: 'Zero-Internet Air-Gapped Defense & Core Banking Enclave',
-    transport: 'Unidirectional Hardware Data Diode + Signed Offline Bundles',
-    enclaveBoundary: 'Physical Faraday / HSM Hardware Root-of-Trust (No External NIC)',
-    latencyBudget: '<28ms Deterministic Enclave Bus',
-    costPosture: 'Dedicated Dual-Redundant CapEx + Quarterly Signed Model Drops',
-    tradeOffGuidance:
-      'Eliminates remote exfiltration surface entirely for defense, sovereign health registries, and Tier-1 banking cores.',
-    failurePitfall:
-      'Pitfall: Model drift or stale AML/clinical ontologies without internet sync. Mitigation: Cryptographically signed SHA-256 offline weight & policy cassettes.',
-  },
-};
-
-interface WalkthroughHop {
-  stepNumber: number;
-  trunkId: string;
-  branchId: string;
-  title: string;
-  payloadSummary: string;
-  latencyTarget: string;
-  pitfallMitigation: string;
-}
-
-interface RequestWalkthroughTrace {
-  id: 'banking-icr' | 'hospital-hl7' | 'xltd-baas';
-  label: string;
-  subtitle: string;
-  hops: WalkthroughHop[];
-}
+export type { DeploymentProviderId };
 
 const REQUEST_TRACES: RequestWalkthroughTrace[] = [
   {
@@ -109,46 +46,61 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         stepNumber: 1,
         trunkId: 'trunk-core',
         branchId: 'branch-layer-L1',
-        title: 'Ingress & Local TLS Termination (L1/L2)',
+        nodeCode: 'L1',
+        title: 'Ingress & Local TLS Termination',
+        transitionLabel: 'mTLS',
         payloadSummary: '300 DPI multi-page loan PDF + NID scan ingested via branch scanner queue.',
         latencyTarget: '140ms',
         pitfallMitigation: 'Strip EXIF/PII metadata outside enclave; enforce zero external DNS egress.',
+        highlightCompKind: 'protocol',
       },
       {
         stepNumber: 2,
         trunkId: 'trunk-ops',
         branchId: 'branch-app-icr_ops',
+        nodeCode: 'ICR',
         title: 'LLaMA 3.2 Vision + LayoutLMv3 Extraction',
+        transitionLabel: 'Vision',
         payloadSummary: '14 structured collateral, guarantor & handwritten Bangla fields extracted locally.',
         latencyTarget: '18.4s (<30s SLA)',
         pitfallMitigation: 'Quantized INT4/FP8 batching prevents VRAM OOM on 96GB Tier-3 baselines.',
+        highlightCompKind: 'capability',
       },
       {
         stepNumber: 3,
         trunkId: 'trunk-governance',
         branchId: 'branch-opa-gate',
+        nodeCode: 'OPA',
         title: '0.88 Confidence OPA Circuit Breaker',
+        transitionLabel: 'Score',
         payloadSummary: 'Field-level score evaluated (0.94 Pass vs 0.81 Hold) against opa.bfsi.icr_v4.',
         latencyTarget: '24ms',
         pitfallMitigation: 'Any signature smudge <0.88 halts auto-commit and routes to React verifier.',
+        highlightCompKind: 'protocol',
       },
       {
         stepNumber: 4,
         trunkId: 'trunk-core',
         branchId: 'branch-layer-L5',
+        nodeCode: 'L5',
         title: 'Immutable PostgreSQL / Kafka Core Commit',
+        transitionLabel: 'Commit',
         payloadSummary: 'Signed SHA-256 inference hash + extracted JSON written to core banking ledger.',
         latencyTarget: '38ms',
         pitfallMitigation: 'Idempotency key prevents duplicate loan disbursements on retry.',
+        highlightCompKind: 'capability',
       },
       {
         stepNumber: 5,
         trunkId: 'trunk-hardware',
         branchId: 'branch-tier-3',
+        nodeCode: 'T3',
         title: 'On-Prem Tier-3 Enclave Attestation',
+        transitionLabel: 'NVMe',
         payloadSummary: 'Audit trail archived to local encrypted NVMe/NAS with zero cloud bytes sent.',
         latencyTarget: '12ms',
         pitfallMitigation: 'Daily offline snapshot verification prevents silent ledger corruption.',
+        highlightCompKind: 'hardware',
       },
     ],
   },
@@ -161,37 +113,49 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         stepNumber: 1,
         trunkId: 'trunk-ops',
         branchId: 'branch-app-healthcare_erp',
+        nodeCode: 'HL7',
         title: 'HL7/FHIR Ward Vitals & Rx Intake',
+        transitionLabel: 'FHIR',
         payloadSummary: 'Aggregates 24-bed ICU vitals stream, lab flags, and handwritten discharge scripts.',
         latencyTarget: '110ms',
         pitfallMitigation: 'Strict HL7 v2/FHIR schema validation drops malformed telemetry before LLM prompt.',
+        highlightCompKind: 'capability',
       },
       {
         stepNumber: 2,
         trunkId: 'trunk-core',
         branchId: 'branch-layer-L3',
-        title: 'Local Clinical LLM Synthesis (L3)',
+        nodeCode: 'L3',
+        title: 'Local Clinical LLM Synthesis',
+        transitionLabel: 'cRAG',
         payloadSummary: 'Generates prioritized shift handover brief with drug-interaction warnings.',
         latencyTarget: '1.9s',
         pitfallMitigation: 'Corrective RAG grounds dosage checks solely against approved hospital formulary.',
+        highlightCompKind: 'protocol',
       },
       {
         stepNumber: 3,
         trunkId: 'trunk-governance',
         branchId: 'branch-opa-gate',
+        nodeCode: 'HITL',
         title: 'Clinical Safety 0.88 HITL Gate',
+        transitionLabel: 'Gate',
         payloadSummary: 'Flags ambiguous dosage (0.81 confidence) for attending MD sign-off queue.',
         latencyTarget: '19ms',
         pitfallMitigation: 'Zero silent clinical auto-commits when confidence drops below 0.88.',
+        highlightCompKind: 'capability',
       },
       {
         stepNumber: 4,
         trunkId: 'trunk-core',
         branchId: 'branch-layer-L6',
-        title: 'Omni-Channel Clinician Handoff UI (L6)',
+        nodeCode: 'L6',
+        title: 'Omni-Channel Clinician Handoff UI',
+        transitionLabel: 'Push',
         payloadSummary: 'Delivers verified handover checklist to nursing tablet with highlighted Rx crops.',
         latencyTarget: '45ms',
         pitfallMitigation: 'RBAC ward scoping prevents cross-department patient PHI exposure.',
+        highlightCompKind: 'protocol',
       },
     ],
   },
@@ -204,37 +168,49 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         stepNumber: 1,
         trunkId: 'trunk-governance',
         branchId: 'branch-xltd-mobility',
+        nodeCode: 'BMS',
         title: 'BaaS Cabinet & EV BMS Telemetry Burst',
+        transitionLabel: 'MQTT',
         payloadSummary: 'Cell voltage, thermal gradient, and rider RFID streamed over local MQTT broker.',
         latencyTarget: '9ms',
         pitfallMitigation: 'Edge store-and-forward ring buffer survives 4G backhaul blackouts.',
+        highlightCompKind: 'proof',
       },
       {
         stepNumber: 2,
         trunkId: 'trunk-exp',
         branchId: 'branch-app-iot_edge',
+        nodeCode: 'EDGE',
         title: 'Wasm Quantized Edge Anomaly Scoring',
+        transitionLabel: 'Wasm',
         payloadSummary: 'Local Green AI model predicts cell degradation & selects optimal charged bay.',
         latencyTarget: '22ms (<50ms SLA)',
         pitfallMitigation: 'Thermal threshold hardware interlock overrides software if cell >58°C.',
+        highlightCompKind: 'capability',
       },
       {
         stepNumber: 3,
         trunkId: 'trunk-core',
         branchId: 'branch-layer-L1',
-        title: 'Sovereign IIoT Gateway Actuation (L1)',
+        nodeCode: 'IIoT',
+        title: 'Sovereign IIoT Gateway Actuation',
+        transitionLabel: 'Unlock',
         payloadSummary: 'Unlocks verified battery bay and signs swap telemetry event.',
         latencyTarget: '11ms',
         pitfallMitigation: 'Mutual TLS device certificates block spoofed cabinet unlock commands.',
+        highlightCompKind: 'protocol',
       },
       {
         stepNumber: 4,
         trunkId: 'trunk-hardware',
         branchId: 'branch-tier-4',
+        nodeCode: 'T4',
         title: 'Tier-4 Branch Node ESG Carbon Sync',
+        transitionLabel: 'ESG',
         payloadSummary: 'Commits Scope 2/3 carbon savings to regional X Ltd fleet ledger.',
         latencyTarget: '34ms',
         pitfallMitigation: 'Idempotent batch replay prevents double-counted carbon offset credits.',
+        highlightCompKind: 'proof',
       },
     ],
   },
@@ -595,17 +571,26 @@ export function InteractiveArchitecturePathway({
   syncedPolarity,
   onPolarityChange,
 }: InteractiveArchitecturePathwayProps) {
-  const { theme, selectedIds, toggleApp, hitlConfidence, stackMetrics } = useStack();
+  const {
+    theme,
+    selectedIds,
+    toggleApp,
+    hitlConfidence,
+    stackMetrics,
+    deploymentTarget,
+    deploymentProfile,
+    setDeploymentTarget,
+  } = useStack();
 
-  // Deployment Provider Swapping (system-design-explainer.vercel.app)
-  const [providerId, setProviderId] = useState<DeploymentProviderId>('on-prem');
-  const activeProfile = DEPLOYMENT_PROFILES[providerId];
+  // Global synchronized Deployment Provider Swapping
+  const activeProfile = deploymentProfile;
   const tree = useMemo(() => buildPathwayTree(activeProfile), [activeProfile]);
 
-  // Hop-by-Hop Request Walkthrough Player (systemdesignprimer.vercel.app)
+  // Hop-by-Hop Request Walkthrough Player state
   const [activeTraceId, setActiveTraceId] = useState<RequestWalkthroughTrace['id']>('banking-icr');
   const [activeHopIdx, setActiveHopIdx] = useState<number>(-1); // -1 = idle
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
   const activeTrace = useMemo(
     () => REQUEST_TRACES.find((t) => t.id === activeTraceId) ?? REQUEST_TRACES[0],
@@ -647,9 +632,10 @@ export function InteractiveArchitecturePathway({
     setInspectedBranchId(currentHop.branchId);
   }, [currentHop]);
 
-  // Clean autoplay timer cleared on pause, manual step, or unmount
+  // Clean autoplay timer scaled by playbackSpeed and cleared on pause, step, or unmount
   useEffect(() => {
     if (!isPlaying) return;
+    const intervalMs = Math.round(2400 / playbackSpeed);
     const timer = window.setInterval(() => {
       setActiveHopIdx((prev) => {
         const next = prev + 1;
@@ -659,9 +645,9 @@ export function InteractiveArchitecturePathway({
         }
         return next;
       });
-    }, 2600);
+    }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [isPlaying, activeTrace.hops.length]);
+  }, [isPlaying, activeTrace.hops.length, playbackSpeed]);
 
   const handleSelectTrace = (id: RequestWalkthroughTrace['id']) => {
     setIsPlaying(false);
@@ -690,6 +676,11 @@ export function InteractiveArchitecturePathway({
     setActiveHopIdx((prev) =>
       prev < 0 ? 0 : Math.min(activeTrace.hops.length - 1, prev + 1),
     );
+  };
+
+  const handleSelectHop = (idx: number) => {
+    setIsPlaying(false);
+    setActiveHopIdx(idx);
   };
 
   const handleResetWalkthrough = () => {
@@ -741,7 +732,7 @@ export function InteractiveArchitecturePathway({
 
   const handleExportPathwayMd = () => {
     downloadMarkdownFile(
-      `spenta-pathway-${providerId}-${activeTrace.id}.md`,
+      `spenta-pathway-${deploymentTarget}-${activeTrace.id}.md`,
       buildPathwayMarkdownExport(tree, activeProfile, activeTrace),
     );
     setExportedFlag(true);
@@ -886,17 +877,16 @@ export function InteractiveArchitecturePathway({
         </div>
       </div>
 
-      {/* Deployment Provider Switcher + Hop-by-Hop Walkthrough Transport Bar */}
+      {/* Deployment Target Topology Bar (Synced Globally with Studio Workspace) */}
       <div
-        className={`px-4 sm:px-6 py-3 border-b grid grid-cols-1 xl:grid-cols-12 gap-3 items-center ${
+        className={`px-4 sm:px-6 py-2.5 border-b flex flex-col md:flex-row md:items-center justify-between gap-2.5 ${
           isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#FAF8F4] border-[#E4DFD6]'
         }`}
       >
-        {/* Deployment Provider Swap (system-design-explainer pattern) */}
-        <div className="xl:col-span-5 flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase ${mutedText}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] font-bold ${mutedText}`}>
             <Server className="w-3.5 h-3.5" strokeWidth={1.6} />
-            <span>Topology:</span>
+            <span>Infrastructure Target:</span>
           </span>
           <div
             role="group"
@@ -905,14 +895,14 @@ export function InteractiveArchitecturePathway({
               isDark ? 'bg-[#0F1529] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
             }`}
           >
-            {(['on-prem', 'private-vpc', 'air-gapped'] as const).map((pid) => {
+            {DEPLOYMENT_TARGET_ORDER.map((pid) => {
               const prof = DEPLOYMENT_PROFILES[pid];
-              const active = providerId === pid;
+              const active = deploymentTarget === pid;
               return (
                 <button
                   key={pid}
                   type="button"
-                  onClick={() => setProviderId(pid)}
+                  onClick={() => setDeploymentTarget(pid, 'Pathway Explorer')}
                   aria-pressed={active}
                   className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     active
@@ -931,168 +921,85 @@ export function InteractiveArchitecturePathway({
           </div>
         </div>
 
-        {/* Hop-by-Hop Request Walkthrough Player (systemdesignprimer pattern) */}
-        <div className="xl:col-span-7 flex flex-wrap items-center xl:justify-end gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {REQUEST_TRACES.map((tr) => {
-              const selected = tr.id === activeTraceId;
-              return (
-                <button
-                  key={tr.id}
-                  type="button"
-                  onClick={() => handleSelectTrace(tr.id)}
-                  className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                    selected
-                      ? isDark
-                        ? 'bg-[#161D3A] border-[#8FA6E8] text-[#8FA6E8]'
-                        : 'bg-[#EEF3FB] border-[#1F3863] text-[#1F3863]'
-                      : isDark
-                        ? 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4] hover:border-[#7FA6FF]'
-                        : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163] hover:border-[#1F3863]'
-                  }`}
-                >
-                  {tr.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div
-            className={`inline-flex items-center gap-1 p-1 rounded-lg border shrink-0 ${
-              isDark ? 'bg-[#0F1529] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={handleTogglePlay}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-                isPlaying
-                  ? isDark
-                    ? 'bg-[#E0B063] text-[#0B1020]'
-                    : 'bg-[#8A5C10] text-white'
-                  : isDark
-                    ? 'bg-[#8FA6E8] text-[#0B1020]'
-                    : 'bg-[#1F3863] text-white'
-              }`}
-            >
-              {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              <span>{isPlaying ? 'Pause' : 'Walkthrough'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleStepPrev}
-              aria-label="Previous walkthrough hop"
-              className={`p-1 rounded-md cursor-pointer ${secondaryText}`}
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="font-mono text-[10px] font-bold px-1 tabular-nums">
-              {activeHopIdx >= 0 ? `${activeHopIdx + 1}/${activeTrace.hops.length}` : `0/${activeTrace.hops.length}`}
-            </span>
-            <button
-              type="button"
-              onClick={handleStepNext}
-              aria-label="Next walkthrough hop"
-              className={`p-1 rounded-md cursor-pointer ${secondaryText}`}
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-            {activeHopIdx >= 0 && (
-              <button
-                type="button"
-                onClick={handleResetWalkthrough}
-                aria-label="Reset walkthrough"
-                title="Stop and clear active trace"
-                className={`p-1 rounded-md cursor-pointer ${mutedText}`}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+        <div className={`text-[11px] font-mono flex flex-wrap items-center gap-2 tabular-nums ${mutedText}`}>
+          <span className={isDark ? 'text-[#E7EBF5] font-semibold' : 'text-[#16213A] font-semibold'}>
+            {activeProfile.latencyBudget}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            Stack ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K · Tier {stackMetrics.tier}
+          </span>
         </div>
       </div>
 
-      {/* Active Hop Telemetry Banner OR Contextual Hover Tooltip Strip */}
-      <div
-        className={`px-4 sm:px-6 py-2.5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
-          currentHop
-            ? isDark
-              ? 'bg-[#2A2112]/70 border-[#E0B063]/40'
-              : 'bg-[#FDF5E6] border-[#8A5C10]/30'
-            : isDark
+      {/* Dedicated Hop-by-Hop Request Playback Component */}
+      <PathwayHopPlayback
+        traces={REQUEST_TRACES}
+        activeTrace={activeTrace}
+        activeHopIdx={activeHopIdx}
+        isPlaying={isPlaying}
+        speed={playbackSpeed}
+        isDark={isDark}
+        activeProfile={activeProfile}
+        onSelectTrace={handleSelectTrace}
+        onTogglePlay={handleTogglePlay}
+        onStepPrev={handleStepPrev}
+        onStepNext={handleStepNext}
+        onSelectHop={handleSelectHop}
+        onReset={handleResetWalkthrough}
+        onSpeedChange={setPlaybackSpeed}
+      />
+
+      {/* Contextual Hover Tooltip Strip */}
+      {!currentHop && (
+        <div
+          className={`px-4 sm:px-6 py-2 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+            isDark
               ? 'bg-[#141A32]/70 border-[#232B4A]'
               : 'bg-[#FFFFFF] border-[#E4DFD6]'
-        }`}
-      >
-        {currentHop ? (
-          <>
-            <div className="min-w-0 flex flex-wrap items-center gap-2">
-              <span
-                className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 tabular-nums"
-                style={{
-                  backgroundColor: hopAmber,
-                  color: isDark ? '#0B1020' : '#FFFFFF',
-                }}
-              >
-                HOP {currentHop.stepNumber}/{activeTrace.hops.length}
+          }`}
+        >
+          {hoveredTip ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <span
+                  className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                    isDark ? 'bg-[#161D3A] text-[#8FA6E8]' : 'bg-[#EEF3FB] text-[#1F3863]'
+                  }`}
+                >
+                  {hoveredTip.code}
+                </span>
+                <span className="font-bold truncate">{hoveredTip.title}</span>
+                <span className={mutedText} aria-hidden="true">
+                  ·
+                </span>
+                <span className={`truncate ${secondaryText}`}>{hoveredTip.summary}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                <span className={isDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]'}>
+                  {hoveredTip.metric}
+                </span>
+                <span className={mutedText}>{hoveredTip.hint}</span>
+              </div>
+            </>
+          ) : (
+            <div className={`flex flex-wrap items-center justify-between w-full gap-2 ${mutedText}`}>
+              <span className="inline-flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                <span>
+                  <strong className={isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}>
+                    {activeProfile.shortLabel}:
+                  </strong>{' '}
+                  {activeProfile.transport} · {activeProfile.egressPolicy}
+                </span>
               </span>
-              <span className="font-bold">{currentHop.title}</span>
-              <span className={mutedText} aria-hidden="true">
-                ·
+              <span className="font-mono text-[11px] tabular-nums">
+                Press Play above to step through connections and node states
               </span>
-              <span className={secondaryText}>{currentHop.payloadSummary}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0 font-mono text-[10.5px] tabular-nums">
-              <span style={{ color: activeGreen }} className="font-bold">
-                Target {currentHop.latencyTarget}
-              </span>
-              <span className={mutedText}>·</span>
-              <span className={`truncate max-w-[260px] ${secondaryText}`} title={currentHop.pitfallMitigation}>
-                {currentHop.pitfallMitigation}
-              </span>
-            </div>
-          </>
-        ) : hoveredTip ? (
-          <>
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <span
-                className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                  isDark ? 'bg-[#161D3A] text-[#8FA6E8]' : 'bg-[#EEF3FB] text-[#1F3863]'
-                }`}
-              >
-                {hoveredTip.code}
-              </span>
-              <span className="font-bold truncate">{hoveredTip.title}</span>
-              <span className={mutedText} aria-hidden="true">
-                ·
-              </span>
-              <span className={`truncate ${secondaryText}`}>{hoveredTip.summary}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
-              <span className={isDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]'}>
-                {hoveredTip.metric}
-              </span>
-              <span className={mutedText}>{hoveredTip.hint}</span>
-            </div>
-          </>
-        ) : (
-          <div className={`flex flex-wrap items-center justify-between w-full gap-2 ${mutedText}`}>
-            <span className="inline-flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-              <span>
-                <strong className={isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}>
-                  {activeProfile.shortLabel}:
-                </strong>{' '}
-                {activeProfile.transport} · {activeProfile.latencyBudget}
-              </span>
-            </span>
-            <span className="font-mono text-[11px] tabular-nums">
-              Stack Scope ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K · Blended GM{' '}
-              {stackMetrics.blendedGmPct.toFixed(1)}% · Tier {stackMetrics.tier}
-            </span>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Main Split: Left Orthogonal Branching Tree | Right roadmap.sh Slide-In Inspector */}
       <div className={`grid grid-cols-1 ${compact ? 'xl:grid-cols-12' : 'lg:grid-cols-12'}`}>
@@ -1104,35 +1011,150 @@ export function InteractiveArchitecturePathway({
             isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'
           }`}
         >
-          {/* Top Orthogonal Architectural Flow Bar (SVG Code-Drawn Overview) */}
+          {/* Top Orthogonal Architectural Flow Bar (SVG Code-Drawn Overview + Directed Hop Transitions) */}
           <div className={`rounded-lg border p-3.5 ${bandClass}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-              <span className={`font-mono text-[10px] tracking-[0.08em] ${mutedText}`}>
-                Orthogonal System Spine · {activeProfile.shortLabel} (Click any pillar to toggle branches)
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className={`font-mono text-[10px] tracking-[0.06em] ${mutedText}`}>
+                Orthogonal System Spine · {activeProfile.shortLabel}{' '}
+                {currentHop
+                  ? `· Hop ${currentHop.stepNumber}/${activeTrace.hops.length} (${currentHop.transitionLabel})`
+                  : '(Click any pillar to toggle branches)'}
               </span>
               <span className={`font-mono text-[10px] tabular-nums ${mutedText}`}>
                 {expandedTrunks.length}/5 Pillars Expanded
               </span>
             </div>
             <svg
-              viewBox="0 0 880 78"
+              viewBox="0 0 880 116"
               className="w-full h-auto block select-none"
               role="img"
-              aria-label="Five-stage interactive Sovereign Architecture Spine"
+              aria-label="Five-stage interactive Sovereign Architecture Spine with directed hop-by-hop transitions"
             >
-              {/* Horizontal Spine Bus */}
+              <defs>
+                <marker
+                  id="spenta-arrow-active"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill={hopAmber} />
+                </marker>
+                <marker
+                  id="spenta-arrow-passed"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="5.5"
+                  markerHeight="5.5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill={activeGreen} />
+                </marker>
+              </defs>
+
+              {/* Horizontal Baseline Spine Bus */}
               <line
                 x1="78"
-                y1="39"
+                y1="77"
                 x2="802"
-                y2="39"
+                y2="77"
                 stroke={inactiveStroke}
                 strokeWidth="1.5"
               />
+
+              {/* Directed Hop-by-Hop Transition Arcs Above Spine */}
+              {activeHopIdx >= 0 &&
+                activeTrace.hops.map((hop, idx) => {
+                  if (idx === 0 || idx > activeHopIdx) return null;
+                  const fromHop = activeTrace.hops[idx - 1];
+                  const fromIdx = tree.findIndex((t) => t.id === fromHop.trunkId);
+                  const toIdx = tree.findIndex((t) => t.id === hop.trunkId);
+                  if (fromIdx < 0 || toIdx < 0) return null;
+
+                  const x1 = 10 + fromIdx * 174 + 79;
+                  const x2 = 10 + toIdx * 174 + 79;
+                  const isCurrentTransition = idx === activeHopIdx;
+                  const strokeCol = isCurrentTransition ? hopAmber : activeGreen;
+                  const arcLift =
+                    fromIdx === toIdx
+                      ? 14
+                      : Math.max(10, 36 - Math.abs(toIdx - fromIdx) * 6);
+                  const midX = (x1 + x2) / 2;
+                  const pathD =
+                    fromIdx === toIdx
+                      ? `M ${x1 - 24} 48 C ${x1 - 24} ${arcLift}, ${x1 + 24} ${arcLift}, ${x1 + 24} 46`
+                      : `M ${x1} 48 Q ${midX} ${arcLift} ${x2} 46`;
+
+                  return (
+                    <g key={`arc-${activeTrace.id}-${idx}`}>
+                      <path
+                        d={pathD}
+                        fill="none"
+                        stroke={strokeCol}
+                        strokeWidth={isCurrentTransition ? 2.4 : 1.5}
+                        strokeDasharray={isCurrentTransition ? '5 3' : undefined}
+                        opacity={isCurrentTransition ? 1 : 0.72}
+                        markerEnd={
+                          isCurrentTransition
+                            ? 'url(#spenta-arrow-active)'
+                            : 'url(#spenta-arrow-passed)'
+                        }
+                      />
+                      {isCurrentTransition && (
+                        <>
+                          <rect
+                            x={midX - 42}
+                            y={Math.max(2, arcLift - 7)}
+                            width="84"
+                            height="16"
+                            rx="4"
+                            fill={hopAmber}
+                          />
+                          <text
+                            x={midX}
+                            y={Math.max(13, arcLift + 4)}
+                            textAnchor="middle"
+                            fill={isDark ? '#0B1020' : '#FFFFFF'}
+                            fontSize="8.5"
+                            fontWeight="800"
+                            fontFamily="IBM Plex Mono, JetBrains Mono, monospace"
+                          >
+                            {`H${hop.stepNumber} · ${hop.transitionLabel}`}
+                          </text>
+                          {isPlaying && (
+                            <circle r="3.6" fill={hopAmber}>
+                              <animateMotion dur="1.1s" repeatCount="indefinite" path={pathD} />
+                            </circle>
+                          )}
+                        </>
+                      )}
+                    </g>
+                  );
+                })}
+
               {tree.map((trunk, idx) => {
                 const x = 10 + idx * 174;
                 const isExpanded = expandedTrunks.includes(trunk.id);
                 const isHopTrunk = currentHop?.trunkId === trunk.id;
+                const passedHopSteps =
+                  activeHopIdx >= 0
+                    ? activeTrace.hops
+                        .slice(0, activeHopIdx)
+                        .filter((h) => h.trunkId === trunk.id)
+                        .map((h) => h.stepNumber)
+                    : [];
+                const upcomingHopSteps =
+                  activeHopIdx >= 0
+                    ? activeTrace.hops
+                        .slice(activeHopIdx + 1)
+                        .filter((h) => h.trunkId === trunk.id)
+                        .map((h) => h.stepNumber)
+                    : [];
+                const isPassedTrunk = !isHopTrunk && passedHopSteps.length > 0;
+                const isQueuedTrunk = !isHopTrunk && !isPassedTrunk && upcomingHopSteps.length > 0;
                 const activeCount = trunk.branches.filter(
                   (b) => b.appId && selectedIds.includes(b.appId),
                 ).length;
@@ -1153,19 +1175,19 @@ export function InteractiveArchitecturePathway({
                     onMouseLeave={() => setHoveredTip(null)}
                     className="cursor-pointer"
                   >
-                    {idx > 0 && (isExpanded || isHopTrunk) && (
+                    {idx > 0 && (isExpanded || isHopTrunk || isPassedTrunk) && (
                       <line
                         x1={x - 16}
-                        y1="39"
+                        y1="77"
                         x2={x}
-                        y2="39"
-                        stroke={isHopTrunk ? hopAmber : brandStroke}
-                        strokeWidth="2.2"
+                        y2="77"
+                        stroke={isHopTrunk ? hopAmber : isPassedTrunk ? activeGreen : brandStroke}
+                        strokeWidth={isHopTrunk ? 2.4 : 1.9}
                       />
                     )}
                     <rect
                       x={x}
-                      y="10"
+                      y="48"
                       width="158"
                       height="58"
                       rx="8"
@@ -1174,48 +1196,59 @@ export function InteractiveArchitecturePathway({
                           ? isDark
                             ? '#2A2112'
                             : '#FDF5E6'
-                          : isExpanded
+                          : isPassedTrunk
                             ? isDark
-                              ? '#161D3A'
-                              : '#EEF3FB'
-                            : isDark
-                              ? '#141A32'
-                              : '#FFFFFF'
+                              ? '#10261F'
+                              : '#ECF7F1'
+                            : isExpanded
+                              ? isDark
+                                ? '#161D3A'
+                                : '#EEF3FB'
+                              : isDark
+                                ? '#141A32'
+                                : '#FFFFFF'
                       }
                       stroke={
                         isHopTrunk
                           ? hopAmber
-                          : activeCount > 0
+                          : isPassedTrunk || activeCount > 0
                             ? activeGreen
-                            : isExpanded
+                            : isQueuedTrunk || isExpanded
                               ? brandStroke
                               : inactiveStroke
                       }
-                      strokeWidth={isHopTrunk ? 2.2 : isExpanded ? 1.8 : 1.15}
+                      strokeDasharray={isQueuedTrunk ? '4 2.5' : undefined}
+                      strokeWidth={isHopTrunk ? 2.3 : isPassedTrunk || isExpanded ? 1.8 : 1.15}
                     />
                     <text
                       x={x + 12}
-                      y="27"
+                      y="65"
                       fill={
                         isHopTrunk
                           ? hopAmber
-                          : isExpanded
-                            ? brandStroke
-                            : isDark
-                              ? '#8D97B5'
-                              : '#5F6576'
+                          : isPassedTrunk
+                            ? activeGreen
+                            : isQueuedTrunk || isExpanded
+                              ? brandStroke
+                              : isDark
+                                ? '#8D97B5'
+                                : '#5F6576'
                       }
-                      fontSize="9.5"
+                      fontSize="9.2"
                       fontWeight="700"
                       fontFamily="IBM Plex Mono, JetBrains Mono, monospace"
                     >
                       {isHopTrunk
-                        ? `HOP ${currentHop.stepNumber} ACTIVE`
-                        : `${trunk.index}. ${isExpanded ? 'EXPANDED' : 'BRANCH +'}`}
+                        ? `ACTIVE · HOP ${currentHop.stepNumber}`
+                        : isPassedTrunk
+                          ? `PASSED · HOP ${passedHopSteps[passedHopSteps.length - 1]}`
+                          : isQueuedTrunk
+                            ? `QUEUED · HOP ${upcomingHopSteps[0]}`
+                            : `${trunk.index}. ${isExpanded ? 'EXPANDED' : 'BRANCH +'}`}
                     </text>
                     <text
                       x={x + 12}
-                      y="44"
+                      y="82"
                       fill={isDark ? '#E7EBF5' : '#16213A'}
                       fontSize="11"
                       fontWeight="700"
@@ -1225,7 +1258,7 @@ export function InteractiveArchitecturePathway({
                     </text>
                     <text
                       x={x + 12}
-                      y="59"
+                      y="97"
                       fill={activeCount > 0 ? activeGreen : isDark ? '#8D97B5' : '#5F6576'}
                       fontSize="9"
                       fontFamily="IBM Plex Mono, JetBrains Mono, monospace"
@@ -1338,20 +1371,33 @@ export function InteractiveArchitecturePathway({
                         {trunk.branches.map((branch) => {
                           const isBranchOpen = expandedBranches.includes(branch.id);
                           const isInspected = inspectedBranchId === branch.id;
+                          const branchHopIdx = activeTrace.hops.findIndex(
+                            (h) => h.branchId === branch.id,
+                          );
+                          const branchHop = branchHopIdx >= 0 ? activeTrace.hops[branchHopIdx] : null;
                           const isHopBranch = currentHop?.branchId === branch.id;
+                          const isPassedBranch =
+                            !isHopBranch &&
+                            activeHopIdx >= 0 &&
+                            branchHopIdx >= 0 &&
+                            branchHopIdx < activeHopIdx;
+                          const isQueuedBranch =
+                            !isHopBranch &&
+                            activeHopIdx >= 0 &&
+                            branchHopIdx > activeHopIdx;
                           const isInStack = branch.appId ? selectedIds.includes(branch.appId) : false;
 
                           return (
                             <div key={branch.id} className="relative space-y-2">
                               <span
                                 aria-hidden="true"
-                                className="hidden md:block absolute -left-5 top-5 w-5 h-px"
+                                className="hidden md:block absolute -left-5 top-5 w-5 h-[1.5px] transition-colors duration-200"
                                 style={{
                                   backgroundColor: isHopBranch
                                     ? hopAmber
-                                    : isInStack
+                                    : isPassedBranch || isInStack
                                       ? activeGreen
-                                      : isInspected
+                                      : isQueuedBranch || isInspected
                                         ? brandStroke
                                         : inactiveStroke,
                                 }}
@@ -1363,15 +1409,23 @@ export function InteractiveArchitecturePathway({
                                     ? isDark
                                       ? 'bg-[#2A2112]/80 border-[#E0B063] shadow-sm'
                                       : 'bg-[#FDF5E6] border-[#8A5C10] shadow-sm'
-                                    : isInspected
+                                    : isPassedBranch
                                       ? isDark
-                                        ? 'bg-[#141A32] border-[#7FA6FF] shadow-sm'
-                                        : 'bg-[#FFFFFF] border-[#1F3863] shadow-sm'
-                                      : isInStack
+                                        ? 'bg-[#10261F]/70 border-[#6FCB9F]'
+                                        : 'bg-[#ECF7F1] border-[#1C6E46]'
+                                      : isQueuedBranch
                                         ? isDark
-                                          ? 'bg-[#141A32] border-[#6FCB9F]/60'
-                                          : 'bg-[#FFFFFF] border-[#1C6E46]/60'
-                                        : cardClass
+                                          ? 'bg-[#141A32]/85 border-[#7FA6FF]/70 border-dashed'
+                                          : 'bg-[#FFFFFF] border-[#1F3863]/55 border-dashed'
+                                        : isInspected
+                                          ? isDark
+                                            ? 'bg-[#141A32] border-[#7FA6FF] shadow-sm'
+                                            : 'bg-[#FFFFFF] border-[#1F3863] shadow-sm'
+                                          : isInStack
+                                            ? isDark
+                                              ? 'bg-[#141A32] border-[#6FCB9F]/60'
+                                              : 'bg-[#FFFFFF] border-[#1C6E46]/60'
+                                            : cardClass
                                 }`}
                               >
                                 <div className="p-3 flex items-start justify-between gap-2">
@@ -1398,7 +1452,7 @@ export function InteractiveArchitecturePathway({
                                             ? isDark
                                               ? 'text-[#E0B063] font-bold'
                                               : 'text-[#8A5C10] font-bold'
-                                            : isInStack
+                                            : isPassedBranch || isInStack
                                               ? isDark
                                                 ? 'text-[#6FCB9F] font-bold'
                                                 : 'text-[#1C6E46] font-bold'
@@ -1407,7 +1461,13 @@ export function InteractiveArchitecturePathway({
                                                 : 'text-[#1F3863] font-bold'
                                         }
                                       >
-                                        {isHopBranch ? `HOP ${currentHop.stepNumber} · ${branch.code}` : branch.code}
+                                        {isHopBranch
+                                          ? `ACTIVE · HOP ${currentHop.stepNumber} · ${branch.code}`
+                                          : isPassedBranch && branchHop
+                                            ? `PASSED · HOP ${branchHop.stepNumber} · ${branch.code}`
+                                            : isQueuedBranch && branchHop
+                                              ? `QUEUED · HOP ${branchHop.stepNumber} · ${branch.code}`
+                                              : branch.code}
                                       </span>
                                       <span className={mutedText} aria-hidden="true">
                                         ·
@@ -1486,56 +1546,69 @@ export function InteractiveArchitecturePathway({
                                     <div className={`font-mono text-[9.5px] ${mutedText}`}>
                                       Sub-Components &amp; Compositions ({branch.compositions.length})
                                     </div>
-                                    {branch.compositions.map((comp) => (
-                                      <button
-                                        key={comp.id}
-                                        type="button"
-                                        onClick={() => {
-                                          if (comp.linkedAppId) {
-                                            focusLinkedAppBranch(comp.linkedAppId);
-                                          } else {
-                                            setInspectedBranchId(branch.id);
+                                    {branch.compositions.map((comp) => {
+                                      const isHighlightedLeaf =
+                                        isHopBranch &&
+                                        currentHop?.highlightCompKind === comp.kind;
+                                      return (
+                                        <button
+                                          key={comp.id}
+                                          type="button"
+                                          onClick={() => {
+                                            if (comp.linkedAppId) {
+                                              focusLinkedAppBranch(comp.linkedAppId);
+                                            } else {
+                                              setInspectedBranchId(branch.id);
+                                            }
+                                          }}
+                                          onMouseEnter={() =>
+                                            setHoveredTip({
+                                              code: comp.code,
+                                              title: comp.label,
+                                              summary: comp.detail,
+                                              metric: comp.metric,
+                                              hint: comp.linkedAppId
+                                                ? 'Click to jump to linked module'
+                                                : 'Click to inspect in drawer',
+                                            })
                                           }
-                                        }}
-                                        onMouseEnter={() =>
-                                          setHoveredTip({
-                                            code: comp.code,
-                                            title: comp.label,
-                                            summary: comp.detail,
-                                            metric: comp.metric,
-                                            hint: comp.linkedAppId
-                                              ? 'Click to jump to linked module'
-                                              : 'Click to inspect in drawer',
-                                          })
-                                        }
-                                        onMouseLeave={() => setHoveredTip(null)}
-                                        className={`w-full text-left px-2.5 py-1.5 rounded-md border text-[11px] flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                                          isDark
-                                            ? 'bg-[#141A32] border-[#232B4A] hover:border-[#7FA6FF]'
-                                            : 'bg-[#FFFFFF] border-[#E4DFD6] hover:border-[#1F3863]'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <span
-                                            className={`font-mono text-[9.5px] font-bold shrink-0 ${
-                                              comp.kind === 'synergy'
-                                                ? isDark
-                                                  ? 'text-[#6FCB9F]'
-                                                  : 'text-[#1C6E46]'
-                                                : isDark
-                                                  ? 'text-[#8FA6E8]'
-                                                  : 'text-[#1F3863]'
-                                            }`}
-                                          >
-                                            {comp.code}
+                                          onMouseLeave={() => setHoveredTip(null)}
+                                          className={`w-full text-left px-2.5 py-1.5 rounded-md border text-[11px] flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                                            isHighlightedLeaf
+                                              ? isDark
+                                                ? 'bg-[#2A2112]/90 border-[#E0B063]'
+                                                : 'bg-[#FDF5E6] border-[#8A5C10]'
+                                              : isDark
+                                                ? 'bg-[#141A32] border-[#232B4A] hover:border-[#7FA6FF]'
+                                                : 'bg-[#FFFFFF] border-[#E4DFD6] hover:border-[#1F3863]'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span
+                                              className={`font-mono text-[9.5px] font-bold shrink-0 ${
+                                                isHighlightedLeaf
+                                                  ? isDark
+                                                    ? 'text-[#E0B063]'
+                                                    : 'text-[#8A5C10]'
+                                                  : comp.kind === 'synergy'
+                                                    ? isDark
+                                                      ? 'text-[#6FCB9F]'
+                                                      : 'text-[#1C6E46]'
+                                                    : isDark
+                                                      ? 'text-[#8FA6E8]'
+                                                      : 'text-[#1F3863]'
+                                              }`}
+                                            >
+                                              {comp.code}
+                                            </span>
+                                            <span className="truncate font-medium">{comp.label}</span>
+                                          </div>
+                                          <span className={`font-mono text-[10px] shrink-0 tabular-nums ${mutedText}`}>
+                                            {comp.metric}
                                           </span>
-                                          <span className="truncate font-medium">{comp.label}</span>
-                                        </div>
-                                        <span className={`font-mono text-[10px] shrink-0 tabular-nums ${mutedText}`}>
-                                          {comp.metric}
-                                        </span>
-                                      </button>
-                                    ))}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -1605,6 +1678,64 @@ export function InteractiveArchitecturePathway({
                   </div>
                 </div>
               </div>
+
+              {/* Active Hop-by-Hop Playback State for Inspected Node */}
+              {activeHopIdx >= 0 &&
+                (() => {
+                  const idxInTrace = activeTrace.hops.findIndex(
+                    (h) => h.branchId === inspectedContext.branch.id,
+                  );
+                  if (idxInTrace < 0) return null;
+                  const hopMeta = activeTrace.hops[idxInTrace];
+                  const prevMeta = idxInTrace > 0 ? activeTrace.hops[idxInTrace - 1] : null;
+                  const nodeState =
+                    idxInTrace === activeHopIdx
+                      ? isPlaying
+                        ? 'Executing'
+                        : 'Active'
+                      : idxInTrace < activeHopIdx
+                        ? 'Passed'
+                        : 'Queued';
+                  return (
+                    <div
+                      className={`rounded-lg border p-3 space-y-1.5 text-[11px] ${
+                        idxInTrace === activeHopIdx
+                          ? isDark
+                            ? 'bg-[#2A2112]/80 border-[#E0B063]'
+                            : 'bg-[#FDF5E6] border-[#8A5C10]'
+                          : idxInTrace < activeHopIdx
+                            ? isDark
+                              ? 'bg-[#10261F]/70 border-[#6FCB9F]'
+                              : 'bg-[#ECF7F1] border-[#1C6E46]'
+                            : isDark
+                              ? 'bg-[#141A32] border-[#2E3862] border-dashed'
+                              : 'bg-[#FFFFFF] border-[#B8C4DA] border-dashed'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 font-mono text-[10px] font-bold tabular-nums">
+                        <span
+                          style={{
+                            color:
+                              idxInTrace === activeHopIdx
+                                ? hopAmber
+                                : idxInTrace < activeHopIdx
+                                  ? activeGreen
+                                  : brandStroke,
+                          }}
+                        >
+                          HOP {hopMeta.stepNumber}/{activeTrace.hops.length} · {nodeState.toUpperCase()}
+                        </span>
+                        <span className={mutedText}>
+                          {prevMeta ? `${prevMeta.nodeCode} → ${hopMeta.nodeCode}` : `Entry → ${hopMeta.nodeCode}`} ({hopMeta.transitionLabel})
+                        </span>
+                      </div>
+                      <p className={`leading-relaxed ${secondaryText}`}>{hopMeta.payloadSummary}</p>
+                      <div className={`font-mono text-[10px] tabular-nums ${mutedText}`}>
+                        Target {hopMeta.latencyTarget} · {hopMeta.pitfallMitigation}
+                      </div>
+                    </div>
+                  );
+                })()}
 
               {/* Deployment Trade-Off & Failure Pitfall Callout (system-design-explainer) */}
               <div
