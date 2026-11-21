@@ -147,7 +147,7 @@ export interface StackMetrics {
 }
 
 export interface PendingNavFocus {
-  type: 'app' | 'slide' | 'infographic' | 'layer' | 'tier' | 'case' | 'blueprint';
+  type: 'app' | 'slide' | 'infographic' | 'layer' | 'tier' | 'case' | 'blueprint' | 'studio';
   id: string;
   ts: number;
 }

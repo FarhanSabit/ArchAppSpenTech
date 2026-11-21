@@ -259,6 +259,30 @@ export function GlobalSearchBar() {
       });
     });
 
+    // Coding-Agent Prompt Pack & 4-Theme Comparison Studio
+    items.push(
+      {
+        id: 'studio-prompt-pack',
+        kind: 'Section',
+        title: 'Prompt Pack & 4-Theme Design Studio',
+        subtitle: 'Download Universal Markdown P0/P1/P2 prompts, sandboxed 4-theme preview & matrix',
+        keywords:
+          'prompt pack markdown p0 p1 p2 coding agent cursor claude windsurf design studio theme template',
+        tab: 'Resources',
+        focus: { type: 'studio', id: 'prompt-theme-studio' },
+      },
+      {
+        id: 'studio-theme-comparison',
+        kind: 'Section',
+        title: '4-Way Theme Comparison: oits-web-v2, MMIS v2, oitsdhaka & Spenta OS',
+        subtitle: 'Isolated light/dark preview sandbox, verified hex tokens & Markdown comparison table',
+        keywords:
+          'oits-web-v2 mmis-intel-dashboards-v2 oitsdhaka comparison table theme tokens swatches design pov',
+        tab: 'Resources',
+        focus: { type: 'studio', id: 'theme-comparison' },
+      },
+    );
+
     return items;
   }, [theme, toggleTheme]);
 

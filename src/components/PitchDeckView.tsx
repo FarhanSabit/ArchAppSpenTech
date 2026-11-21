@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
   ChevronLeft,
@@ -17,6 +17,7 @@ import { useStack } from '../store/StackContext';
 import {
   PdfThemeOption,
   StackAppendixData,
+  downloadSerializedPrintDeckPdf,
   exportPitchDeckToPdf,
 } from '../utils/exportPitchDeckPdf';
 import { SpentaLogo } from './SpentaLogo';
@@ -26,7 +27,14 @@ type ExportScope = 'all' | 'current' | 'range';
 export function PitchDeckView() {
   const { pendingNavFocus, clearPendingNavFocus, selectedApps, stackMetrics } = useStack();
   const [slideIdx, setSlideIdx] = useState(0);
+  const [displayedIdx, setDisplayedIdx] = useState(0);
+  const [transitionStage, setTransitionStage] = useState<'visible' | 'fading-out' | 'fading-in'>(
+    'visible',
+  );
+  const [slideDir, setSlideDir] = useState<1 | -1>(1);
   const [showNotes, setShowNotes] = useState(true);
+  const transitionTimerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   // High-Quality PDF Export state & modal options
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -38,23 +46,75 @@ export function PitchDeckView() {
   const [pdfTheme, setPdfTheme] = useState<PdfThemeOption>('auto');
   const [pdfState, setPdfState] = useState<'idle' | 'exporting' | 'done'>('idle');
   const [pdfProgress, setPdfProgress] = useState<string>('');
+  const [blobPdfState, setBlobPdfState] = useState<'idle' | 'exporting' | 'done'>('idle');
+  const [blobPdfProgress, setBlobPdfProgress] = useState<string>('');
 
   const total = PITCH_DECK_SLIDES.length;
-  const slide = PITCH_DECK_SLIDES[slideIdx];
+  const slide = PITCH_DECK_SLIDES[displayedIdx];
+  const activeSlide = PITCH_DECK_SLIDES[slideIdx];
   const isDarkSlide = slide.theme === 'dark';
 
-  const goPrev = () => setSlideIdx((i) => Math.max(0, i - 1));
-  const goNext = () => setSlideIdx((i) => Math.min(total - 1, i + 1));
+  const navigateToSlide = useCallback(
+    (targetIdx: number) => {
+      const clamped = Math.max(0, Math.min(total - 1, targetIdx));
+      if (clamped === slideIdx && clamped === displayedIdx && transitionStage === 'visible') return;
+
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      const prefersReduced =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      setSlideIdx(clamped);
+
+      if (prefersReduced) {
+        setDisplayedIdx(clamped);
+        setTransitionStage('visible');
+        return;
+      }
+
+      setSlideDir(clamped >= displayedIdx ? 1 : -1);
+      setTransitionStage('fading-out');
+
+      transitionTimerRef.current = window.setTimeout(() => {
+        setDisplayedIdx(clamped);
+        setTransitionStage('fading-in');
+        rafRef.current = window.requestAnimationFrame(() => {
+          rafRef.current = window.requestAnimationFrame(() => {
+            setTransitionStage('visible');
+          });
+        });
+      }, 140);
+    },
+    [total, slideIdx, displayedIdx, transitionStage],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current);
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const goPrev = () => navigateToSlide(slideIdx - 1);
+  const goNext = () => navigateToSlide(slideIdx + 1);
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'slide') {
       const num = Number(pendingNavFocus.id);
       if (num >= 1 && num <= total) {
-        setSlideIdx(num - 1);
+        navigateToSlide(num - 1);
       }
       clearPendingNavFocus();
     }
-  }, [pendingNavFocus, clearPendingNavFocus, total]);
+  }, [pendingNavFocus, clearPendingNavFocus, total, navigateToSlide]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -66,15 +126,15 @@ export function PitchDeckView() {
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
-        setSlideIdx((i) => Math.min(total - 1, i + 1));
+        navigateToSlide(slideIdx + 1);
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
-        setSlideIdx((i) => Math.max(0, i - 1));
+        navigateToSlide(slideIdx - 1);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [total, exportModalOpen]);
+  }, [exportModalOpen, navigateToSlide, slideIdx]);
 
   const buildStackAppendix = (): StackAppendixData | null => {
     if (!includeStackAppendix || selectedApps.length === 0) return null;
@@ -110,8 +170,8 @@ export function PitchDeckView() {
     let filename = 'Spenta-Sovereign-OS-18-Slide-Investor-Deck.pdf';
 
     if (scope === 'current') {
-      targetSlides = [slide];
-      filename = `Spenta-Slide-${String(slide.num).padStart(2, '0')}-${slide.section
+      targetSlides = [activeSlide];
+      filename = `Spenta-Slide-${String(activeSlide.num).padStart(2, '0')}-${activeSlide.section
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')}.pdf`;
     } else if (scope === 'range') {
@@ -144,6 +204,48 @@ export function PitchDeckView() {
       setPdfState('idle');
       setPdfProgress('');
     }
+  };
+
+  // Serialize .pitch-deck-print-deck DOM content and trigger Blob-based PDF download
+  const handleDownloadSerializedPrintDeck = async () => {
+    setBlobPdfState('exporting');
+    setBlobPdfProgress('Serializing deck…');
+    try {
+      await downloadSerializedPrintDeckPdf({
+        containerSelector: '.pitch-deck-print-deck',
+        filename: 'Spenta-Sovereign-OS-Pitch-Deck-Print.pdf',
+        onProgress: (curr, tot) => {
+          setBlobPdfProgress(`Blob PDF ${curr}/${tot}…`);
+        },
+      });
+      setBlobPdfState('done');
+      setBlobPdfProgress('');
+      window.setTimeout(() => setBlobPdfState('idle'), 2400);
+    } catch {
+      setBlobPdfState('idle');
+      setBlobPdfProgress('');
+    }
+  };
+
+  // Trigger browser print dialog scoped specifically to .pitch-deck-print-deck elements
+  const handlePrintPitchDeck = () => {
+    const printContainer = document.querySelector('.pitch-deck-print-deck');
+    if (!printContainer) return;
+
+    const root = document.documentElement;
+    root.classList.add('printing-pitch-deck-only');
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      root.classList.remove('printing-pitch-deck-only');
+      window.removeEventListener('afterprint', cleanup);
+    };
+
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1200);
   };
 
   const kpiAccentClass = (accent?: 'emerald' | 'teal' | 'amber' | 'crimson') => {
@@ -192,7 +294,7 @@ export function PitchDeckView() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>Slide {String(slide.num).padStart(2, '0')} PDF</span>
+            <span>Slide {String(activeSlide.num).padStart(2, '0')} PDF</span>
           </button>
 
           <button
@@ -230,9 +332,9 @@ export function PitchDeckView() {
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={handlePrintPitchDeck}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
-            title="Print full 18-slide deck to PDF via browser print dialog"
+            title="Print full 18-slide .pitch-deck-print-deck to PDF via browser print dialog"
           >
             <Printer className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>Print</span>
@@ -266,7 +368,7 @@ export function PitchDeckView() {
                 <button
                   key={s.num}
                   type="button"
-                  onClick={() => setSlideIdx(idx)}
+                  onClick={() => navigateToSlide(idx)}
                   className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-start gap-2.5 ${
                     active
                       ? 'bg-zinc-950 text-white dark:bg-emerald-500/15 dark:text-emerald-200 dark:border dark:border-emerald-500/40 font-semibold'
@@ -297,14 +399,27 @@ export function PitchDeckView() {
         </aside>
 
         <div className="lg:col-span-9 space-y-4 order-1 lg:order-2">
-          {/* 16:9 Aspect Slide Stage */}
+          {/* 16:9 Aspect Slide Stage with Smooth Directional Fade-In/Out Transition */}
           <div
-            className={`relative rounded-2xl border overflow-hidden flex flex-col justify-between p-5 sm:p-8 lg:p-10 min-h-[380px] lg:aspect-[16/9] ${
+            className={`relative rounded-2xl border overflow-hidden transition-colors duration-200 motion-reduce:transition-none ${
               isDarkSlide
                 ? 'bg-[#09090B] bg-obsidian-grid text-white border-emerald-500/35'
                 : 'bg-white text-zinc-950 border-zinc-200 dark:border-white/[0.12]'
             }`}
           >
+            <div
+              className={`flex flex-col justify-between p-5 sm:p-8 lg:p-10 min-h-[380px] lg:aspect-[16/9] will-change-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${
+                transitionStage === 'fading-out'
+                  ? `transition-all duration-150 ease-in opacity-0 ${
+                      slideDir === 1 ? '-translate-x-2' : 'translate-x-2'
+                    }`
+                  : transitionStage === 'fading-in'
+                    ? `transition-none opacity-0 ${
+                        slideDir === 1 ? 'translate-x-2' : '-translate-x-2'
+                      }`
+                    : 'transition-all duration-200 ease-out opacity-100 translate-x-0'
+              }`}
+            >
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <SpentaLogo className="h-6 sm:h-7" tone={isDarkSlide ? 'dark-bg' : 'light-bg'} />
@@ -414,6 +529,7 @@ export function PitchDeckView() {
               <span>spenta.tech · Sovereign OS</span>
               <span>Confidential Investor Briefing · hello@spenta.tech</span>
             </div>
+            </div>
           </div>
 
           {/* Navigation Controls + Progress Bar */}
@@ -451,12 +567,18 @@ export function PitchDeckView() {
           {/* Speaker Notes Drawer */}
           {showNotes && (
             <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#111315] p-4">
-              <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">
-                Presenter Speaker Notes — Slide {String(slide.num).padStart(2, '0')}
+              <div
+                className={`transition-opacity duration-200 motion-reduce:transition-none ${
+                  transitionStage === 'visible' ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">
+                  Presenter Speaker Notes — Slide {String(slide.num).padStart(2, '0')}
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                  {slide.speakerNotes}
+                </p>
               </div>
-              <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                {slide.speakerNotes}
-              </p>
             </div>
           )}
         </div>
@@ -740,6 +862,46 @@ export function PitchDeckView() {
           </div>
         </div>
       )}
+
+      {/* Floating Print Pitch Deck & Serialized Blob PDF Action Bar (positioned bottom-left to stay clear of AI Advisor) */}
+      <div
+        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/95 dark:bg-[#111315]/95 backdrop-blur-md border border-zinc-200 dark:border-white/[0.12] shadow-lg no-print pitch-deck-nav"
+        role="region"
+        aria-label="Pitch Deck Print and PDF Download Controls"
+      >
+        <button
+          type="button"
+          onClick={handlePrintPitchDeck}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          title="Open browser print dialog targeting .pitch-deck-print-deck"
+        >
+          <Printer className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
+          <span>Print Pitch Deck</span>
+        </button>
+
+        <button
+          type="button"
+          disabled={blobPdfState === 'exporting'}
+          onClick={handleDownloadSerializedPrintDeck}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/50 text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
+          title="Serialize .pitch-deck-print-deck content and download as PDF Blob"
+        >
+          {blobPdfState === 'exporting' ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+          ) : blobPdfState === 'done' ? (
+            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          ) : (
+            <Download className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+          )}
+          <span className="hidden sm:inline">
+            {blobPdfState === 'exporting'
+              ? blobPdfProgress || 'Serializing…'
+              : blobPdfState === 'done'
+                ? 'Blob PDF Saved'
+                : 'Download Print PDF'}
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

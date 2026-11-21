@@ -643,5 +643,303 @@ export async function exportPitchDeckToPdf({
     );
   }
 
-  doc.save(filename);
+  const pdfBlob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+  triggerPdfBlobDownload(pdfBlob, filename);
 }
+
+export interface SerializedPrintSlide {
+  section: string;
+  counter: string;
+  title: string;
+  subtitle: string;
+  kpis: {
+    label: string;
+    value: string;
+    accent: 'emerald' | 'teal' | 'amber' | 'crimson';
+  }[];
+  bullets: string[];
+  callout: { label: string; text: string } | null;
+  speakerNotes: string | null;
+}
+
+export function triggerPdfBlobDownload(pdfBlob: Blob, filename: string): void {
+  const blobUrl = URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+}
+
+export function serializePrintDeckDom(
+  containerSelector = '.pitch-deck-print-deck',
+): SerializedPrintSlide[] {
+  const container = document.querySelector(containerSelector);
+  if (!container) return [];
+
+  const slideEls = Array.from(container.querySelectorAll<HTMLElement>('.pitch-deck-print-slide'));
+  return slideEls.map((el, index) => {
+    const section =
+      el.querySelector('.pitch-deck-print-badge')?.textContent?.trim() ?? 'INVESTOR DECK';
+    const counter =
+      el.querySelector('.pitch-deck-print-counter')?.textContent?.trim() ??
+      `${String(index + 1).padStart(2, '0')} / ${slideEls.length}`;
+    const title = el.querySelector('h2')?.textContent?.trim() ?? `Slide ${index + 1}`;
+    const subtitle = el.querySelector('.pitch-deck-print-subtitle')?.textContent?.trim() ?? '';
+
+    const kpis = Array.from(el.querySelectorAll<HTMLElement>('.pitch-deck-print-kpi')).map(
+      (kpiEl) => {
+        const label =
+          kpiEl.querySelector('.pitch-deck-print-kpi-label')?.textContent?.trim() ?? '';
+        const valEl = kpiEl.querySelector<HTMLElement>('.pitch-deck-print-kpi-value');
+        const value = valEl?.textContent?.trim() ?? '';
+        let accent: 'emerald' | 'teal' | 'amber' | 'crimson' = 'emerald';
+        if (valEl?.classList.contains('print-accent-crimson')) accent = 'crimson';
+        else if (valEl?.classList.contains('print-accent-amber')) accent = 'amber';
+        else if (valEl?.classList.contains('print-accent-teal')) accent = 'teal';
+        return { label, value, accent };
+      },
+    );
+
+    const bullets = Array.from(
+      el.querySelectorAll<HTMLElement>('.pitch-deck-print-bullet-text'),
+    )
+      .map((b) => b.textContent?.trim() ?? '')
+      .filter(Boolean);
+
+    const calloutEl = el.querySelector<HTMLElement>('.pitch-deck-print-callout');
+    let callout: { label: string; text: string } | null = null;
+    if (calloutEl) {
+      const labelRaw =
+        calloutEl.querySelector('.pitch-deck-print-callout-label')?.textContent?.trim() ?? '';
+      const label = labelRaw.replace(/:$/, '').trim();
+      const fullText = calloutEl.textContent?.trim() ?? '';
+      const text = labelRaw ? fullText.replace(labelRaw, '').trim() : fullText;
+      if (label || text) {
+        callout = { label: label || 'HIGHLIGHT', text };
+      }
+    }
+
+    const speakerNotes =
+      el.querySelector('.pitch-deck-print-notes p')?.textContent?.trim() ?? null;
+
+    return {
+      section,
+      counter,
+      title,
+      subtitle,
+      kpis,
+      bullets,
+      callout,
+      speakerNotes,
+    };
+  });
+}
+
+export async function downloadSerializedPrintDeckPdf(options?: {
+  containerSelector?: string;
+  filename?: string;
+  onProgress?: (current: number, total: number) => void;
+}): Promise<Blob> {
+  const {
+    containerSelector = '.pitch-deck-print-deck',
+    filename = 'Spenta-Sovereign-OS-Print-Deck.pdf',
+    onProgress,
+  } = options ?? {};
+
+  const serializedSlides = serializePrintDeckDom(containerSelector);
+  if (serializedSlides.length === 0) {
+    throw new Error('No .pitch-deck-print-deck slide elements found to serialize.');
+  }
+
+  const W = 297;
+  const H = 167.06;
+  const padX = 16;
+  const contentW = W - padX * 2;
+  const totalPages = serializedSlides.length;
+  const dateLabel = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
+  const logoAsset = await tryLoadLogoDataUrl(SPENTA_LOGO_URL);
+
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [W, H],
+    compress: true,
+  });
+
+  doc.setProperties({
+    title: 'Spenta Sovereign OS — Print-Serialized Investor Pitch Deck',
+    subject: 'Serialized .pitch-deck-print-deck Investor Presentation',
+    author: 'Spenta Technology (spenta.tech)',
+    creator: 'Spenta Sovereign OS Print Serializer',
+  });
+
+  for (let idx = 0; idx < serializedSlides.length; idx++) {
+    const s = serializedSlides[idx];
+    onProgress?.(idx + 1, totalPages);
+    if (idx > 0) doc.addPage([W, H], 'landscape');
+
+    // Paper-safe high-contrast white slide matching .pitch-deck-print-slide
+    doc.setFillColor(...COLORS.white);
+    doc.rect(0, 0, W, H, 'F');
+
+    // Top emerald accent bar (matching border-top: 3.5pt solid #059669)
+    doc.setFillColor(...COLORS.emerald);
+    doc.rect(0, 0, W, 2.2, 'F');
+
+    // Outer subtle border
+    doc.setDrawColor(...COLORS.zincBorder);
+    doc.setLineWidth(0.25);
+    doc.rect(5, 5, W - 10, H - 10, 'S');
+
+    // Brand + section badge + counter
+    const brandW = drawBrandMark(doc, padX, 11.5, false, logoAsset);
+    const badgeX = padX + brandW;
+    const sectionText = sanitizePdfText(s.section.toUpperCase());
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(7.6);
+    const badgeW = Math.min(90, doc.getTextWidth(sectionText) + 7);
+    doc.setFillColor(...COLORS.emeraldTintLight);
+    doc.setDrawColor(...COLORS.emerald);
+    doc.setLineWidth(0.22);
+    doc.roundedRect(badgeX, 10.6, badgeW, 5.8, 1.2, 1.2, 'FD');
+    doc.setTextColor(...COLORS.emeraldDark);
+    doc.text(sectionText, badgeX + 3.5, 14.5);
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...COLORS.zinc700);
+    doc.text(sanitizePdfText(s.counter), W - padX, 14.5, { align: 'right' });
+
+    doc.setDrawColor(...COLORS.zincBorder);
+    doc.setLineWidth(0.2);
+    doc.line(padX, 21.5, W - padX, 21.5);
+
+    // Title & Subtitle
+    let y = 31;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20.5);
+    doc.setTextColor(...COLORS.zinc900);
+    const titleLines = doc.splitTextToSize(sanitizePdfText(s.title), contentW);
+    doc.text(titleLines, padX, y);
+    y += titleLines.length * 7.8 + 1.5;
+
+    if (s.subtitle) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10.5);
+      doc.setTextColor(...COLORS.zinc700);
+      const subLines = doc.splitTextToSize(sanitizePdfText(s.subtitle), contentW - 8);
+      doc.text(subLines, padX, y);
+      y += subLines.length * 4.8 + 4.5;
+    }
+
+    // KPI Cards
+    if (s.kpis.length > 0) {
+      const kpiCount = Math.min(4, s.kpis.length);
+      const gap = 4;
+      const cardW = (contentW - gap * (kpiCount - 1)) / kpiCount;
+      const cardH = 19.5;
+
+      s.kpis.slice(0, 4).forEach((kpi, kIdx) => {
+        const x = padX + kIdx * (cardW + gap);
+        doc.setFillColor(...COLORS.zincLight);
+        doc.setDrawColor(...COLORS.zincBorder);
+        doc.setLineWidth(0.25);
+        doc.roundedRect(x, y, cardW, cardH, 2, 2, 'FD');
+
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(...COLORS.zinc500);
+        doc.text(sanitizePdfText(kpi.label.toUpperCase()).slice(0, 34), x + 3.5, y + 6);
+
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(13.5);
+        doc.setTextColor(...getKpiColor(kpi.accent, false));
+        doc.text(sanitizePdfText(kpi.value), x + 3.5, y + 14.2);
+      });
+      y += cardH + 5.5;
+    }
+
+    // Reserve footer + optional notes + optional callout
+    const footerReserve = s.speakerNotes ? 34 : 16;
+    const calloutReserve = s.callout ? 14 : 0;
+    const maxBulletY = H - footerReserve - calloutReserve;
+
+    // Bullets
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.8);
+    for (const bullet of s.bullets) {
+      const wrapped = doc.splitTextToSize(sanitizePdfText(bullet), contentW - 7);
+      const blockH = wrapped.length * 4.5 + 2.2;
+      if (y + blockH > maxBulletY) break;
+
+      doc.setFillColor(...COLORS.emerald);
+      doc.circle(padX + 1.4, y - 1.2, 0.9, 'F');
+      doc.setTextColor(...COLORS.zinc900);
+      doc.text(wrapped, padX + 5.2, y);
+      y += blockH;
+    }
+
+    // Callout Box
+    if (s.callout) {
+      const calloutY = Math.min(y + 1.5, H - footerReserve - 13);
+      doc.setFillColor(...COLORS.emeraldTintLight);
+      doc.setDrawColor(...COLORS.emerald);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(padX, calloutY, contentW, 11.2, 1.8, 1.8, 'FD');
+
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...COLORS.emeraldDark);
+      const labelTxt = `${sanitizePdfText(s.callout.label).toUpperCase()}: `;
+      doc.text(labelTxt, padX + 3.5, calloutY + 6.7);
+
+      const labelW = doc.getTextWidth(labelTxt);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...COLORS.zinc900);
+      const cText = doc.splitTextToSize(
+        sanitizePdfText(s.callout.text),
+        contentW - labelW - 7,
+      )[0];
+      doc.text(cText ?? '', padX + 3.5 + labelW, calloutY + 6.7);
+    }
+
+    // Speaker Notes Band (serialized from .pitch-deck-print-notes)
+    if (s.speakerNotes) {
+      const noteY = H - 31.5;
+      doc.setFillColor(...COLORS.zincSubtle);
+      doc.setDrawColor(...COLORS.zincBorder);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(padX, noteY, contentW, 16, 1.8, 1.8, 'FD');
+
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(7.1);
+      doc.setTextColor(...COLORS.emeraldDark);
+      doc.text('PRESENTER SPEAKER NOTES:', padX + 3.5, noteY + 4.8);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...COLORS.zinc700);
+      const nLines = doc
+        .splitTextToSize(sanitizePdfText(s.speakerNotes), contentW - 7)
+        .slice(0, 2);
+      doc.text(nLines, padX + 3.5, noteY + 9.4);
+    }
+
+    drawFooter(doc, W, H, padX, false, (idx + 1) / totalPages, dateLabel);
+  }
+
+  const pdfBlob = new Blob([doc.output('arraybuffer')], { type: 'application/pdf' });
+  triggerPdfBlobDownload(pdfBlob, filename);
+  return pdfBlob;
+}
+

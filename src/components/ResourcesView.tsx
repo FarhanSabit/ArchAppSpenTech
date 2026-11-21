@@ -18,6 +18,8 @@ import {
   SPENTA_CONTACT_EMAIL,
 } from '../data/spentaManifest';
 import { SavedProposal, useStack } from '../store/StackContext';
+import { DesignComparisonTable } from './DesignComparisonTable';
+import { PromptThemeStudio } from './PromptThemeStudio';
 
 const SECTORS = [
   'All',
@@ -45,6 +47,7 @@ export function ResourcesView() {
     clearPendingNavFocus,
   } = useStack();
 
+  const [resourcesMode, setResourcesMode] = useState<'proofs' | 'studio'>('proofs');
   const [sectorFilter, setSectorFilter] = useState<(typeof SECTORS)[number]>('All');
   const [organization, setOrganization] = useState('');
   const [contactName, setContactName] = useState('');
@@ -56,7 +59,11 @@ export function ResourcesView() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (pendingNavFocus?.type === 'case') {
+    if (pendingNavFocus?.type === 'studio') {
+      setResourcesMode('studio');
+      clearPendingNavFocus();
+    } else if (pendingNavFocus?.type === 'case') {
+      setResourcesMode('proofs');
       const match = SECTORS.find((s) => s === pendingNavFocus.id);
       if (match) setSectorFilter(match);
       clearPendingNavFocus();
@@ -124,21 +131,60 @@ export function ResourcesView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5">
-        <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.14em]">
-          ENTERPRISE PROOFS · REGULATORY COMPLIANCE · STACK-AWARE PROPOSALS
+      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div>
+          <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.14em]">
+            ENTERPRISE PROOFS · REGULATORY COMPLIANCE · AGENT PROMPT PACK
+          </div>
+          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
+            Resources — Case Studies, Proposals &amp; Prompt Studio
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-3xl">
+            Inspect verified deployments and compliance controls, build a stack-aware proposal routed to{' '}
+            <span className="font-mono text-zinc-950 dark:text-zinc-100">{SPENTA_CONTACT_EMAIL}</span>, or download the P0/P1/P2 coding-agent Markdown prompt pack and 4-theme design studio.
+          </p>
         </div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
-          Resources — Production Case Studies, Compliance &amp; Proposal Builder
-        </h1>
-        <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-3xl">
-          Inspect verified deployments across Healthcare, Banking, Retail, Nordic BI, and EV Mobility, review sovereign compliance controls, and generate a stack-aware proposal routed to{' '}
-          <span className="font-mono text-zinc-950 dark:text-zinc-100">{SPENTA_CONTACT_EMAIL}</span>.
-        </p>
+
+        <div
+          role="tablist"
+          aria-label="Resources workspace view"
+          className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] shrink-0 self-start lg:self-auto"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={resourcesMode === 'proofs'}
+            onClick={() => setResourcesMode('proofs')}
+            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              resourcesMode === 'proofs'
+                ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+            }`}
+          >
+            Proofs &amp; Proposals
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={resourcesMode === 'studio'}
+            onClick={() => setResourcesMode('studio')}
+            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              resourcesMode === 'studio'
+                ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+            }`}
+          >
+            Prompt Pack &amp; Theme Studio
+          </button>
+        </div>
       </section>
 
-      {/* Enterprise Case Studies */}
-      <section className="space-y-4">
+      {resourcesMode === 'studio' ? (
+        <PromptThemeStudio />
+      ) : (
+        <>
+          {/* Enterprise Case Studies */}
+          <section className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-500" strokeWidth={1.5} />
@@ -260,6 +306,9 @@ export function ResourcesView() {
           ))}
         </div>
       </section>
+
+      {/* 4-Way Design & Theme Comparison Table */}
+      <DesignComparisonTable />
 
       {/* Stack-Aware Proposal Request Form */}
       <section
@@ -547,6 +596,8 @@ export function ResourcesView() {
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

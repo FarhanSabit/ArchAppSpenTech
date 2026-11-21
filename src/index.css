@@ -172,6 +172,16 @@ input[type="range"].spenta-slider::-moz-range-thumb {
     box-shadow: none !important;
   }
 
+  /* Scoped print isolation when triggered via Print Pitch Deck button */
+  html.printing-pitch-deck-only body * {
+    visibility: hidden !important;
+  }
+
+  html.printing-pitch-deck-only .pitch-deck-print-deck,
+  html.printing-pitch-deck-only .pitch-deck-print-deck * {
+    visibility: visible !important;
+  }
+
   /* Reveal dedicated print-formatted 18-slide deck */
   .pitch-deck-print-deck {
     display: block !important;
