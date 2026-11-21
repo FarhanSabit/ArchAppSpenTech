@@ -25,6 +25,7 @@ export function StackComposerDrawer() {
     buildExecutiveBrief,
     buildMailtoHref,
     setActiveTab,
+    deploymentProfile,
   } = useStack();
 
   const [copied, setCopied] = useState(false);
@@ -86,7 +87,7 @@ export function StackComposerDrawer() {
               </span>
             </div>
             <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-              Unified RBAC · PostgreSQL/Kafka · 0.88 OPA Gate
+              {deploymentProfile.shortLabel} · {deploymentProfile.latencyBudget} · 0.88 OPA Gate
             </p>
           </div>
           <button
@@ -216,7 +217,7 @@ export function StackComposerDrawer() {
               <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-emerald-400 mb-1">
                 <span className="inline-flex items-center gap-1.5 font-semibold">
                   <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  RECOMMENDED ON-PREM SERVER
+                  TARGET: {deploymentProfile.switcherLabel.toUpperCase()} · {tierSpec.code}
                 </span>
                 <span>{tierSpec.speed}</span>
               </div>

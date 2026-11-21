@@ -53,6 +53,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '140ms',
         pitfallMitigation: 'Strip EXIF/PII metadata outside enclave; enforce zero external DNS egress.',
         highlightCompKind: 'protocol',
+        metadataState: {
+          stage: 'Ingress Terminated',
+          enclaveState: 'Zero-Egress LAN Ingest',
+          policyDecision: 'mTLS Cert Verified',
+          auditProof: 'Packet Hash Queued',
+          latencyMs: 140,
+        },
       },
       {
         stepNumber: 2,
@@ -65,6 +72,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '18.4s (<30s SLA)',
         pitfallMitigation: 'Quantized INT4/FP8 batching prevents VRAM OOM on 96GB Tier-3 baselines.',
         highlightCompKind: 'capability',
+        metadataState: {
+          stage: '14 Fields Extracted',
+          enclaveState: 'Local VRAM Tensor Inference',
+          policyDecision: 'PII Redaction Active',
+          auditProof: 'BBox Coordinates Logged',
+          latencyMs: 18400,
+        },
       },
       {
         stepNumber: 3,
@@ -77,6 +91,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '24ms',
         pitfallMitigation: 'Any signature smudge <0.88 halts auto-commit and routes to React verifier.',
         highlightCompKind: 'protocol',
+        metadataState: {
+          stage: 'OPA 0.88 Scored',
+          enclaveState: 'Deterministic Rego Sandbox',
+          policyDecision: '0.94 Pass / <0.88 HITL',
+          auditProof: 'Policy Verdict Signed',
+          latencyMs: 24,
+        },
       },
       {
         stepNumber: 4,
@@ -89,6 +110,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '38ms',
         pitfallMitigation: 'Idempotency key prevents duplicate loan disbursements on retry.',
         highlightCompKind: 'capability',
+        metadataState: {
+          stage: 'Ledger Committed',
+          enclaveState: 'Encrypted Core Bus',
+          policyDecision: 'Idempotent Write Approved',
+          auditProof: 'SHA-256 Ledger Sealed',
+          latencyMs: 38,
+        },
       },
       {
         stepNumber: 5,
@@ -101,6 +129,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '12ms',
         pitfallMitigation: 'Daily offline snapshot verification prevents silent ledger corruption.',
         highlightCompKind: 'hardware',
+        metadataState: {
+          stage: 'Enclave Attested',
+          enclaveState: 'SEV-SNP / TDX Verified',
+          policyDecision: '0 Bytes Cloud Egress',
+          auditProof: 'WORM NVMe Archived',
+          latencyMs: 12,
+        },
       },
     ],
   },
@@ -120,6 +155,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '110ms',
         pitfallMitigation: 'Strict HL7 v2/FHIR schema validation drops malformed telemetry before LLM prompt.',
         highlightCompKind: 'capability',
+        metadataState: {
+          stage: 'FHIR Schema Validated',
+          enclaveState: 'Hospital Intranet PHI',
+          policyDecision: 'Ward RBAC Scoped',
+          auditProof: 'HL7 Stream Checksummed',
+          latencyMs: 110,
+        },
       },
       {
         stepNumber: 2,
@@ -132,6 +174,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '1.9s',
         pitfallMitigation: 'Corrective RAG grounds dosage checks solely against approved hospital formulary.',
         highlightCompKind: 'protocol',
+        metadataState: {
+          stage: 'Formulary cRAG Grounded',
+          enclaveState: 'Local Clinical Enclave',
+          policyDecision: 'Zero External API Calls',
+          auditProof: 'Citation Links Attached',
+          latencyMs: 1900,
+        },
       },
       {
         stepNumber: 3,
@@ -144,6 +193,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '19ms',
         pitfallMitigation: 'Zero silent clinical auto-commits when confidence drops below 0.88.',
         highlightCompKind: 'capability',
+        metadataState: {
+          stage: '0.81 Routed to MD',
+          enclaveState: 'OPA Clinical Guardrail',
+          policyDecision: 'Mandatory Clinician Sign-Off',
+          auditProof: 'Override Queue Logged',
+          latencyMs: 19,
+        },
       },
       {
         stepNumber: 4,
@@ -156,6 +212,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '45ms',
         pitfallMitigation: 'RBAC ward scoping prevents cross-department patient PHI exposure.',
         highlightCompKind: 'protocol',
+        metadataState: {
+          stage: 'Shift Brief Delivered',
+          enclaveState: 'Ward Tablet TLS Session',
+          policyDecision: 'HIPAA Audit Complete',
+          auditProof: 'Sign-Off Timestamp Sealed',
+          latencyMs: 45,
+        },
       },
     ],
   },
@@ -175,6 +238,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '9ms',
         pitfallMitigation: 'Edge store-and-forward ring buffer survives 4G backhaul blackouts.',
         highlightCompKind: 'proof',
+        metadataState: {
+          stage: 'BMS Frame Ingested',
+          enclaveState: 'Cabinet Edge Broker',
+          policyDecision: 'Device mTLS Authenticated',
+          auditProof: 'RFID + Pack ID Paired',
+          latencyMs: 9,
+        },
       },
       {
         stepNumber: 2,
@@ -187,6 +257,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '22ms (<50ms SLA)',
         pitfallMitigation: 'Thermal threshold hardware interlock overrides software if cell >58°C.',
         highlightCompKind: 'capability',
+        metadataState: {
+          stage: 'Thermal & SoH Cleared',
+          enclaveState: 'Sandboxed Wasm Runtime',
+          policyDecision: 'Cell <58°C Interlock Pass',
+          auditProof: 'Bay #4 Optimal Selected',
+          latencyMs: 22,
+        },
       },
       {
         stepNumber: 3,
@@ -199,6 +276,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '11ms',
         pitfallMitigation: 'Mutual TLS device certificates block spoofed cabinet unlock commands.',
         highlightCompKind: 'protocol',
+        metadataState: {
+          stage: 'Bay Latch Actuated',
+          enclaveState: 'Signed IIoT Bus',
+          policyDecision: 'Actuator Command Verified',
+          auditProof: 'Swap Event Signed',
+          latencyMs: 11,
+        },
       },
       {
         stepNumber: 4,
@@ -211,6 +295,13 @@ const REQUEST_TRACES: RequestWalkthroughTrace[] = [
         latencyTarget: '34ms',
         pitfallMitigation: 'Idempotent batch replay prevents double-counted carbon offset credits.',
         highlightCompKind: 'proof',
+        metadataState: {
+          stage: 'ESG Ledger Reconciled',
+          enclaveState: 'Tier-4 Edge Appliance',
+          policyDecision: 'Idempotent Carbon Commit',
+          auditProof: 'Scope 2/3 Credit Sealed',
+          latencyMs: 34,
+        },
       },
     ],
   },
@@ -1185,6 +1276,20 @@ export function InteractiveArchitecturePathway({
                         strokeWidth={isHopTrunk ? 2.4 : 1.9}
                       />
                     )}
+                    {isHopTrunk && (
+                      <rect
+                        x={x - 3}
+                        y="45"
+                        width="164"
+                        height="64"
+                        rx="10"
+                        fill="none"
+                        stroke={hopAmber}
+                        strokeWidth="1.25"
+                        strokeOpacity="0.5"
+                        strokeDasharray="3 2"
+                      />
+                    )}
                     <rect
                       x={x}
                       y="48"
@@ -1730,6 +1835,24 @@ export function InteractiveArchitecturePathway({
                         </span>
                       </div>
                       <p className={`leading-relaxed ${secondaryText}`}>{hopMeta.payloadSummary}</p>
+                      <div className="grid grid-cols-1 gap-1 pt-1 border-t border-current/10 font-mono text-[10px]">
+                        <div>
+                          <span className={mutedText}>Stage: </span>
+                          <strong>{hopMeta.metadataState.stage}</strong>
+                        </div>
+                        <div>
+                          <span className={mutedText}>Enclave: </span>
+                          <strong>{hopMeta.metadataState.enclaveState}</strong>
+                        </div>
+                        <div>
+                          <span className={mutedText}>Policy: </span>
+                          <strong style={{ color: hopAmber }}>{hopMeta.metadataState.policyDecision}</strong>
+                        </div>
+                        <div>
+                          <span className={mutedText}>Audit: </span>
+                          <strong style={{ color: activeGreen }}>{hopMeta.metadataState.auditProof}</strong>
+                        </div>
+                      </div>
                       <div className={`font-mono text-[10px] tabular-nums ${mutedText}`}>
                         Target {hopMeta.latencyTarget} · {hopMeta.pitfallMitigation}
                       </div>

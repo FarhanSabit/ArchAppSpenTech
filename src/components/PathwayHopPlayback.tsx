@@ -10,6 +10,14 @@ import {
 } from 'lucide-react';
 import { DeploymentProfileSpec } from '../data/deploymentProfiles';
 
+export interface HopMetadataState {
+  stage: string;
+  enclaveState: string;
+  policyDecision: string;
+  auditProof: string;
+  latencyMs: number;
+}
+
 export interface WalkthroughHop {
   stepNumber: number;
   trunkId: string;
@@ -21,6 +29,7 @@ export interface WalkthroughHop {
   latencyTarget: string;
   pitfallMitigation: string;
   highlightCompKind?: 'capability' | 'protocol' | 'hardware' | 'synergy' | 'proof';
+  metadataState: HopMetadataState;
 }
 
 export interface RequestWalkthroughTrace {
@@ -49,6 +58,13 @@ interface PathwayHopPlaybackProps {
   onSpeedChange: (speed: PlaybackSpeed) => void;
 }
 
+function formatCumulativeLatency(ms: number): string {
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(2)}s`;
+  }
+  return `${ms}ms`;
+}
+
 export function PathwayHopPlayback({
   traces,
   activeTrace,
@@ -70,6 +86,14 @@ export function PathwayHopPlayback({
   const previousHop = activeHopIdx > 0 ? activeTrace.hops[activeHopIdx - 1] ?? null : null;
   const isCompleted = activeHopIdx === totalHops - 1 && !isPlaying;
 
+  const progressPct = activeHopIdx >= 0 ? Math.round(((activeHopIdx + 1) / totalHops) * 100) : 0;
+  const cumulativeMs =
+    activeHopIdx >= 0
+      ? activeTrace.hops
+          .slice(0, activeHopIdx + 1)
+          .reduce((sum, hop) => sum + hop.metadataState.latencyMs, 0)
+      : 0;
+
   const mutedText = isDark ? 'text-[#8D97B5]' : 'text-[#5F6576]';
   const secondaryText = isDark ? 'text-[#C3CCE4]' : 'text-[#4A5163]';
   const activeGreen = isDark ? '#6FCB9F' : '#1C6E46';
@@ -90,7 +114,11 @@ export function PathwayHopPlayback({
           <span className={`font-mono text-[10px] font-bold shrink-0 ${mutedText}`}>
             Hop-by-Hop Trace:
           </span>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Request walkthrough scenario">
+          <div
+            className="flex flex-wrap items-center gap-1.5"
+            role="group"
+            aria-label="Request walkthrough scenario"
+          >
             {traces.map((tr) => {
               const selected = tr.id === activeTrace.id;
               return (
@@ -219,13 +247,58 @@ export function PathwayHopPlayback({
         </div>
       </div>
 
-      {/* Interactive Hop-by-Hop Sequence Track (Nodes + Directed Transitions) */}
+      {/* Linear Playback Progress Bar & Status Cue */}
+      <div
+        className={`px-4 sm:px-6 pb-2.5 flex flex-wrap items-center justify-between gap-2 text-[10.5px] font-mono tabular-nums ${mutedText}`}
+      >
+        <div className="flex items-center gap-2.5 flex-1 min-w-[200px]">
+          <div
+            className={`flex-1 h-1.5 rounded-full overflow-hidden ${
+              isDark ? 'bg-[#1B2340]' : 'bg-[#E4DFD6]'
+            }`}
+            role="progressbar"
+            aria-valuenow={progressPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Hop-by-hop playback progress"
+          >
+            <div
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${progressPct}%`,
+                backgroundColor: isCompleted ? activeGreen : hopAmber,
+              }}
+            />
+          </div>
+          <span className="shrink-0 font-semibold">
+            {activeHopIdx < 0
+              ? 'Idle · Ready to step'
+              : isPlaying
+                ? `Playing Hop ${activeHopIdx + 1} of ${totalHops}`
+                : isCompleted
+                  ? `Verified ${totalHops}/${totalHops} Hops`
+                  : `Paused at Hop ${activeHopIdx + 1}/${totalHops}`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span>
+            Cumulative SLA:{' '}
+            <strong style={{ color: activeHopIdx >= 0 ? activeGreen : undefined }}>
+              {activeHopIdx >= 0 ? formatCumulativeLatency(cumulativeMs) : '—'}
+            </strong>
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>Target: {activeProfile.switcherLabel}</span>
+        </div>
+      </div>
+
+      {/* Interactive Hop-by-Hop Sequence Track (Nodes + Directed Transitions + Metadata Stages) */}
       <div
         className={`px-4 sm:px-6 py-3 border-t overflow-x-auto ${
           isDark ? 'border-[#232B4A]/80 bg-[#0B1020]/70' : 'border-[#E4DFD6]/90 bg-[#FAF8F4]/90'
         }`}
       >
-        <div className="flex items-stretch gap-1.5 min-w-[660px]">
+        <div className="flex items-stretch gap-1.5 min-w-[700px]">
           {activeTrace.hops.map((hop, idx) => {
             const state: 'idle' | 'completed' | 'active' | 'queued' =
               activeHopIdx < 0
@@ -242,7 +315,7 @@ export function PathwayHopPlayback({
                 : state === 'active'
                   ? isPlaying
                     ? 'Executing'
-                    : 'Focused'
+                    : 'Active'
                   : state === 'queued'
                     ? 'Queued'
                     : 'Ready';
@@ -262,7 +335,7 @@ export function PathwayHopPlayback({
                   type="button"
                   onClick={() => onSelectHop(idx)}
                   aria-current={state === 'active' ? 'step' : undefined}
-                  className={`flex-1 min-w-[126px] text-left rounded-lg border px-2.5 py-2 transition-all duration-150 cursor-pointer ${
+                  className={`flex-1 min-w-[132px] text-left rounded-lg border px-2.5 py-2 transition-all duration-150 cursor-pointer ${
                     state === 'active'
                       ? isDark
                         ? 'bg-[#2A2112]/90 border-[#E0B063]'
@@ -314,7 +387,10 @@ export function PathwayHopPlayback({
                   <div className="text-[11px] font-bold mt-1 leading-tight line-clamp-1">
                     {hop.title}
                   </div>
-                  <div className={`font-mono text-[9.5px] mt-0.5 tabular-nums ${mutedText}`}>
+                  <div className={`font-mono text-[9px] mt-0.5 truncate ${secondaryText}`}>
+                    {hop.metadataState.stage}
+                  </div>
+                  <div className={`font-mono text-[9px] mt-0.5 tabular-nums ${mutedText}`}>
                     {hop.latencyTarget}
                   </div>
                 </button>
@@ -326,7 +402,7 @@ export function PathwayHopPlayback({
                     aria-hidden="true"
                   >
                     <span
-                      className="font-mono text-[8.5px] truncate max-w-[40px] mb-0.5"
+                      className="font-mono text-[8.5px] truncate max-w-[40px] mb-0.5 font-semibold"
                       style={{
                         color:
                           nextEdgeState === 'inflight'
@@ -376,50 +452,69 @@ export function PathwayHopPlayback({
         </div>
       </div>
 
-      {/* Live Transition & Hop State Telemetry Strip */}
+      {/* Live Transition & Node Metadata State Telemetry Bar */}
       {currentHop && (
         <div
-          className={`px-4 sm:px-6 py-2.5 border-t flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs ${
+          className={`px-4 sm:px-6 py-3 border-t space-y-2 text-xs ${
             isDark
               ? 'bg-[#2A2112]/65 border-[#E0B063]/35'
               : 'bg-[#FDF5E6] border-[#8A5C10]/30'
           }`}
         >
-          <div className="min-w-0 flex flex-wrap items-center gap-2">
-            <span
-              className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 tabular-nums"
-              style={{
-                backgroundColor: hopAmber,
-                color: isDark ? '#0B1020' : '#FFFFFF',
-              }}
-            >
-              HOP {currentHop.stepNumber}/{totalHops}
-            </span>
-            {previousHop ? (
-              <span className="font-mono text-[10.5px] font-semibold shrink-0">
-                {previousHop.nodeCode} → {currentHop.nodeCode} ({currentHop.transitionLabel})
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+            <div className="min-w-0 flex flex-wrap items-center gap-2">
+              <span
+                className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 tabular-nums"
+                style={{
+                  backgroundColor: hopAmber,
+                  color: isDark ? '#0B1020' : '#FFFFFF',
+                }}
+              >
+                HOP {currentHop.stepNumber}/{totalHops}
               </span>
-            ) : (
               <span className="font-mono text-[10.5px] font-semibold shrink-0">
-                Entry → {currentHop.nodeCode} ({currentHop.transitionLabel})
+                {previousHop
+                  ? `${previousHop.nodeCode} → ${currentHop.nodeCode}`
+                  : `Ingress → ${currentHop.nodeCode}`}{' '}
+                ({currentHop.transitionLabel})
               </span>
-            )}
-            <span className={mutedText} aria-hidden="true">
-              ·
-            </span>
-            <span className="font-bold">{currentHop.title}</span>
-            <span className={mutedText} aria-hidden="true">
-              ·
-            </span>
-            <span className={secondaryText}>{currentHop.payloadSummary}</span>
+              <span className={mutedText} aria-hidden="true">
+                ·
+              </span>
+              <span className="font-bold">{currentHop.title}</span>
+              <span className={mutedText} aria-hidden="true">
+                ·
+              </span>
+              <span className={secondaryText}>{currentHop.payloadSummary}</span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 font-mono text-[10.5px] tabular-nums">
+              <span style={{ color: activeGreen }} className="font-bold">
+                SLA {currentHop.latencyTarget}
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0 font-mono text-[10.5px] tabular-nums">
-            <span style={{ color: activeGreen }} className="font-bold">
-              SLA {currentHop.latencyTarget}
-            </span>
-            <span className={mutedText}>·</span>
-            <span className={secondaryText}>{activeProfile.switcherLabel} Transport</span>
+          {/* Explicit Metadata State Row Updating Per Hop */}
+          <div
+            className={`pt-2 border-t grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-[10.5px] ${
+              isDark ? 'border-[#E0B063]/20' : 'border-[#8A5C10]/20'
+            }`}
+          >
+            <div className="truncate">
+              <span className={mutedText}>Enclave State: </span>
+              <strong className={isDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}>
+                {currentHop.metadataState.enclaveState} ({activeProfile.switcherLabel})
+              </strong>
+            </div>
+            <div className="truncate">
+              <span className={mutedText}>Policy State: </span>
+              <strong style={{ color: hopAmber }}>{currentHop.metadataState.policyDecision}</strong>
+            </div>
+            <div className="truncate">
+              <span className={mutedText}>Audit Proof: </span>
+              <strong style={{ color: activeGreen }}>{currentHop.metadataState.auditProof}</strong>
+            </div>
           </div>
         </div>
       )}

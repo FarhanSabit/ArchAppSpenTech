@@ -34,6 +34,10 @@ import {
   ServerTierId,
 } from '../data/spentaManifest';
 import {
+  DEPLOYMENT_PROFILES,
+  DEPLOYMENT_TARGET_ORDER,
+} from '../data/deploymentProfiles';
+import {
   CoreAuditScope,
   CoreIsolationMode,
   CoreLayerId,
@@ -113,6 +117,9 @@ export function SpentaCoreView() {
     stackMetrics,
     pendingNavFocus,
     clearPendingNavFocus,
+    deploymentTarget,
+    deploymentProfile,
+    setDeploymentTarget,
     coreLayerConfigs,
     coreAuditLog,
     updateCoreLayerConfig,
@@ -298,8 +305,42 @@ export function SpentaCoreView() {
             Spenta Core — Sovereign Fusion Architecture &amp; Configuration Governance
           </h1>
           <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-3xl">
-            Every module in the Spenta App Vault inherits one shared L1–L6 kernel. Tune per-layer isolation, OPA policy gates, Hardware TEEs, and server tiers—with every change immutably tracked in the Audit Log.
+            Every module in the Spenta App Vault inherits one shared L1–L6 kernel. Active target:{' '}
+            <strong className="font-mono text-zinc-900 dark:text-zinc-100">
+              {deploymentProfile.shortLabel}
+            </strong>{' '}
+            ({deploymentProfile.latencyBudget} · {deploymentProfile.transport}).
           </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              Target Environment:
+            </span>
+            <div
+              role="group"
+              aria-label="Core infrastructure target environment"
+              className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+            >
+              {DEPLOYMENT_TARGET_ORDER.map((tid) => {
+                const prof = DEPLOYMENT_PROFILES[tid];
+                const active = deploymentTarget === tid;
+                return (
+                  <button
+                    key={tid}
+                    type="button"
+                    onClick={() => setDeploymentTarget(tid, 'Spenta Core Console')}
+                    aria-pressed={active}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      active
+                        ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    {prof.switcherLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="inline-flex rounded-xl bg-zinc-100 dark:bg-[#18181B] p-1 border border-zinc-200 dark:border-white/[0.08] self-start lg:self-auto shrink-0">

@@ -45,6 +45,8 @@ export function ResourcesView() {
     setDrawerOpen,
     pendingNavFocus,
     clearPendingNavFocus,
+    deploymentTarget,
+    deploymentProfile,
   } = useStack();
 
   const [resourcesMode, setResourcesMode] = useState<'proofs' | 'studio'>('proofs');
@@ -52,11 +54,17 @@ export function ResourcesView() {
   const [organization, setOrganization] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
-  const [deployment, setDeployment] = useState<'On-Prem' | 'Private VPC' | 'SaaS'>('On-Prem');
+  const [deployment, setDeployment] = useState<'On-Prem' | 'Private VPC' | 'SaaS'>(() =>
+    deploymentTarget === 'private-vpc' ? 'Private VPC' : 'On-Prem',
+  );
   const [timeline, setTimeline] = useState('Q2–Q3 Pilot (60–90 Days)');
   const [notes, setNotes] = useState('');
   const [lastSubmitted, setLastSubmitted] = useState<SavedProposal | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDeployment(deploymentTarget === 'private-vpc' ? 'Private VPC' : 'On-Prem');
+  }, [deploymentTarget]);
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'studio') {
@@ -336,7 +344,9 @@ export function ResourcesView() {
 
             <div className="rounded-xl bg-[#09090B] border border-emerald-500/35 text-white p-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-emerald-400">PRE-POPULATED STACK</span>
+                <span className="text-emerald-400">
+                  PRE-POPULATED STACK · {deploymentProfile.switcherLabel.toUpperCase()}
+                </span>
                 <span className="tabular-nums text-zinc-300">{selectedApps.length} / 13 Modules</span>
               </div>
 

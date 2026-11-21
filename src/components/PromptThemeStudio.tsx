@@ -117,6 +117,7 @@ export function PromptThemeStudio() {
 
   // Master Prompt accordion state
   const [masterPromptExpanded, setMasterPromptExpanded] = useState(true);
+  const [showArchMetadata, setShowArchMetadata] = useState(true);
 
   // Clipboard & download visual confirmations
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -212,6 +213,29 @@ export function PromptThemeStudio() {
   }, [coreLayerConfigs]);
 
   const activeServerTier = SERVER_TIERS[stackMetrics.tier];
+
+  const liveArchitectureMetadataJson = useMemo(() => {
+    const metadata = {
+      project: 'Spenta Sovereign OS',
+      infrastructureTarget: {
+        id: deploymentProfile.id,
+        environment: deploymentProfile.switcherLabel,
+        topology: deploymentProfile.title,
+        transport: deploymentProfile.transport,
+        enclaveBoundary: deploymentProfile.enclaveBoundary,
+        latencyBudget: deploymentProfile.latencyBudget,
+        egressPolicy: deploymentProfile.egressPolicy,
+        compliancePosture: deploymentProfile.compliancePosture,
+      },
+      stackSizing: {
+        activeModules: selectedApps.length,
+        recommendedTier: `${activeServerTier.code} (${activeServerTier.name})`,
+        estimatedBuildUsd: stackMetrics.totalSetupUsd,
+      },
+      coreLayers: coreLayerConfigs,
+    };
+    return JSON.stringify(metadata, null, 2);
+  }, [deploymentProfile, selectedApps.length, activeServerTier, stackMetrics.totalSetupUsd, coreLayerConfigs]);
 
   const filteredPrompts = useMemo(() => {
     const q = promptQuery.trim().toLowerCase();
@@ -535,6 +559,107 @@ export function PromptThemeStudio() {
               {deploymentProfile.costPosture}
             </div>
           </div>
+        </div>
+
+        {/* Interactive Live Architectural Metadata Inspector & L1-L6 Isolation Matrix */}
+        <div className="border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E11]">
+          <div className="px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                architecture.meta.json
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>Live L1–L6 isolation, Hardware TEE &amp; OPA metadata synced across project</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleCopy('studio-arch-meta', liveArchitectureMetadataJson)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap"
+              >
+                {copiedKey === 'studio-arch-meta' ? (
+                  <Check className="w-3 h-3 text-emerald-500" />
+                ) : (
+                  <Copy className="w-3 h-3" strokeWidth={1.6} />
+                )}
+                <span>{copiedKey === 'studio-arch-meta' ? 'Copied Metadata' : 'Copy Metadata JSON'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowArchMetadata((v) => !v)}
+                aria-expanded={showArchMetadata}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap"
+              >
+                {showArchMetadata ? (
+                  <>
+                    <ChevronUp className="w-3 h-3" />
+                    <span>Hide Details</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3 h-3" />
+                    <span>Inspect Live Metadata</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {showArchMetadata && (
+            <div className="px-4 sm:px-5 pb-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+              {/* Left 7 cols: Live L6-L1 Layer Isolation & TEE Table */}
+              <div className="lg:col-span-7 rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-x-auto">
+                <table className="w-full text-left border-collapse text-[11px]">
+                  <thead>
+                    <tr className="border-b border-zinc-200 dark:border-white/[0.08] text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                      <th className="py-2 px-3 font-semibold">Layer</th>
+                      <th className="py-2 px-3 font-semibold">Isolation Boundary</th>
+                      <th className="py-2 px-3 font-semibold">Hardware TEE</th>
+                      <th className="py-2 px-3 font-semibold">OPA Policy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.05] font-mono tabular-nums">
+                    {(['L6', 'L5', 'L4', 'L3', 'L2', 'L1'] as const).map((layerKey) => {
+                      const cfg = coreLayerConfigs[layerKey];
+                      return (
+                        <tr key={layerKey} className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
+                          <td className="py-2 px-3 font-bold text-zinc-950 dark:text-zinc-100">
+                            {layerKey}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-700 dark:text-zinc-300">
+                            {cfg.isolationMode}
+                          </td>
+                          <td
+                            className={`py-2 px-3 font-semibold ${
+                              cfg.teeEnabled
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-zinc-500 dark:text-zinc-500'
+                            }`}
+                          >
+                            {cfg.teeEnabled ? 'Enforced' : 'Standard'}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 truncate max-w-[180px]">
+                            {cfg.policyMode}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Right 5 cols: Live Project Architectural Metadata JSON */}
+              <div className="lg:col-span-5 rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col">
+                <div className="px-3 py-1.5 border-b border-zinc-800 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                  <span>target: {deploymentProfile.id}</span>
+                  <span className="text-emerald-400">{deploymentProfile.switcherLabel} Active</span>
+                </div>
+                <pre className="p-3 text-[10.5px] leading-relaxed font-mono text-emerald-200 overflow-auto max-h-[215px] whitespace-pre">
+                  {liveArchitectureMetadataJson}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
