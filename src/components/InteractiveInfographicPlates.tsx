@@ -82,10 +82,37 @@ function getOitsPalette(polarity: 'light' | 'dark'): Palette {
   };
 }
 
-export function exportPlateSvg(svgEl: SVGSVGElement | null, filename: string): void {
-  if (!svgEl) return;
+export function exportPlateSvg(
+  svgEl: SVGSVGElement | null,
+  filename: string,
+  metadataTitle?: string,
+): boolean {
+  if (!svgEl) return false;
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+  const viewBox = clone.getAttribute('viewBox');
+  if (viewBox) {
+    const parts = viewBox.trim().split(/[\s,]+/);
+    if (parts.length === 4) {
+      clone.setAttribute('width', parts[2]);
+      clone.setAttribute('height', parts[3]);
+    }
+  }
+
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const styleEl = document.createElementNS(svgNs, 'style');
+  styleEl.textContent =
+    'text { font-family: "Plus Jakarta Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }';
+  clone.insertBefore(styleEl, clone.firstChild);
+
+  if (metadataTitle) {
+    const titleEl = document.createElementNS(svgNs, 'title');
+    titleEl.textContent = metadataTitle;
+    clone.insertBefore(titleEl, clone.firstChild);
+  }
+
   const serialized = new XMLSerializer().serializeToString(clone);
   const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`], {
     type: 'image/svg+xml;charset=utf-8',
@@ -97,7 +124,8 @@ export function exportPlateSvg(svgEl: SVGSVGElement | null, filename: string): v
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
 /* ============================================================================

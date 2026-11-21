@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Check,
   Code2,
   Download,
   GitBranch,
@@ -105,6 +106,8 @@ export function InfographicsView() {
   const [lightboxItem, setLightboxItem] = useState<InfographicPlate | null>(null);
   const [zoom, setZoom] = useState<number>(1);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [downloadedKey, setDownloadedKey] = useState<string | null>(null);
+  const downloadTimerRef = useRef<number | null>(null);
 
   const svgRefs: Record<OitsPlateId, React.RefObject<SVGSVGElement | null>> = {
     'ai-brain': useRef<SVGSVGElement | null>(null),
@@ -118,6 +121,14 @@ export function InfographicsView() {
   useEffect(() => {
     setPlatePolarity(theme);
   }, [theme]);
+
+  useEffect(() => {
+    return () => {
+      if (downloadTimerRef.current !== null) {
+        window.clearTimeout(downloadTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'infographic') {
@@ -157,11 +168,32 @@ export function InfographicsView() {
     }));
   };
 
+  const flashDownloadConfirmation = (key: string) => {
+    setDownloadedKey(key);
+    if (downloadTimerRef.current !== null) {
+      window.clearTimeout(downloadTimerRef.current);
+    }
+    downloadTimerRef.current = window.setTimeout(() => {
+      setDownloadedKey(null);
+      downloadTimerRef.current = null;
+    }, 1800);
+  };
+
   const downloadPlate = (plate: InfographicPlate, fromLightbox = false) => {
     const mode = getPlateMode(plate.id);
+    const key = fromLightbox ? `${plate.id}-lightbox` : plate.id;
     if (mode === 'code') {
       const targetSvg = fromLightbox ? lightboxSvgRef.current : svgRefs[plate.id].current;
-      exportPlateSvg(targetSvg, plate.svgFilename);
+      const polaritySuffix = platePolarity === 'dark' ? 'nocturnal' : 'stone';
+      const svgFilename = plate.svgFilename.replace(/\.svg$/i, `-${polaritySuffix}.svg`);
+      const exported = exportPlateSvg(
+        targetSvg,
+        svgFilename,
+        `${plate.plateNumber}: ${plate.title}`,
+      );
+      if (exported) {
+        flashDownloadConfirmation(key);
+      }
       return;
     }
     const link = document.createElement('a');
@@ -170,6 +202,7 @@ export function InfographicsView() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    flashDownloadConfirmation(key);
   };
 
   const isDark = platePolarity === 'dark';
@@ -365,7 +398,7 @@ export function InfographicsView() {
                 }`}
               >
                 <div
-                  className={`px-5 py-4 border-b flex items-start justify-between gap-3 ${
+                  className={`px-5 py-4 border-b flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
                     isDark ? 'border-[#232B4A] bg-[#0F1529]' : 'border-[#E4DFD6] bg-[#FAF8F4]'
                   }`}
                 >
@@ -407,11 +440,11 @@ export function InfographicsView() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 no-print">
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 no-print">
                     <button
                       type="button"
                       onClick={() => toggleSinglePlateMode(plate.id)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                         isDark
                           ? 'bg-[#141A32] border-[#2E3862] text-[#E7EBF5] hover:border-[#8FA6E8]'
                           : 'bg-[#FFFFFF] border-[#CFC8BC] text-[#16213A] hover:border-[#1F3863]'
@@ -434,15 +467,41 @@ export function InfographicsView() {
                     <button
                       type="button"
                       onClick={() => downloadPlate(plate)}
-                      className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                        isDark
-                          ? 'border-[#2E3862] text-[#C3CCE4] hover:border-[#8FA6E8] hover:text-white'
-                          : 'border-[#CFC8BC] text-[#4A5163] hover:border-[#1F3863] hover:text-[#16213A]'
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                        downloadedKey === plate.id
+                          ? isDark
+                            ? 'bg-[#10261F] border-[#6FCB9F] text-[#6FCB9F]'
+                            : 'bg-[#ECF7F1] border-[#1C6E46] text-[#1C6E46]'
+                          : mode === 'code'
+                            ? isDark
+                              ? 'bg-[#161D3A] border-[#8FA6E8]/70 text-[#E7EBF5] hover:border-[#8FA6E8] hover:bg-[#1D264A]'
+                              : 'bg-[#EEF3FB] border-[#1F3863]/45 text-[#1F3863] hover:border-[#1F3863] hover:bg-[#E2ECFA]'
+                            : isDark
+                              ? 'border-[#2E3862] text-[#C3CCE4] hover:border-[#8FA6E8] hover:text-white'
+                              : 'border-[#CFC8BC] text-[#4A5163] hover:border-[#1F3863] hover:text-[#16213A]'
                       }`}
-                      title={mode === 'code' ? 'Export interactive SVG' : 'Download high-res JPG'}
-                      aria-label={`Download ${plate.title}`}
+                      title={
+                        mode === 'code'
+                          ? `Download ${plate.plateNumber} vector graphic as SVG`
+                          : `Download ${plate.plateNumber} static JPG`
+                      }
+                      aria-label={
+                        mode === 'code'
+                          ? `Download ${plate.title} as SVG`
+                          : `Download ${plate.title} as JPG`
+                      }
                     >
-                      <Download className="w-4 h-4" strokeWidth={1.5} />
+                      {downloadedKey === plate.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                          <span>{mode === 'code' ? 'Saved SVG' : 'Saved JPG'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" strokeWidth={1.7} />
+                          <span>{mode === 'code' ? 'Download as SVG' : 'Save JPG'}</span>
+                        </>
+                      )}
                     </button>
 
                     <button
@@ -451,7 +510,7 @@ export function InfographicsView() {
                         setZoom(1);
                         setLightboxItem(plate);
                       }}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
                         isDark
                           ? 'bg-[#8FA6E8] text-[#0B1020] hover:bg-[#7FA6FF]'
                           : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
@@ -598,12 +657,23 @@ export function InfographicsView() {
               <button
                 type="button"
                 onClick={() => downloadPlate(lightboxItem, true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#6FCB9F] hover:bg-[#82D7AE] text-[#0B1020] font-semibold text-xs cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#6FCB9F] hover:bg-[#82D7AE] text-[#0B1020] font-semibold text-xs cursor-pointer whitespace-nowrap shrink-0"
               >
-                <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
-                <span className="hidden sm:inline">
-                  {getPlateMode(lightboxItem.id) === 'code' ? 'Export SVG' : 'Save JPG'}
-                </span>
+                {downloadedKey === `${lightboxItem.id}-lightbox` ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" strokeWidth={2.2} />
+                    <span>
+                      {getPlateMode(lightboxItem.id) === 'code' ? 'Saved SVG' : 'Saved JPG'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
+                    <span>
+                      {getPlateMode(lightboxItem.id) === 'code' ? 'Download as SVG' : 'Save JPG'}
+                    </span>
+                  </>
+                )}
               </button>
               <button
                 type="button"

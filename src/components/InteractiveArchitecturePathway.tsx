@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Check,
@@ -29,6 +29,7 @@ import {
 import { downloadMarkdownFile } from '../data/promptThemeStudioData';
 import { useStack } from '../store/StackContext';
 import {
+  ActivationHistoryEntry,
   PathwayHopPlayback,
   PlaybackSpeed,
   RequestWalkthroughTrace,
@@ -677,17 +678,48 @@ export function InteractiveArchitecturePathway({
   const activeProfile = deploymentProfile;
   const tree = useMemo(() => buildPathwayTree(activeProfile), [activeProfile]);
 
-  // Hop-by-Hop Request Walkthrough Player state
+  // Hop-by-Hop Request Walkthrough Player + Chronological Back/Forward History state
   const [activeTraceId, setActiveTraceId] = useState<RequestWalkthroughTrace['id']>('banking-icr');
   const [activeHopIdx, setActiveHopIdx] = useState<number>(-1); // -1 = idle
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+  const [navHistory, setNavHistory] = useState<{
+    entries: ActivationHistoryEntry[];
+    cursor: number;
+  }>({ entries: [], cursor: -1 });
+  const pendingHistorySourceRef = useRef<
+    ActivationHistoryEntry['source'] | 'history-restore' | null
+  >(null);
 
   const activeTrace = useMemo(
     () => REQUEST_TRACES.find((t) => t.id === activeTraceId) ?? REQUEST_TRACES[0],
     [activeTraceId],
   );
   const currentHop = activeHopIdx >= 0 ? activeTrace.hops[activeHopIdx] ?? null : null;
+
+  const pushHistoryEntry = useCallback((entry: Omit<ActivationHistoryEntry, 'id'>) => {
+    setNavHistory((prev) => {
+      const current = prev.cursor >= 0 ? prev.entries[prev.cursor] : null;
+      if (
+        current &&
+        current.traceId === entry.traceId &&
+        current.hopIdx === entry.hopIdx &&
+        current.branchId === entry.branchId
+      ) {
+        return prev;
+      }
+      const sliced = prev.entries.slice(0, prev.cursor + 1);
+      const nextEntry: ActivationHistoryEntry = {
+        ...entry,
+        id: `${entry.traceId}-${entry.hopIdx}-${entry.branchId}-${Date.now()}-${sliced.length}`,
+      };
+      const nextEntries = [...sliced, nextEntry].slice(-40);
+      return {
+        entries: nextEntries,
+        cursor: nextEntries.length - 1,
+      };
+    });
+  }, []);
 
   // Scoped OITS Dhaka polarity synced to portal theme or parent
   const [localPolarity, setLocalPolarity] = useState<'light' | 'dark'>(syncedPolarity ?? theme);
@@ -711,7 +743,7 @@ export function InteractiveArchitecturePathway({
   const [hoveredTip, setHoveredTip] = useState<HoveredTipState | null>(null);
   const [exportedFlag, setExportedFlag] = useState(false);
 
-  // Sync tree expansion & inspector whenever the active walkthrough hop advances
+  // Sync tree expansion, inspector, and chronological activation history whenever active hop changes
   useEffect(() => {
     if (!currentHop) return;
     setExpandedTrunks((prev) =>
@@ -721,13 +753,29 @@ export function InteractiveArchitecturePathway({
       prev.includes(currentHop.branchId) ? prev : [...prev, currentHop.branchId],
     );
     setInspectedBranchId(currentHop.branchId);
-  }, [currentHop]);
+
+    const pendingSource = pendingHistorySourceRef.current;
+    pendingHistorySourceRef.current = null;
+    if (pendingSource === 'history-restore') return;
+
+    pushHistoryEntry({
+      traceId: activeTrace.id,
+      traceLabel: activeTrace.label,
+      hopIdx: activeHopIdx,
+      trunkId: currentHop.trunkId,
+      branchId: currentHop.branchId,
+      nodeCode: currentHop.nodeCode,
+      label: currentHop.title,
+      source: pendingSource ?? 'step',
+    });
+  }, [activeTrace, activeHopIdx, currentHop, pushHistoryEntry]);
 
   // Clean autoplay timer scaled by playbackSpeed and cleared on pause, step, or unmount
   useEffect(() => {
     if (!isPlaying) return;
     const intervalMs = Math.round(2400 / playbackSpeed);
     const timer = window.setInterval(() => {
+      pendingHistorySourceRef.current = 'play';
       setActiveHopIdx((prev) => {
         const next = prev + 1;
         if (next >= activeTrace.hops.length) {
@@ -742,6 +790,7 @@ export function InteractiveArchitecturePathway({
 
   const handleSelectTrace = (id: RequestWalkthroughTrace['id']) => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = 'trace';
     setActiveTraceId(id);
     setActiveHopIdx(0);
   };
@@ -752,6 +801,7 @@ export function InteractiveArchitecturePathway({
       return;
     }
     if (activeHopIdx < 0 || activeHopIdx >= activeTrace.hops.length - 1) {
+      pendingHistorySourceRef.current = 'play';
       setActiveHopIdx(0);
     }
     setIsPlaying(true);
@@ -759,11 +809,13 @@ export function InteractiveArchitecturePathway({
 
   const handleStepPrev = () => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = 'step';
     setActiveHopIdx((prev) => (prev <= 0 ? 0 : prev - 1));
   };
 
   const handleStepNext = () => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = 'step';
     setActiveHopIdx((prev) =>
       prev < 0 ? 0 : Math.min(activeTrace.hops.length - 1, prev + 1),
     );
@@ -771,12 +823,56 @@ export function InteractiveArchitecturePathway({
 
   const handleSelectHop = (idx: number) => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = 'jump';
     setActiveHopIdx(idx);
   };
 
   const handleResetWalkthrough = () => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = null;
     setActiveHopIdx(-1);
+    setNavHistory({ entries: [], cursor: -1 });
+  };
+
+  const applyHistoryAtIndex = useCallback(
+    (nextIndex: number) => {
+      const target = navHistory.entries[nextIndex];
+      if (!target) return;
+
+      setIsPlaying(false);
+      setNavHistory((prev) => ({
+        ...prev,
+        cursor: Math.max(0, Math.min(prev.entries.length - 1, nextIndex)),
+      }));
+
+      const hopStateWillChange =
+        target.hopIdx >= 0 &&
+        (target.traceId !== activeTraceId || target.hopIdx !== activeHopIdx);
+      if (hopStateWillChange) {
+        pendingHistorySourceRef.current = 'history-restore';
+      }
+
+      setActiveTraceId(target.traceId);
+      setActiveHopIdx(target.hopIdx);
+      setExpandedTrunks((prev) =>
+        prev.includes(target.trunkId) ? prev : [...prev, target.trunkId],
+      );
+      setExpandedBranches((prev) =>
+        prev.includes(target.branchId) ? prev : [...prev, target.branchId],
+      );
+      setInspectedBranchId(target.branchId);
+    },
+    [navHistory.entries, activeTraceId, activeHopIdx],
+  );
+
+  const handleHistoryBack = () => {
+    if (navHistory.cursor <= 0) return;
+    applyHistoryAtIndex(navHistory.cursor - 1);
+  };
+
+  const handleHistoryForward = () => {
+    if (navHistory.cursor < 0 || navHistory.cursor >= navHistory.entries.length - 1) return;
+    applyHistoryAtIndex(navHistory.cursor + 1);
   };
 
   const isDark = localPolarity === 'dark';
@@ -797,10 +893,33 @@ export function InteractiveArchitecturePathway({
   };
 
   const toggleBranch = (branch: PathwayBranchNode) => {
+    setIsPlaying(false);
     setInspectedBranchId(branch.id);
     setExpandedBranches((prev) =>
       prev.includes(branch.id) ? prev.filter((item) => item !== branch.id) : [...prev, branch.id],
     );
+
+    const matchedHopIdx = activeTrace.hops.findIndex((h) => h.branchId === branch.id);
+    if (matchedHopIdx >= 0) {
+      pendingHistorySourceRef.current = 'branch';
+      setActiveHopIdx(matchedHopIdx);
+      return;
+    }
+
+    const owningTrunk = tree.find((t) => t.branches.some((b) => b.id === branch.id));
+    if (owningTrunk) {
+      setActiveHopIdx(-1);
+      pushHistoryEntry({
+        traceId: activeTrace.id,
+        traceLabel: activeTrace.label,
+        hopIdx: -1,
+        trunkId: owningTrunk.id,
+        branchId: branch.id,
+        nodeCode: branch.code,
+        label: branch.title,
+        source: 'branch',
+      });
+    }
   };
 
   const expandAll = () => {
@@ -815,7 +934,9 @@ export function InteractiveArchitecturePathway({
 
   const resetPathway = () => {
     setIsPlaying(false);
+    pendingHistorySourceRef.current = null;
     setActiveHopIdx(-1);
+    setNavHistory({ entries: [], cursor: -1 });
     setExpandedTrunks(defaultExpandedTrunks);
     setExpandedBranches(['branch-layer-L5', 'branch-app-healthcare_erp']);
     setInspectedBranchId('branch-app-healthcare_erp');
@@ -833,6 +954,8 @@ export function InteractiveArchitecturePathway({
   const focusLinkedAppBranch = (appId: string) => {
     const targetBranchId = `branch-app-${appId}`;
     const owningTrunk = tree.find((t) => t.branches.some((b) => b.id === targetBranchId));
+    const targetBranch = owningTrunk?.branches.find((b) => b.id === targetBranchId);
+    setIsPlaying(false);
     if (owningTrunk && !expandedTrunks.includes(owningTrunk.id)) {
       setExpandedTrunks((prev) => [...prev, owningTrunk.id]);
     }
@@ -840,6 +963,24 @@ export function InteractiveArchitecturePathway({
       setExpandedBranches((prev) => [...prev, targetBranchId]);
     }
     setInspectedBranchId(targetBranchId);
+
+    const matchedHopIdx = activeTrace.hops.findIndex((h) => h.branchId === targetBranchId);
+    if (matchedHopIdx >= 0) {
+      pendingHistorySourceRef.current = 'branch';
+      setActiveHopIdx(matchedHopIdx);
+    } else if (owningTrunk && targetBranch) {
+      setActiveHopIdx(-1);
+      pushHistoryEntry({
+        traceId: activeTrace.id,
+        traceLabel: activeTrace.label,
+        hopIdx: -1,
+        trunkId: owningTrunk.id,
+        branchId: targetBranch.id,
+        nodeCode: targetBranch.code,
+        label: targetBranch.title,
+        source: 'branch',
+      });
+    }
   };
 
   // Explicit OITS Dhaka palette tokens scoped cleanly to this container
@@ -1032,6 +1173,8 @@ export function InteractiveArchitecturePathway({
         speed={playbackSpeed}
         isDark={isDark}
         activeProfile={activeProfile}
+        historyStack={navHistory.entries}
+        historyCursor={navHistory.cursor}
         onSelectTrace={handleSelectTrace}
         onTogglePlay={handleTogglePlay}
         onStepPrev={handleStepPrev}
@@ -1039,6 +1182,9 @@ export function InteractiveArchitecturePathway({
         onSelectHop={handleSelectHop}
         onReset={handleResetWalkthrough}
         onSpeedChange={setPlaybackSpeed}
+        onHistoryBack={handleHistoryBack}
+        onHistoryForward={handleHistoryForward}
+        onJumpToHistory={applyHistoryAtIndex}
       />
 
       {/* Contextual Hover Tooltip Strip */}

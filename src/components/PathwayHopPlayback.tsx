@@ -1,9 +1,11 @@
 import React from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   ChevronLeft,
   ChevronRight,
+  History,
   Pause,
   Play,
   RotateCcw,
@@ -41,6 +43,18 @@ export interface RequestWalkthroughTrace {
 
 export type PlaybackSpeed = 0.75 | 1 | 1.5;
 
+export interface ActivationHistoryEntry {
+  id: string;
+  traceId: RequestWalkthroughTrace['id'];
+  traceLabel: string;
+  hopIdx: number;
+  trunkId: string;
+  branchId: string;
+  nodeCode: string;
+  label: string;
+  source: 'play' | 'step' | 'jump' | 'trace' | 'branch';
+}
+
 interface PathwayHopPlaybackProps {
   traces: RequestWalkthroughTrace[];
   activeTrace: RequestWalkthroughTrace;
@@ -49,6 +63,8 @@ interface PathwayHopPlaybackProps {
   speed: PlaybackSpeed;
   isDark: boolean;
   activeProfile: DeploymentProfileSpec;
+  historyStack: ActivationHistoryEntry[];
+  historyCursor: number;
   onSelectTrace: (id: RequestWalkthroughTrace['id']) => void;
   onTogglePlay: () => void;
   onStepPrev: () => void;
@@ -56,6 +72,9 @@ interface PathwayHopPlaybackProps {
   onSelectHop: (idx: number) => void;
   onReset: () => void;
   onSpeedChange: (speed: PlaybackSpeed) => void;
+  onHistoryBack: () => void;
+  onHistoryForward: () => void;
+  onJumpToHistory: (index: number) => void;
 }
 
 function formatCumulativeLatency(ms: number): string {
@@ -73,6 +92,8 @@ export function PathwayHopPlayback({
   speed,
   isDark,
   activeProfile,
+  historyStack,
+  historyCursor,
   onSelectTrace,
   onTogglePlay,
   onStepPrev,
@@ -80,11 +101,19 @@ export function PathwayHopPlayback({
   onSelectHop,
   onReset,
   onSpeedChange,
+  onHistoryBack,
+  onHistoryForward,
+  onJumpToHistory,
 }: PathwayHopPlaybackProps) {
   const totalHops = activeTrace.hops.length;
   const currentHop = activeHopIdx >= 0 ? activeTrace.hops[activeHopIdx] ?? null : null;
   const previousHop = activeHopIdx > 0 ? activeTrace.hops[activeHopIdx - 1] ?? null : null;
   const isCompleted = activeHopIdx === totalHops - 1 && !isPlaying;
+
+  const canHistoryBack = historyCursor > 0;
+  const canHistoryForward = historyCursor >= 0 && historyCursor < historyStack.length - 1;
+  const backTarget = canHistoryBack ? historyStack[historyCursor - 1] : null;
+  const forwardTarget = canHistoryForward ? historyStack[historyCursor + 1] : null;
 
   const progressPct = activeHopIdx >= 0 ? Math.round(((activeHopIdx + 1) / totalHops) * 100) : 0;
   const cumulativeMs =
@@ -206,12 +235,72 @@ export function PathwayHopPlayback({
             <button
               type="button"
               onClick={onReset}
-              disabled={activeHopIdx < 0 && !isPlaying}
-              aria-label="Reset playback"
-              title="Reset hop-by-hop playback"
+              disabled={activeHopIdx < 0 && !isPlaying && historyStack.length === 0}
+              aria-label="Reset playback and history"
+              title="Reset hop-by-hop playback and navigation history"
               className={`p-1.5 rounded-md transition-colors cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${mutedText}`}
             >
               <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Manual Back / Forward Node Activation History Controls */}
+          <div
+            role="group"
+            aria-label="Node activation history navigation"
+            className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
+              isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#FFFFFF] border-[#E4DFD6]'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={onHistoryBack}
+              disabled={!canHistoryBack}
+              title={
+                backTarget
+                  ? `Back to ${backTarget.nodeCode} · ${backTarget.label}`
+                  : 'No earlier node activation in history'
+              }
+              aria-label="Step back in activation history"
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${
+                canHistoryBack
+                  ? isDark
+                    ? 'text-[#E7EBF5] hover:bg-[#161D3A]'
+                    : 'text-[#16213A] hover:bg-[#EEF3FB]'
+                  : mutedText
+              }`}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <span>Back</span>
+            </button>
+
+            <span
+              className={`font-mono text-[10px] font-semibold px-1 tabular-nums ${mutedText}`}
+              title="Current position in activation history"
+            >
+              {historyStack.length > 0 ? `${historyCursor + 1}/${historyStack.length}` : '0/0'}
+            </span>
+
+            <button
+              type="button"
+              onClick={onHistoryForward}
+              disabled={!canHistoryForward}
+              title={
+                forwardTarget
+                  ? `Forward to ${forwardTarget.nodeCode} · ${forwardTarget.label}`
+                  : 'No later node activation in history'
+              }
+              aria-label="Step forward in activation history"
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed ${
+                canHistoryForward
+                  ? isDark
+                    ? 'text-[#E7EBF5] hover:bg-[#161D3A]'
+                    : 'text-[#16213A] hover:bg-[#EEF3FB]'
+                  : mutedText
+              }`}
+            >
+              <span>Forward</span>
+              <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
             </button>
           </div>
 
@@ -291,6 +380,72 @@ export function PathwayHopPlayback({
           <span>Target: {activeProfile.switcherLabel}</span>
         </div>
       </div>
+
+      {/* Interactive Chronological Node Activation History Trail */}
+      {historyStack.length > 0 && (
+        <div
+          className={`px-4 sm:px-6 py-2 border-t flex items-center gap-2 overflow-x-auto ${
+            isDark ? 'border-[#232B4A]/70 bg-[#0B1020]/50' : 'border-[#E4DFD6]/80 bg-[#FFFFFF]/70'
+          }`}
+          aria-label="Chronological node activation history"
+        >
+          <span
+            className={`inline-flex items-center gap-1.5 font-mono text-[10px] font-bold shrink-0 ${mutedText}`}
+          >
+            <History className="w-3 h-3" strokeWidth={1.75} />
+            <span>History Trail:</span>
+          </span>
+          <div className="flex items-center gap-1 min-w-max">
+            {historyStack.map((entry, idx) => {
+              const isCurrent = idx === historyCursor;
+              const isFuture = idx > historyCursor;
+              return (
+                <React.Fragment key={entry.id}>
+                  {idx > 0 && (
+                    <ArrowRight
+                      className={`w-3 h-3 shrink-0 ${
+                        isFuture
+                          ? isDark
+                            ? 'text-[#2E3862]'
+                            : 'text-[#CFC8BC]'
+                          : isDark
+                            ? 'text-[#6FCB9F]/70'
+                            : 'text-[#1C6E46]/70'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onJumpToHistory(idx)}
+                    aria-current={isCurrent ? 'location' : undefined}
+                    title={`${entry.traceLabel} — ${entry.nodeCode}: ${entry.label}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-mono text-[10px] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      isCurrent
+                        ? isDark
+                          ? 'bg-[#2A2112] border-[#E0B063] text-[#E0B063] font-bold'
+                          : 'bg-[#FDF5E6] border-[#8A5C10] text-[#8A5C10] font-bold'
+                        : isFuture
+                          ? isDark
+                            ? 'bg-transparent border-[#2E3862] border-dashed text-[#6E7896] hover:text-[#C3CCE4] hover:border-[#7FA6FF]'
+                            : 'bg-transparent border-[#CFC8BC] border-dashed text-[#7B8294] hover:text-[#16213A] hover:border-[#1F3863]'
+                          : isDark
+                            ? 'bg-[#10261F]/70 border-[#6FCB9F]/45 text-[#C3CCE4] hover:border-[#6FCB9F]'
+                            : 'bg-[#ECF7F1]/80 border-[#1C6E46]/35 text-[#16213A] hover:border-[#1C6E46]'
+                    }`}
+                  >
+                    <span className="tabular-nums opacity-75">#{idx + 1}</span>
+                    <span className="font-bold">{entry.nodeCode}</span>
+                    <span className="max-w-[110px] truncate font-sans text-[10.5px]">
+                      {entry.label}
+                    </span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Interactive Hop-by-Hop Sequence Track (Nodes + Directed Transitions + Metadata Stages) */}
       <div
