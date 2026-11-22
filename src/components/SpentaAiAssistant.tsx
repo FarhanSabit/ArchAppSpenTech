@@ -77,7 +77,7 @@ const BENCHMARK_QUICK_ACTIONS: { label: string; prompt: string }[] = [
 const STARTER_PROMPTS: Record<Persona, string[]> = {
   architect: [
     'Review my composed stack and benchmark our on-prem server tier against current cloud GPU API costs.',
-    'How does Prime Bank BankOCR enforce the 0.88 OPA HITL gate compared to current fintech OCR benchmarks?',
+    'How does Bank Document Intelligence (BankOCR) enforce the 0.88 OPA HITL gate compared to current fintech OCR benchmarks?',
     'Which Spenta modules should a 150-bed hospital deploy first under latest 2026 HL7/FHIR standards?',
   ],
   investor: [

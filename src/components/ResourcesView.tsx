@@ -431,7 +431,7 @@ export function ResourcesView() {
                     required
                     value={organization}
                     onChange={(e) => setOrganization(e.target.value)}
-                    placeholder="e.g., Prime Bank / Apollo Hospital Group"
+                    placeholder="e.g., Bank / Apollo Hospital Group"
                     className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
                   />
                 </div>

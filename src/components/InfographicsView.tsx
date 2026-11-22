@@ -53,7 +53,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['Zero Cloud PII Egress', '0.88 Confidence HITL Gate', 'San Jose · Australia · Dhaka'],
     imageUrl: aiBrainPlate,
     filename: 'spenta-plate-01-sovereign-ai-brain.jpg',
-    svgFilename: 'spenta-plate-01-oitsdhaka-brain.svg',
+    svgFilename: 'spenta-plate-01-spentadhaka-brain.svg',
   },
   {
     id: 'l1-l6-stack',
@@ -66,7 +66,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['Tier 1–4 ($3.2K–$15.3K)', 'Tier 3 Baseline $7.5K–$8.5K', '<50ms Edge Inference'],
     imageUrl: l1L6Plate,
     filename: 'spenta-plate-02-l1-l6-sovereign-stack.jpg',
-    svgFilename: 'spenta-plate-02-oitsdhaka-l1-l6-stack.svg',
+    svgFilename: 'spenta-plate-02-spentadhaka-l1-l6-stack.svg',
   },
   {
     id: 'captive-ecosystem',
@@ -79,7 +79,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['65+ Retail Showrooms', '80 BaaS Stations / 480 EVs', 'Live Sister-Entity Proof'],
     imageUrl: captivePlate,
     filename: 'spenta-plate-03-captive-ecosystem-synergies.jpg',
-    svgFilename: 'spenta-plate-03-oitsdhaka-captive-synergies.svg',
+    svgFilename: 'spenta-plate-03-spentadhaka-captive-synergies.svg',
   },
   {
     id: 'financial-edge',
@@ -92,7 +92,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     highlights: ['$500K SAFE · $4.5M Cap', '6.38× 5-Yr Net Return', '40%–60% Cost Advantage'],
     imageUrl: financialsPlate,
     filename: 'spenta-plate-04-financial-trajectory-dual-shore.jpg',
-    svgFilename: 'spenta-plate-04-oitsdhaka-financial-edge.svg',
+    svgFilename: 'spenta-plate-04-spentadhaka-financial-edge.svg',
   },
 ];
 
@@ -219,7 +219,7 @@ export function InfographicsView() {
               isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]'
             }`}
           >
-            OITS Dhaka Swiss Editorial Edition · Interactive Code Plates &amp; Branching Pathway
+            Spenta Dhaka Swiss Editorial Edition · Interactive Code Plates &amp; Branching Pathway
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-balance">
             Infographics — Code-Drawn Architectural Plates &amp; Interactive Pathway
@@ -229,7 +229,7 @@ export function InfographicsView() {
               isDark ? 'text-[#C3CCE4]' : 'text-[#4A5163]'
             }`}
           >
-            Inspect all four executive plates as live, clickable OITS Dhaka vector schematics synced directly to your Stack Composer—or toggle to the original static JPG raster plates at any time.
+            Inspect all four executive plates as live, clickable Spenta Dhaka vector schematics synced directly to your Stack Composer—or toggle to the original static JPG raster plates at any time.
           </p>
         </div>
 
@@ -320,7 +320,7 @@ export function InfographicsView() {
           {/* Local OITS Dhaka Stone Light / Nocturnal Dark Polarity Toggle */}
           <div
             role="group"
-            aria-label="OITS Dhaka plate theme polarity"
+            aria-label="Spenta Dhaka plate theme polarity"
             className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
               isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
             }`}

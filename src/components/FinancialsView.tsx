@@ -326,7 +326,7 @@ export function FinancialsView() {
             250%–350%
           </div>
           <div className="text-xs text-zinc-600 dark:text-zinc-400 font-mono mt-1">
-            Banking Proofs (Prime/Secure): 450%–580%
+            Banking Proofs (Bank/Secure): 450%–580%
           </div>
         </div>
       </section>

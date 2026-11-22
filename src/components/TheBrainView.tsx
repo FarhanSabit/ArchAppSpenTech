@@ -331,13 +331,13 @@ export function TheBrainView() {
         )}
         <div className="relative z-10">
           <div className={`text-[11px] font-mono font-semibold ${brandInk}`}>
-            OITS Dhaka Edition · Sovereign Operational Tech Radar &amp; Dual-Studio 3D Neural Core
+            Spenta Dhaka Edition · Sovereign Operational Tech Radar &amp; Dual-Studio 3D Neural Core
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-balance">
             The Brain — Sovereign Tech Radar, 3D Core &amp; 0.88 HITL Simulator
           </h1>
           <p className={`text-xs sm:text-sm mt-1 max-w-3xl leading-relaxed ${bodyInk}`}>
-            Inspect all 13 modules across CORE, PRODUCTION, and PILOT rings with live synergy arcs, explore the OITS Heritage 3D Neural Core synced to your Architecture Profile, and test deterministic OPA 0.88 confidence gating.
+            Inspect all 13 modules across CORE, PRODUCTION, and PILOT rings with live synergy arcs, explore the Spenta Heritage 3D Neural Core synced to your Architecture Profile, and test deterministic OPA 0.88 confidence gating.
           </p>
         </div>
 
@@ -381,7 +381,7 @@ export function TheBrainView() {
           {/* Local OITS Dhaka Stone Light / Nocturnal Dark Toggle */}
           <div
             role="group"
-            aria-label="The Brain OITS Dhaka polarity"
+            aria-label="The Brain Spenta Dhaka polarity"
             className={`inline-flex rounded-lg p-1 border ${recessedBox}`}
           >
             <button
@@ -494,7 +494,7 @@ export function TheBrainView() {
                   viewBox="0 0 520 520"
                   className="relative z-10 w-full h-full select-none"
                   role="img"
-                  aria-label="Spenta Operational Tech Radar in OITS Dhaka Editorial Palette"
+                  aria-label="Spenta Operational Tech Radar in Spenta Dhaka Editorial Palette"
                 >
                   {/* Concentric Rings */}
                   {[220, 158, 96].map((r, i) => (

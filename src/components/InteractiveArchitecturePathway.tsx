@@ -633,7 +633,7 @@ function buildPathwayMarkdownExport(
   trace: RequestWalkthroughTrace,
 ): string {
   const lines: string[] = [
-    '# Spenta Sovereign OS — Interactive OITS Dhaka × roadmap.sh Architecture Pathway',
+    '# Spenta Sovereign OS — Interactive Spenta Dhaka × roadmap.sh Architecture Pathway',
     '',
     `> **Active Deployment Topology**: ${profile.title}`,
     `> **Transport**: ${profile.transport} | **Enclave**: ${profile.enclaveBoundary} | **Latency Budget**: ${profile.latencyBudget}`,
@@ -1057,7 +1057,7 @@ export function InteractiveArchitecturePathway({
   return (
     <section
       className={`rounded-[10px] border transition-colors duration-200 overflow-hidden ${canvasClass}`}
-      aria-label="Interactive OITS Dhaka and roadmap.sh Architecture Pathway"
+      aria-label="Interactive Spenta Dhaka and roadmap.sh Architecture Pathway"
     >
       {/* Top Editorial Header Bar */}
       <div
@@ -1069,7 +1069,7 @@ export function InteractiveArchitecturePathway({
               PLATE 00 · CODE-DRAWN INTERACTIVE PATHWAY
             </span>
             <span aria-hidden="true">·</span>
-            <span>OITS Dhaka × roadmap.sh × Provider Swap &amp; Trace Player</span>
+            <span>Spenta Dhaka × roadmap.sh × Provider Swap &amp; Trace Player</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">
               {selectedIds.length}/13 Modules Active · OPA {hitlConfidence.toFixed(2)}

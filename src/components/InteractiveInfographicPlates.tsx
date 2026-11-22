@@ -648,7 +648,7 @@ function Plate01BrainTopology({
             fontWeight="700"
             fontFamily="JetBrains Mono, monospace"
           >
-            PLATE 01 · OITS DHAKA EDITION
+            PLATE 01 · SPENTA DHAKA EDITION
           </text>
         </svg>
       </div>
@@ -1017,7 +1017,7 @@ function Plate02StackAndServers({
             fontWeight="700"
             fontFamily="JetBrains Mono, monospace"
           >
-            PLATE 02 · OITS DHAKA EDITION
+            PLATE 02 · SPENTA DHAKA EDITION
           </text>
         </svg>
       </div>
@@ -1442,7 +1442,7 @@ function Plate03CaptiveSynergies({
             fontWeight="700"
             fontFamily="JetBrains Mono, monospace"
           >
-            PLATE 03 · OITS DHAKA EDITION
+            PLATE 03 · SPENTA DHAKA EDITION
           </text>
         </svg>
       </div>
@@ -1894,7 +1894,7 @@ function Plate04FinancialEdge({
             fontWeight="700"
             fontFamily="JetBrains Mono, monospace"
           >
-            PLATE 04 · OITS DHAKA EDITION
+            PLATE 04 · SPENTA DHAKA EDITION
           </text>
         </svg>
       </div>

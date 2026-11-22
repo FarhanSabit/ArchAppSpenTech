@@ -274,10 +274,10 @@ export function GlobalSearchBar() {
       {
         id: 'studio-theme-comparison',
         kind: 'Section',
-        title: '4-Way Theme Comparison: oits-web-v2, MMIS v2, oitsdhaka & Spenta OS',
+        title: '4-Way Theme Comparison: Spenta Web v2, MMIS v2, Spenta Dhaka & Spenta OS',
         subtitle: 'Isolated light/dark preview sandbox, verified hex tokens & Markdown comparison table',
         keywords:
-          'oits-web-v2 mmis-intel-dashboards-v2 oitsdhaka comparison table theme tokens swatches design pov',
+          'spenta-web-v2 mmis-intel-dashboards-v2 spenta-dhaka comparison table theme tokens swatches design pov',
         tab: 'Resources',
         focus: { type: 'studio', id: 'theme-comparison' },
       },

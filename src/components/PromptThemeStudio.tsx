@@ -74,7 +74,7 @@ const INITIAL_IFRAME_POLARITIES: Record<ThemeRefId, 'light' | 'dark'> = {
 const BRAND_SWATCH_PRESETS = [
   { label: 'Heritage Navy', hex: '#1F3863' },
   { label: 'Sovereign Emerald', hex: '#10B981' },
-  { label: 'OITS Green', hex: '#1C6E46' },
+  { label: 'Spenta Green', hex: '#1C6E46' },
   { label: 'Enterprise Cobalt', hex: '#2563EB' },
   { label: 'Sovereign Crimson', hex: '#E11D48' },
   { label: 'Governance Amber', hex: '#B45309' },
@@ -379,10 +379,10 @@ export function PromptThemeStudio() {
               <span aria-hidden="true">·</span>
               <span className="font-mono tabular-nums">v0 Responsive Design Workbench</span>
               <span aria-hidden="true">·</span>
-              <span>Refero State Taxonomy &amp; OITS Dhaka Master Remix</span>
+              <span>Refero State Taxonomy &amp; Spenta Dhaka Master Remix</span>
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-zinc-950 dark:text-zinc-50 tracking-tight text-balance">
-              Coding-Agent Prompt Pack, v0 Theme Workbench &amp; OITS Dhaka Remix Studio
+              Coding-Agent Prompt Pack, v0 Theme Workbench &amp; Spenta Dhaka Remix Studio
             </h2>
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl leading-relaxed">
               Download any individual P0/P1/P2 section or phase bundle as Markdown, test all four themes live across Desktop/Tablet/Mobile frames with live CSS token tweaking, and audit UI pattern completeness.
@@ -449,7 +449,7 @@ export function PromptThemeStudio() {
               onClick={() =>
                 handleDownloadMd(
                   'bundle-master-remix',
-                  'oitsdhaka-roadmap-master-remix-prompt.md',
+                  'spenta-dhaka-roadmap-master-remix-prompt.md',
                   buildOitsDhakaMasterRemixMd(),
                 )
               }
@@ -460,7 +460,7 @@ export function PromptThemeStudio() {
               ) : (
                 <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
-              <span>OITS Dhaka Master (.md)</span>
+              <span>Spenta Dhaka Master (.md)</span>
             </button>
 
             <button
@@ -1637,11 +1637,11 @@ export function PromptThemeStudio() {
               <span className="mx-1.5" aria-hidden="true">
                 ·
               </span>
-              <span>oitsdhaka.com Visual System × roadmap.sh UX × Spenta/Odoo Content</span>
+              <span>spenta-dhaka Visual System × roadmap.sh UX × Spenta/Odoo Content</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
               <GitBranch className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
-              <span>Deep OITS Dhaka Analysis &amp; Master GitHub Branch Remix Prompt</span>
+              <span>Deep Spenta Dhaka Analysis &amp; Master GitHub Branch Remix Prompt</span>
             </h3>
           </div>
 
@@ -1666,7 +1666,7 @@ export function PromptThemeStudio() {
               onClick={() =>
                 handleDownloadMd(
                   'oits-master-md',
-                  'oitsdhaka-roadmap-master-remix-prompt.md',
+                  'spenta-dhaka-roadmap-master-remix-prompt.md',
                   buildOitsDhakaMasterRemixMd(),
                 )
               }
@@ -1704,7 +1704,7 @@ export function PromptThemeStudio() {
               <div className="space-y-2 text-xs leading-relaxed">
                 <div>
                   <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    OITS Dhaka Pattern:{' '}
+                    Spenta Dhaka Pattern:{' '}
                   </span>
                   <span className="text-zinc-700 dark:text-zinc-300">{pillar.oitsDhakaPattern}</span>
                 </div>
@@ -1737,10 +1737,10 @@ export function PromptThemeStudio() {
           <div className="px-4 sm:px-5 py-3.5 border-b border-zinc-200 dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
-                git checkout -b remix/oitsdhaka-roadmap-edition
+                git checkout -b remix/spenta-dhaka-roadmap-edition
               </div>
               <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
-                Executable Master Prompt — OITS Dhaka Theme + Code-Drawn roadmap.sh Infographics + Tactile 3D PBR + 4-Resource Spec
+                Executable Master Prompt — Spenta Dhaka Theme + Code-Drawn roadmap.sh Infographics + Tactile 3D PBR + 4-Resource Spec
               </div>
             </div>
             <button

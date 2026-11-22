@@ -322,7 +322,7 @@ export const SPENTA_APPS: SpentaApp[] = [
     depends: ['cyber_sla'],
     integratesWith: ['fintech_rails', 'workflow_ai', 'genai_bi', 'healthcare_erp', 'datasets'],
     provides: ['verified_forms', 'hitl_audit_log', 'reconciled_batches'],
-    proofClient: 'Prime Bank (BankOCR)',
+    proofClient: 'Bank (BankOCR)',
     deployment: ['On-Prem', 'Private VPC'],
   },
   {
@@ -617,7 +617,7 @@ export const STARTER_RECIPES: StarterRecipe[] = [
   {
     id: 'banking_pack',
     name: 'Regulated Banking Pack',
-    pattern: 'Prime Bank Pattern',
+    pattern: 'Bank Pattern',
     description: 'Air-gapped ICR, MFS/wallet rails, conversational executive BI & BB ICT v4.0 cyber SLA.',
     ids: ['icr_ops', 'fintech_rails', 'genai_bi', 'mis_erp', 'cyber_sla'],
   },
@@ -761,7 +761,7 @@ export const SERVER_TIERS: Record<ServerTierId, ServerTierSpec> = {
     capex: '$11,500–$14,500',
     capexMidUsd: 13000,
     speed: '12–22 tok/s',
-    idealFor: 'High-volume Prime Bank ICR clusters, Spatial XR rendering nodes & multi-branch enterprise inference.',
+    idealFor: 'High-volume Bank ICR clusters, Spatial XR rendering nodes & multi-branch enterprise inference.',
   },
   3: {
     id: 3,
@@ -896,7 +896,7 @@ export const BLUEPRINT_PILLARS: BlueprintPillar[] = [
       'Self-hosted vision, layout extraction, and Corrective RAG engines running entirely inside client firewalls with mathematical 0.88 confidence gating.',
     metrics: ['<30s/form ICR', '0.88 HITL OPA Gate', '0 bytes cloud PII egress'],
     apps: ['icr_ops', 'workflow_ai', 'genai_bi'],
-    tags: ['LLaMA 3.2 Vision', 'LayoutLMv3', 'OPA', 'Prime Bank', 'SecureBank'],
+    tags: ['LLaMA 3.2 Vision', 'LayoutLMv3', 'OPA', 'Bank', 'SecureBank'],
   },
   {
     id: 'clinical_vertical',
@@ -963,7 +963,7 @@ export const AGENTIC_VERTICALS: AgenticVertical[] = [
     learn: 'Update field-extraction heuristics from officer corrections captured in the 0.88 HITL queue.',
     solve: 'Auto-reconcile approved forms into core banking ledgers in <30s with cryptographic audit trails.',
     hitlTrigger: 'Signature mismatch or OCR confidence < 0.88 routes to compliance desk.',
-    proof: 'Prime Bank · SecureBank AI',
+    proof: 'Bank · SecureBank AI',
   },
   {
     id: 'v_medical',
@@ -1035,7 +1035,7 @@ export const HITL_SAMPLE_EVENTS: HitlSampleEvent[] = [
     id: 'evt_1',
     appId: 'icr_ops',
     appName: 'Document AI (ICR)',
-    clientPattern: 'Prime Bank (BankOCR)',
+    clientPattern: 'Bank (BankOCR)',
     documentType: 'Bangla/EN Handwritten SME Loan Application #PB-48219',
     payloadSummary: 'NID verified, collateral deed parsed (14 fields), ledger reconciliation ready.',
     baseConfidence: 0.94,
@@ -1103,7 +1103,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     ],
     bullets: [
       '13 composable sovereign enterprise apps sharing one L1–L6 kernel (PostgreSQL, Kafka, OPA 0.88 HITL Gate).',
-      'Proven across Samsung Biologics, Prime Bank, Apollo JMI, LABAID, ISHO, Jotax Oy, BEST & X Ltd.',
+      'Proven across Samsung Biologics, Bank, Apollo JMI, LABAID, ISHO, Jotax Oy, BEST & X Ltd.',
       '20-FTE Dhaka R&D Hub ($11.50/hr loaded) orchestrated from San Jose & Australia.',
     ],
     speakerNotes:
@@ -1229,7 +1229,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
   {
     num: 8,
     section: 'Proof 01',
-    title: 'Flagship Proof: Prime Bank Document Intelligence (BankOCR)',
+    title: 'Flagship Proof: Bank Document Intelligence (BankOCR)',
     subtitle: 'Air-gapped multilingual ICR delivering <30s/form extraction with 450%–580% banking ROI',
     theme: 'dark',
     kpis: [
@@ -1462,7 +1462,7 @@ export const CASE_STUDIES: CaseStudy[] = [
   },
   {
     id: 'cs_primebank',
-    client: 'Prime Bank',
+    client: 'Bank',
     sector: 'Banking & Fintech',
     region: 'Bangladesh / SAARC',
     solution: 'BankOCR — Air-Gapped Document Intelligence (ICR)',

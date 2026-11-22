@@ -152,11 +152,11 @@ export function buildVirtualThemeIframeSrcDoc(
 
   const brandWord =
     spec.id === 'oits-web-v2'
-      ? 'OITS Web v2'
+      ? 'Spenta Web v2'
       : spec.id === 'mmis-v2'
         ? 'MMIS Intel'
         : spec.id === 'oitsdhaka'
-          ? 'OITS DHAKA'
+          ? 'SPENTA DHAKA'
           : 'SPENTA OS';
 
   const primaryCtaLabel =

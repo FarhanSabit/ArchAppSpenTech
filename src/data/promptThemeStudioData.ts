@@ -377,8 +377,8 @@ export const AGENT_PROMPT_SECTIONS: AgentPromptSection[] = [
 export const THEME_REFERENCE_SPECS: ThemeReferenceSpec[] = [
   {
     id: 'oits-web-v2',
-    shortLabel: 'oits-web-v2',
-    name: 'OITS Web v2 (Vercel)',
+    shortLabel: 'spenta-web-v2',
+    name: 'Spenta Web v2 (Vercel)',
     sourceUrl: 'https://oits-web-v2-5i7a.vercel.app/',
     archetype: 'Cybernetic Midnight Glass & Luminous Sky',
     defaultPolarity: 'dark',
@@ -435,7 +435,7 @@ export const THEME_REFERENCE_SPECS: ThemeReferenceSpec[] = [
       { label: 'Luminous Sky', hex: '#38BDF8' },
       { label: 'Emerald Signal', hex: '#10B981' },
     ],
-    templatePromptMarkdown: `### THEME TEMPLATE: "Cybernetic Midnight Glass" (\`oits-web-v2\`)
+    templatePromptMarkdown: `### THEME TEMPLATE: "Cybernetic Midnight Glass" (\`spenta-web-v2\`)
 
 **COLOR TOKENS**
 - **Dark Mode (Default — \`html.dark\`)**:
@@ -539,8 +539,8 @@ export const THEME_REFERENCE_SPECS: ThemeReferenceSpec[] = [
   },
   {
     id: 'oitsdhaka',
-    shortLabel: 'oitsdhaka.com',
-    name: 'OITS Dhaka Corporate',
+    shortLabel: 'spenta-dhaka',
+    name: 'Spenta Dhaka Corporate',
     sourceUrl: 'https://www.oitsdhaka.com/',
     archetype: 'Swiss Editorial Stone & Heritage Navy',
     defaultPolarity: 'light',
@@ -597,7 +597,7 @@ export const THEME_REFERENCE_SPECS: ThemeReferenceSpec[] = [
       { label: 'Deep Ink', hex: '#16213A' },
       { label: 'Nocturnal Navy', hex: '#0B1020' },
     ],
-    templatePromptMarkdown: `### THEME TEMPLATE: "Swiss Editorial Stone & Heritage Navy" (\`oitsdhaka.com\`)
+    templatePromptMarkdown: `### THEME TEMPLATE: "Swiss Editorial Stone & Heritage Navy" (\`spenta-dhaka\`)
 
 **COLOR TOKENS**
 - **Light Mode (Default — \`:root\`)**:
@@ -812,7 +812,7 @@ export const THEME_COMPARISON_ROWS: ThemeComparisonRow[] = [
 ];
 
 export function buildThemeComparisonTableMd(): string {
-  const header = `| Design Dimension | 1. oits-web-v2 (Vercel) | 2. mmis-intel-dashboards-v2 | 3. oitsdhaka.com | 4. Spenta Sovereign OS (Current App) |
+  const header = `| Design Dimension | 1. spenta-web-v2 (Vercel) | 2. mmis-intel-dashboards-v2 | 3. spenta-dhaka | 4. Spenta Sovereign OS (Current App) |
 | :--- | :--- | :--- | :--- | :--- |`;
   const rows = THEME_COMPARISON_ROWS.map(
     (r) => `| **${r.dimension}** | ${r.oitsWebV2} | ${r.mmisV2} | ${r.oitsDhaka} | ${r.spentaOs} |`,
@@ -876,13 +876,13 @@ export const OITS_DHAKA_DEEP_ANALYSIS_PILLARS: DeepAnalysisPillar[] = [
   },
 ];
 
-export const OITS_DHAKA_ROADMAP_MASTER_PROMPT = `# MASTER REMIX PROMPT: OITS Dhaka Editorial Theme × roadmap.sh Interactive Architecture (Spenta / Odoo Sovereign OS Branch)
+export const OITS_DHAKA_ROADMAP_MASTER_PROMPT = `# MASTER REMIX PROMPT: Spenta Dhaka Editorial Theme × roadmap.sh Interactive Architecture (Spenta / Odoo Sovereign OS Branch)
 
-> **Target GitHub Workflow**: Create a dedicated remix branch from \`main\` (\`git checkout -b remix/oitsdhaka-roadmap-edition\`). Keep all existing Spenta/Odoo business logic, \`StackContext\` state, 13-app manifest, 5-year Financials, 18-Slide Pitch Deck, and PDF/Print exporters 100% functional while transforming the visual system, code-drawn infographics, and 3D materials into the **OITS Dhaka × roadmap.sh** edition.
+> **Target GitHub Workflow**: Create a dedicated remix branch from \`main\` (\`git checkout -b remix/spenta-dhaka-roadmap-edition\`). Keep all existing Spenta/Odoo business logic, \`StackContext\` state, 13-app manifest, 5-year Financials, 18-Slide Pitch Deck, and PDF/Print exporters 100% functional while transforming the visual system, code-drawn infographics, and 3D materials into the **Spenta Dhaka × roadmap.sh** edition.
 
 ---
 
-## 1. Deep Design Token Contract (\`oitsdhaka.com\` Swiss Editorial Stone & Heritage Navy)
+## 1. Deep Design Token Contract (\`spenta-dhaka\` Swiss Editorial Stone & Heritage Navy)
 
 Implement these exact CSS custom properties and Tailwind v4 dual-theme tokens (\`@custom-variant dark (&:where(.dark, .dark *));\`):
 
@@ -911,7 +911,7 @@ Implement these exact CSS custom properties and Tailwind v4 dual-theme tokens (\
 
 ---
 
-## 2. Primary Content Mapping (Current Spenta / Odoo Sections → OITS Dhaka Frame)
+## 2. Primary Content Mapping (Current Spenta / Odoo Sections → Spenta Dhaka Frame)
 
 Preserve every real dataset and working handler while restyling all 7 primary sections into alternating Stone (\`#FAF8F4\`) and Linen (\`#F2EFE9\`) editorial bands:
 
@@ -919,7 +919,7 @@ Preserve every real dataset and working handler while restyling all 7 primary se
    - Lead with an editorial numbered header (\`01. Composable Enterprise Modules\`) + 4-metric tabular KPI strip.
    - Render the 13 modules in a crisp hairline grid with unboxed \`·\`-separated metadata, Heritage Navy selection state, recursive dependency auto-attachment notices, and slide-over Stack Composer drawer.
 2. **Infographics (Code-Drawn Interactive Plates — Primary Focus)**:
-   - Replace static-only visuals with **code-drawn SVG + React architectural schematics** matching OITS Dhaka's crisp blueprint aesthetic AND **roadmap.sh** interactive ergonomics (see Section 3 below).
+   - Replace static-only visuals with **code-drawn SVG + React architectural schematics** matching Spenta Dhaka's crisp blueprint aesthetic AND **roadmap.sh** interactive ergonomics (see Section 3 below).
 3. **Financials (FY2027–FY2031 P&L & GM Matrix)**:
    - Restyle Recharts axes/series to Heritage Navy (\`#1F3863\`), Sovereign Green (\`#1C6E46\`), and Putty hairlines (\`#E4DFD6\`), keeping Conservative/Upside scenario switches, FX/Tax sliders, and 1-page Quick Summary PDF export intact.
 4. **Spenta Core (L1–L6 Stack, 4-Tier Server Matrix, Dual-Shore Pods & Audit Log)**:
@@ -937,7 +937,7 @@ Preserve every real dataset and working handler while restyling all 7 primary se
 
 All architecture plans, system pathways, and executive diagrams MUST be implemented as **deterministic code-drawn SVG + React components**—never flat raster screenshots:
 
-- **Visual Style (OITS Dhaka GUI Grammar)**:
+- **Visual Style (Spenta Dhaka GUI Grammar)**:
   - Crisp 1px orthogonal SVG connector buses (\`#CFC8BC\` resting, \`#1F3863\` expanded, \`#1C6E46\` active in Stack Composer).
   - Editorial numbered pillar blocks (\`01.\` Sovereign Core L1–L6, \`02.\` Operations Engine, \`03.\` Experience & IR4 Engine, \`04.\` On-Prem Server Tiers & Dual-Shore Pods, \`05.\` 0.88 OPA HITL & Captive Proofs).
   - Scoped Stone Light / Nocturnal Dark toggle directly on the diagram toolbar.
@@ -957,7 +957,7 @@ For the Three.js **3D Sovereign Neural Core** (and any future 3D architectural a
   - Initialize \`RoomEnvironment\` via \`PMREMGenerator\` on every device so metallic and glass surfaces carry crisp studio reflections.
   - **Anisotropic Brushed Metal** (\`MeshPhysicalMaterial\`): Procedural HTML5 Canvas brushed-grain bump/roughness map (\`metalness: 0.92\`, \`roughness: 0.24\`, \`anisotropy: 0.8\`, \`clearcoat: 0.35\`) on L1–L6 spine rings, hemisphere ribs, hub bevel collars, and grounded circuit pedestal trim.
   - **Frosted Optical Glass** (\`MeshPhysicalMaterial\`): Dual brain hemisphere shells and hub containment capsules (\`transmission: isSoftwareGl ? 0 : 0.72\`, \`ior: 1.52\`, \`thickness: 1.2\`, \`roughness: 0.22\`, \`clearcoat: 1.0\`, graceful translucent fallback on software WebGL) revealing luminous crystalline inner cores.
-  - **Dual Material Finish Toggle**: Support switching between **Obsidian Titanium** and **OITS Heritage Stone & Navy** (\`#FAF8F4\` studio cyclorama / \`#1F3863\` brushed navy anodized titanium + warm frosted quartz glass) in real time without tearing down the WebGL context.
+  - **Dual Material Finish Toggle**: Support switching between **Obsidian Titanium** and **Spenta Heritage Stone & Navy** (\`#FAF8F4\` studio cyclorama / \`#1F3863\` brushed navy anodized titanium + warm frosted quartz glass) in real time without tearing down the WebGL context.
 - **Meaningful Visual Feedback**:
   - **Hover Telemetry Callout**: Project the hovered 3D node's world position (\`vector.project(camera)\`) to a clamped, solid-surface DOM callout (zero \`backdrop-filter\` over WebGL) displaying Hub Index, Title, Active App Count, and click action.
   - **Click / Selection Shockwave Ripple**: Clicking a hub or toggling an app spawns an expanding radial emissive pulse ring around that hub and accelerates \`InstancedMesh\` synaptic data packets along its Bezier conduit.
@@ -986,10 +986,10 @@ Synthesize these four high-signal interactive engineering and UI pattern benchma
 ## 6. GitHub Multi-Branch Remix Checklist & Acceptance Criteria
 
 \`\`\`bash
-git checkout -b remix/oitsdhaka-roadmap-edition
-# 1. Apply OITS Dhaka semantic tokens in src/index.css (preserve @custom-variant dark)
+git checkout -b remix/spenta-dhaka-roadmap-edition
+# 1. Apply Spenta Dhaka semantic tokens in src/index.css (preserve @custom-variant dark)
 # 2. Swap static plates for InteractiveArchitecturePathway + hop-by-hop walkthrough & deployment swap
-# 3. Enable OITS Heritage Stone & Navy default finish in SovereignBrain3DCanvas
+# 3. Enable Spenta Heritage Stone & Navy default finish in SovereignBrain3DCanvas
 # 4. Run Refero state-completeness audit & v0 responsive viewport checks
 # 5. Run full typecheck & production bundle check
 npm run lint && npm run build
@@ -1048,7 +1048,7 @@ export const REFERO_UI_PATTERNS: ReferoPatternSpec[] = [
   },
   {
     id: 'ref-pathway-tree',
-    title: 'OITS Dhaka × roadmap.sh Branching Pathway & Walkthrough',
+    title: 'Spenta Dhaka × roadmap.sh Branching Pathway & Walkthrough',
     pageType: 'Architecture',
     uxPatterns: ['Expandable Tree', 'Hop-by-Hop Player', 'Scoped Theme Toggle', 'Slide-In Inspector'],
     targetTab: 'Infographics',
@@ -1137,7 +1137,7 @@ export const REFERO_UI_PATTERNS: ReferoPatternSpec[] = [
     uxPatterns: ['Sticky Column Table', 'Scoped Theme Toggle', 'Markdown Copy'],
     targetTab: 'Resources',
     summary:
-      'Independent Light/Dark table comparing Odoo (Spenta OS), OITS Web, MMIS Intel, and OITS Dhaka across Visual Style, Typography, Spacing, and Palette.',
+      'Independent Light/Dark table comparing Odoo (Spenta OS), Spenta Web, MMIS Intel, and Spenta Dhaka across Visual Style, Typography, Spacing, and Palette.',
     tokenAnatomy: 'Sticky criterion th · Swatch chips · Independent local tableTheme state',
     referenceNote: 'Refero Design-System Matrix Pattern (high-density scannability + zero global bleed)',
     states: { populated: true, empty: false, loading: false, error: false, print: true },
@@ -1232,7 +1232,7 @@ ${t.templatePromptMarkdown}`,
 
   return `# 4-Way Design & Theme Analysis + Universal Theme Templating Prompts
 
-> Grounded in direct live stylesheet & token inspection of \`oits-web-v2\`, \`mmis-intel-dashboards-v2\`, \`oitsdhaka.com\`, and **Spenta Sovereign OS**.
+> Grounded in direct live stylesheet & token inspection of \`spenta-web-v2\`, \`mmis-intel-dashboards-v2\`, \`spenta-dhaka\`, and **Spenta Sovereign OS**.
 
 ${themesBlock}
 

@@ -74,7 +74,7 @@ function HubIcon({ hubId }: { hubId: string }) {
 
 function EvidenceLabel({ app }: { app: SpentaApp }) {
   const isProd =
-    app.proofClient.includes('Prime Bank') ||
+    app.proofClient.includes('Bank') ||
     app.proofClient.includes('Samsung') ||
     app.proofClient.includes('BEST') ||
     app.proofClient.includes('Jotax') ||

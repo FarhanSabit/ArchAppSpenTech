@@ -172,7 +172,7 @@ const COMPARISON_ROWS: ComparisonRow[] = [
 ];
 
 function buildMarkdownTable(rows: ComparisonRow[]): string {
-  const header = `| Dimension | Odoo (Spenta Sovereign OS) | OITS Web | MMIS Intel Dashboards | OITS Dhaka |
+  const header = `| Dimension | Odoo (Spenta Sovereign OS) | Spenta Web | MMIS Intel Dashboards | Spenta Dhaka |
 | :--- | :--- | :--- | :--- | :--- |`;
   const body = rows
     .map(
@@ -370,7 +370,7 @@ export function DesignComparisonTable({
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
                   <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
-                    OITS Web
+                    Spenta Web
                   </div>
                   <a
                     href="https://oits-web-v2-5i7a.vercel.app/"
@@ -382,7 +382,7 @@ export function DesignComparisonTable({
                         : 'text-zinc-500 hover:text-emerald-600'
                     }`}
                   >
-                    <span>oits-web-v2</span>
+                    <span>spenta-web-v2</span>
                     <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
                   </a>
                 </th>
@@ -406,7 +406,7 @@ export function DesignComparisonTable({
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
                   <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
-                    OITS Dhaka
+                    Spenta Dhaka
                   </div>
                   <a
                     href="https://www.oitsdhaka.com/"
@@ -418,7 +418,7 @@ export function DesignComparisonTable({
                         : 'text-zinc-500 hover:text-emerald-600'
                     }`}
                   >
-                    <span>oitsdhaka.com</span>
+                    <span>spenta-dhaka</span>
                     <ExternalLink className="w-2.5 h-2.5" strokeWidth={1.5} />
                   </a>
                 </th>
