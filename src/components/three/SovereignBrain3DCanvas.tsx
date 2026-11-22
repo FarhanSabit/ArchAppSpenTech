@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -16,8 +17,8 @@ import {
   ObservatoryFinish,
   TIMELINE_MAX_MYR,
   TIMELINE_MIN_MYR,
-  formatEpochMyr,
 } from './GalaxyControlPanel';
+import { GalaxyLegendBox } from './GalaxyLegendBox';
 
 interface SovereignBrain3DCanvasProps {
   compact?: boolean;
@@ -25,6 +26,8 @@ interface SovereignBrain3DCanvasProps {
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
   hubFocusNonce?: number;
+  transitionFromSolar?: boolean;
+  onToggleAlternativeSystem?: () => void;
 }
 
 interface SatelliteMeta {
@@ -89,9 +92,22 @@ interface ProjectedNodeAnchor {
   accent: string;
 }
 
+interface ProjectedStarStreak {
+  id: number;
+  x: number;
+  y: number;
+  angleDeg: number;
+  lengthPx: number;
+  accent: string;
+  delaySec: number;
+}
+
 // Pre-allocated scratch math objects (zero GC inside animation loop)
 const _worldPos = new THREE.Vector3();
 const _projVec = new THREE.Vector3();
+const _projTailVec = new THREE.Vector3();
+const _streakHeadPos = new THREE.Vector3();
+const _streakTailPos = new THREE.Vector3();
 const _midCtrl = new THREE.Vector3();
 const _packetPos = new THREE.Vector3();
 const _camGoalPos = new THREE.Vector3();
@@ -352,9 +368,9 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
     float epochNorm = clamp(uSimEpoch / 500.0, -1.0, 1.0);
     float epochProgress = (uSimEpoch + 500.0) / 1000.0;
 
-    // Historical protogalactic expansion (-500 Myr) -> projected compaction (+500 Myr)
-    float epochRadialEvol = mix(1.0, 1.0 - epochNorm * 0.085, diskMask);
-    float epochVertEvol = mix(1.0, 1.0 - epochNorm * 0.24, diskMask * (1.0 - wEllip * 0.72));
+    // Historical protogalactic assembly (-500 Myr) -> projected gravitational settling (+500 Myr)
+    float epochRadialEvol = mix(1.0, 1.0 - epochNorm * 0.14, diskMask);
+    float epochVertEvol = mix(1.0, 1.0 - epochNorm * 0.34, diskMask * (1.0 - wEllip * 0.72));
 
     float spreadMult = (0.72 + uSpread * 0.45) * epochRadialEvol;
 
@@ -381,7 +397,7 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
 
     // Active Starburst bipolar superwind streaming along +/-Y with timeline epoch
     float isPlume = smoothstep(1.15, 2.25, abs(aPosStarburst.y)) * wBurst * diskMask;
-    float plumeFlow = 1.0 + epochNorm * 0.22 + sin(aPhase + uSimEpoch * 0.045) * 0.075;
+    float plumeFlow = 1.0 + epochNorm * 0.28 + sin(aPhase + uSimEpoch * 0.045) * 0.075;
     pos.y = pos.y * mix(epochVertEvol, plumeFlow, isPlume);
     pos.y *= mix(1.0, 0.65, (1.0 - decayPull) * diskMask * (1.0 - isPlume));
 
@@ -395,10 +411,16 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
     float twinkle = 0.78 + 0.22 * sin(uRealTime * aTwinkle + aPhase);
     vTwinkle = twinkle;
 
+    // Subtle spectral evolution across epochs: young blue-cyan assembly (-500 Myr) -> mature golden core (+500 Myr)
+    float youngTint = max(-epochNorm, 0.0) * 0.22 * diskMask;
+    float matureTint = max(epochNorm, 0.0) * smoothstep(7.5, 1.2, morphR) * 0.24 * diskMask;
+    vec3 evolvedCol = mix(baseCol, vec3(0.58, 0.84, 1.0), youngTint);
+    evolvedCol = mix(evolvedCol, vec3(1.0, 0.86, 0.62), matureTint);
+
     // Thermal core brightening under orbital decay & starburst scintillation
     float coreHeat = smoothstep(0.62, 0.38, decayPull) * uDecayRate * diskMask;
     float burstBoost = wBurst * (0.14 + 0.12 * sin(uRealTime * 3.2 + aPhase)) * diskMask;
-    vColor = mix(baseCol, vec3(1.0, 0.92, 0.74), coreHeat * 0.55) * (1.0 + burstBoost);
+    vColor = mix(evolvedCol, vec3(1.0, 0.92, 0.74), coreHeat * 0.55) * (1.0 + burstBoost);
     vScale = aScale * (1.0 + wBurst * isPlume * 0.22);
 
     float densityComp = mix(1.16, 1.0, clamp(uDensity, 0.2, 1.0));
@@ -432,6 +454,92 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
     vec3 col = mix(vColor, vec3(1.0), clamp(core + spikes * 0.5, 0.0, 1.0) * (1.0 - uIsLight * 0.72));
     float finalAlpha = uIsLight > 0.5 ? alpha * 0.74 : alpha * 0.94;
     gl_FragColor = vec4(col, finalAlpha);
+  }
+`;
+
+// Orbital star particle trail streaks synced with the 2.2s .brain-core-dot-pulse harmonic
+const GALAXY_TRAIL_VERTEX_SHADER = /* glsl */ `
+  uniform float uRealTime;
+  uniform float uSimEpoch;
+  uniform float uDecayRate;
+  uniform float uSpread;
+  uniform float uStreakSpan;
+  uniform vec3 uMorphWeights;
+  uniform float uTransitionSwirl;
+
+  attribute vec3 aPosElliptical;
+  attribute vec3 aPosStarburst;
+  attribute vec3 aColor;
+  attribute vec3 aColorElliptical;
+  attribute vec3 aColorStarburst;
+  attribute vec3 aRadiusMorph;
+  attribute float aPhase;
+  attribute float aTrailT;
+
+  varying vec3 vColor;
+  varying float vTrailT;
+  varying float vPulse;
+
+  void main() {
+    float wSpiral = uMorphWeights.x;
+    float wEllip = uMorphWeights.y;
+    float wBurst = uMorphWeights.z;
+
+    vec3 basePos = position * wSpiral + aPosElliptical * wEllip + aPosStarburst * wBurst;
+    vec3 baseCol = aColor * wSpiral + aColorElliptical * wEllip + aColorStarburst * wBurst;
+    float morphR = dot(aRadiusMorph, uMorphWeights);
+
+    float epochNorm = clamp(uSimEpoch / 500.0, -1.0, 1.0);
+    float epochProgress = (uSimEpoch + 500.0) / 1000.0;
+    float epochRadialEvol = 1.0 - epochNorm * 0.14;
+    float epochVertEvol = 1.0 - epochNorm * 0.34 * (1.0 - wEllip * 0.72);
+    float spreadMult = (0.72 + uSpread * 0.45) * epochRadialEvol;
+
+    float inspiralCycle = fract(epochProgress * 1.85 + aPhase * 0.15915494);
+    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.56, clamp(uDecayRate, 0.0, 1.0));
+    float r = max(morphR * spreadMult * decayPull, 0.42);
+
+    float kinRate = wSpiral * 1.0 + wEllip * 0.36 + wBurst * 1.32;
+    float angVel = (0.24 * kinRate) / (pow(max(r, 0.35), 0.58) + 0.32);
+
+    // Offset trailing vertices backward along the instantaneous orbital trajectory
+    float trailLag = aTrailT * uStreakSpan;
+    float spinPhase = (uSimEpoch - trailLag) * 0.16;
+    float inspiralTwist = (1.0 - decayPull) * 3.2;
+    float morphSwirl = uTransitionSwirl * (1.35 / (morphR * 0.16 + 0.65));
+    float angle = spinPhase * angVel + inspiralTwist + morphSwirl;
+    float c = cos(angle);
+    float s = sin(angle);
+
+    vec3 pos = basePos;
+    pos.xz *= spreadMult * decayPull;
+    vec2 rotatedXZ = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
+    pos.x = rotatedXZ.x;
+    pos.z = rotatedXZ.y;
+    pos.y *= epochVertEvol;
+
+    // Mirror .brain-core-dot-pulse (2.2s ease-in-out cycle: 0.60 -> 1.00 -> 0.60)
+    float pulseWave = 0.5 + 0.5 * sin(uRealTime * 2.8559933 + aPhase * 2.0);
+    vPulse = mix(0.55, 1.0, pulseWave);
+    vTrailT = aTrailT;
+    vColor = baseCol;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const GALAXY_TRAIL_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uIsLight;
+  varying vec3 vColor;
+  varying float vTrailT;
+  varying float vPulse;
+
+  void main() {
+    float headFade = pow(1.0 - clamp(vTrailT, 0.0, 1.0), 1.65);
+    float headHot = smoothstep(0.32, 0.0, vTrailT);
+    vec3 col = mix(vColor, vec3(1.0), headHot * (1.0 - uIsLight * 0.72));
+    float baseAlpha = uIsLight > 0.5 ? 0.52 : 0.76;
+    gl_FragColor = vec4(col, headFade * vPulse * baseAlpha);
   }
 `;
 
@@ -703,9 +811,18 @@ export default function SovereignBrain3DCanvas({
   onSelectHub,
   selectedHubId = null,
   hubFocusNonce = 0,
+  transitionFromSolar = false,
+  onToggleAlternativeSystem,
 }: SovereignBrain3DCanvasProps) {
   const { selectedIds, hitlConfidence, appMap } = useStack();
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const gsapActiveRef = useRef<boolean>(false);
+  const isSwitchingOutRef = useRef<boolean>(false);
+  const activeGsapTlRef = useRef<gsap.core.Timeline | null>(null);
+  const transitionFromSolarRef = useRef<boolean>(transitionFromSolar);
 
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
   const [galaxyPreset, setGalaxyPreset] = useState<GalaxyPresetId>('andromeda-spiral');
@@ -719,12 +836,14 @@ export default function SovereignBrain3DCanvas({
   const [starDensity, setStarDensity] = useState<number>(1.0);
   const [orbitalDecay, setOrbitalDecay] = useState<number>(0.0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [orbitalSpread, setOrbitalSpread] = useState<number>(0.65);
   const [morphProgress, setMorphProgress] = useState<number>(1);
   const [dockOpen, setDockOpen] = useState<boolean>(false);
   const [contextLost, setContextLost] = useState<boolean>(false);
   const [callout, setCallout] = useState<ProjectedCallout | null>(null);
   const [projectedNodes, setProjectedNodes] = useState<ProjectedNodeAnchor[]>([]);
+  const [projectedStarStreaks, setProjectedStarStreaks] = useState<ProjectedStarStreak[]>([]);
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
@@ -737,6 +856,7 @@ export default function SovereignBrain3DCanvas({
   const starDensityRef = useRef<number>(starDensity);
   const orbitalDecayRef = useRef<number>(orbitalDecay);
   const isPausedRef = useRef<boolean>(isPaused);
+  const autoRotateRef = useRef<boolean>(autoRotate);
   const spreadRef = useRef<number>(orbitalSpread);
   const hoveredHubRef = useRef<string | null>(null);
   const selectedHubRef = useRef<string | null>(selectedHubId);
@@ -791,6 +911,10 @@ export default function SovereignBrain3DCanvas({
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+
+  useEffect(() => {
+    autoRotateRef.current = autoRotate;
+  }, [autoRotate]);
 
   useEffect(() => {
     spreadRef.current = orbitalSpread;
@@ -978,6 +1102,7 @@ export default function SovereignBrain3DCanvas({
 
     const camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 140);
     camera.position.set(...CAMERA_PRESETS.overview.pos);
+    cameraRef.current = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -988,6 +1113,66 @@ export default function SovereignBrain3DCanvas({
     controls.maxPolarAngle = Math.PI * 0.82;
     controls.minPolarAngle = Math.PI * 0.12;
     controls.target.set(...CAMERA_PRESETS.overview.target);
+    controlsRef.current = controls;
+
+    // GSAP entry morph when returning from Solar System ecliptic plane -> Spiral Galaxy perspective
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (transitionFromSolarRef.current && !prefersReducedMotion) {
+      gsapActiveRef.current = true;
+      camera.position.set(0, 1.9, 17.4);
+      camera.fov = 50;
+      camera.updateProjectionMatrix();
+      controls.target.set(0, 0, 0);
+      controls.update();
+
+      const stageEl = stageRef.current;
+      const proxy = {
+        x: 0,
+        y: 1.9,
+        z: 17.4,
+        tx: 0,
+        ty: 0,
+        tz: 0,
+        fov: 50,
+      };
+      if (stageEl) {
+        gsap.set(stageEl, { opacity: 0 });
+      }
+      const tl = gsap.timeline({
+        onComplete: () => {
+          gsapActiveRef.current = false;
+          activeGsapTlRef.current = null;
+        },
+      });
+      if (stageEl) {
+        tl.to(stageEl, { opacity: 1, duration: 0.36, ease: 'power2.out' }, 0);
+      }
+      tl.to(
+        proxy,
+        {
+          x: CAMERA_PRESETS.overview.pos[0],
+          y: CAMERA_PRESETS.overview.pos[1],
+          z: CAMERA_PRESETS.overview.pos[2],
+          tx: CAMERA_PRESETS.overview.target[0],
+          ty: CAMERA_PRESETS.overview.target[1],
+          tz: CAMERA_PRESETS.overview.target[2],
+          fov: 44,
+          duration: 1.15,
+          ease: 'power3.inOut',
+          onUpdate: () => {
+            camera.position.set(proxy.x, proxy.y, proxy.z);
+            controls.target.set(proxy.tx, proxy.ty, proxy.tz);
+            camera.fov = proxy.fov;
+            camera.updateProjectionMatrix();
+            controls.update();
+          },
+        },
+        0,
+      );
+      activeGsapTlRef.current = tl;
+    }
 
     // Subtle studio PMREM for metallic gimbals and refractive hub shells
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -1534,6 +1719,132 @@ export default function SovereignBrain3DCanvas({
     scene.add(nebulaPoints);
 
     // =========================================================================
+    // 2B. ORBITAL STAR PARTICLE TRAIL STREAKS (GPU ARCS + .brain-core-dot-pulse)
+    // =========================================================================
+    const streakStarCount = 420;
+    const streakSegments = 6;
+    const streakVertCount = streakStarCount * streakSegments * 2;
+    const trPos = new Float32Array(streakVertCount * 3);
+    const trPosEllip = new Float32Array(streakVertCount * 3);
+    const trPosBurst = new Float32Array(streakVertCount * 3);
+    const trCol = new Float32Array(streakVertCount * 3);
+    const trColEllip = new Float32Array(streakVertCount * 3);
+    const trColBurst = new Float32Array(streakVertCount * 3);
+    const trRadiusMorph = new Float32Array(streakVertCount * 3);
+    const trPhase = new Float32Array(streakVertCount);
+    const trTrailT = new Float32Array(streakVertCount);
+    const streakSourceIndices = new Uint32Array(streakStarCount);
+
+    let sampledStreaks = 0;
+    for (let i = 0; i < starCount && sampledStreaks < streakStarCount; i += 47) {
+      const rSp = starRadiusMorph[i * 3];
+      if (rSp < 2.1 || rSp > 14.5) continue;
+      streakSourceIndices[sampledStreaks] = i;
+
+      const src3 = i * 3;
+      const baseVert = sampledStreaks * streakSegments * 2;
+      for (let seg = 0; seg < streakSegments; seg++) {
+        const t0 = seg / streakSegments;
+        const t1 = (seg + 1) / streakSegments;
+        const v0 = baseVert + seg * 2;
+        const v1 = v0 + 1;
+        for (const vIdx of [v0, v1]) {
+          const v3 = vIdx * 3;
+          trPos[v3] = starPositions[src3];
+          trPos[v3 + 1] = starPositions[src3 + 1];
+          trPos[v3 + 2] = starPositions[src3 + 2];
+
+          trPosEllip[v3] = starPosElliptical[src3];
+          trPosEllip[v3 + 1] = starPosElliptical[src3 + 1];
+          trPosEllip[v3 + 2] = starPosElliptical[src3 + 2];
+
+          trPosBurst[v3] = starPosStarburst[src3];
+          trPosBurst[v3 + 1] = starPosStarburst[src3 + 1];
+          trPosBurst[v3 + 2] = starPosStarburst[src3 + 2];
+
+          trRadiusMorph[v3] = starRadiusMorph[src3];
+          trRadiusMorph[v3 + 1] = starRadiusMorph[src3 + 1];
+          trRadiusMorph[v3 + 2] = starRadiusMorph[src3 + 2];
+
+          trPhase[vIdx] = starPhases[i];
+        }
+        trTrailT[v0] = t0;
+        trTrailT[v1] = t1;
+      }
+      sampledStreaks++;
+    }
+
+    const syncTrailColorsFromStars = () => {
+      for (let s = 0; s < sampledStreaks; s++) {
+        const src3 = streakSourceIndices[s] * 3;
+        const baseVert = s * streakSegments * 2;
+        const endVert = baseVert + streakSegments * 2;
+        for (let vIdx = baseVert; vIdx < endVert; vIdx++) {
+          const v3 = vIdx * 3;
+          trCol[v3] = starColors[src3];
+          trCol[v3 + 1] = starColors[src3 + 1];
+          trCol[v3 + 2] = starColors[src3 + 2];
+
+          trColEllip[v3] = starColElliptical[src3];
+          trColEllip[v3 + 1] = starColElliptical[src3 + 1];
+          trColEllip[v3 + 2] = starColElliptical[src3 + 2];
+
+          trColBurst[v3] = starColStarburst[src3];
+          trColBurst[v3 + 1] = starColStarburst[src3 + 1];
+          trColBurst[v3 + 2] = starColStarburst[src3 + 2];
+        }
+      }
+      if (starTrailGeo.attributes.aColor) {
+        (starTrailGeo.attributes.aColor as THREE.BufferAttribute).needsUpdate = true;
+        (starTrailGeo.attributes.aColorElliptical as THREE.BufferAttribute).needsUpdate = true;
+        (starTrailGeo.attributes.aColorStarburst as THREE.BufferAttribute).needsUpdate = true;
+      }
+    };
+
+    const starTrailGeo = new THREE.BufferGeometry();
+    starTrailGeo.setAttribute('position', new THREE.BufferAttribute(trPos, 3));
+    starTrailGeo.setAttribute('aPosElliptical', new THREE.BufferAttribute(trPosEllip, 3));
+    starTrailGeo.setAttribute('aPosStarburst', new THREE.BufferAttribute(trPosBurst, 3));
+    starTrailGeo.setAttribute('aColor', new THREE.BufferAttribute(trCol, 3));
+    starTrailGeo.setAttribute('aColorElliptical', new THREE.BufferAttribute(trColEllip, 3));
+    starTrailGeo.setAttribute('aColorStarburst', new THREE.BufferAttribute(trColBurst, 3));
+    starTrailGeo.setAttribute('aRadiusMorph', new THREE.BufferAttribute(trRadiusMorph, 3));
+    starTrailGeo.setAttribute('aPhase', new THREE.BufferAttribute(trPhase, 1));
+    starTrailGeo.setAttribute('aTrailT', new THREE.BufferAttribute(trTrailT, 1));
+    starTrailGeo.setDrawRange(0, sampledStreaks * streakSegments * 2);
+    syncTrailColorsFromStars();
+
+    const starTrailUniforms = {
+      uRealTime: { value: 0 },
+      uSimEpoch: { value: simEpochRef.current },
+      uDecayRate: { value: orbitalDecayRef.current },
+      uSpread: { value: spreadRef.current },
+      uStreakSpan: { value: 14.0 },
+      uMorphWeights: { value: _morphWeights.clone() },
+      uTransitionSwirl: { value: 0 },
+      uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
+    };
+
+    const starTrailMat = new THREE.ShaderMaterial({
+      vertexShader: GALAXY_TRAIL_VERTEX_SHADER,
+      fragmentShader: GALAXY_TRAIL_FRAGMENT_SHADER,
+      uniforms: starTrailUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending:
+        finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
+    });
+
+    const starTrailLines = new THREE.LineSegments(starTrailGeo, starTrailMat);
+    scene.add(starTrailLines);
+
+    // 10 Curated Orbital Guide Stars projected into 2D for .brain-core-dot-pulse motion streak overlays
+    const pulseGuideIndices: number[] = [];
+    for (let g = 0; g < 10 && g < sampledStreaks; g++) {
+      pulseGuideIndices.push(streakSourceIndices[Math.floor((g * sampledStreaks) / 10)]);
+    }
+
+    // =========================================================================
     // 3. PROCEDURAL ANIMATED SOLAR / GRAVITATIONAL CORE + OPA 0.88 GYRO RING
     // =========================================================================
     const coreGroup = new THREE.Group();
@@ -1921,6 +2232,11 @@ export default function SovereignBrain3DCanvas({
     const handleControlStart = () => {
       cameraFlyActive = false;
       trackedHubId = null;
+      if (gsapActiveRef.current && !isSwitchingOutRef.current) {
+        activeGsapTlRef.current?.kill();
+        activeGsapTlRef.current = null;
+        gsapActiveRef.current = false;
+      }
     };
     controls.addEventListener('start', handleControlStart);
 
@@ -2144,12 +2460,15 @@ export default function SovereignBrain3DCanvas({
         lastAppliedFinish = curFinish;
         applyStarPalette(curFinish);
         applyNebulaPalette(curFinish);
+        syncTrailColorsFromStars();
 
         const nextBlend = isStone ? THREE.NormalBlending : THREE.AdditiveBlending;
         galaxyMat.blending = nextBlend;
         galaxyMat.needsUpdate = true;
         nebulaMat.blending = nextBlend;
         nebulaMat.needsUpdate = true;
+        starTrailMat.blending = nextBlend;
+        starTrailMat.needsUpdate = true;
         accretionMat.blending = nextBlend;
         accretionMat.needsUpdate = true;
         photonHaloMat.blending = nextBlend;
@@ -2165,12 +2484,16 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
-      // Dynamic Star & Nebula Density via GPU drawRange (zero buffer re-uploads)
+      // Dynamic Star, Nebula & Orbital Streak Density via GPU drawRange (zero buffer re-uploads)
       const targetDensity = starDensityRef.current;
       if (Math.abs(targetDensity - lastAppliedDensity) > 0.001) {
         lastAppliedDensity = targetDensity;
         galaxyGeo.setDrawRange(0, Math.max(1000, Math.round(starCount * targetDensity)));
         nebulaGeo.setDrawRange(0, Math.max(120, Math.round(nebulaCount * targetDensity)));
+        starTrailGeo.setDrawRange(
+          0,
+          Math.max(48, Math.round(sampledStreaks * targetDensity)) * streakSegments * 2,
+        );
       }
 
       // Smoothly lerp scene background, exponential fog & lighting
@@ -2182,12 +2505,14 @@ export default function SovereignBrain3DCanvas({
       solarPointLight.intensity =
         (isStone ? 2.6 : 4.2) * (1.0 + _morphWeights.z * 0.25 + _morphWeights.y * 0.15);
 
-      // Update GLSL Galaxy & Nebula Uniforms (GPU morphology + deterministic timeline)
+      // Update GLSL Galaxy, Nebula & Star Trail Uniforms (GPU morphology + deterministic timeline)
+      const futureEpochDecay = Math.max(0, (curEpoch - 180) / 320) * 0.32;
+      const effectiveTargetDecay = Math.min(1.0, Math.max(orbitalDecayRef.current, futureEpochDecay));
       galaxyUniforms.uRealTime.value = realTime;
       galaxyUniforms.uSimEpoch.value = curEpoch;
       galaxyUniforms.uDecayRate.value = THREE.MathUtils.damp(
         galaxyUniforms.uDecayRate.value,
-        orbitalDecayRef.current,
+        effectiveTargetDecay,
         4.5,
         rawDt,
       );
@@ -2208,6 +2533,25 @@ export default function SovereignBrain3DCanvas({
       nebulaUniforms.uMorphWeights.value.copy(_morphWeights);
       nebulaUniforms.uTransitionSwirl.value = transitionSwirl;
       nebulaUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
+
+      const signedVel =
+        (isPausedRef.current ? 0.28 : 1.0) *
+        (playbackRateRef.current < 0 ? -1 : 1) *
+        (0.45 + spinSpeedRef.current * 0.95);
+      const targetStreakSpan = signedVel * 16.5;
+      starTrailUniforms.uRealTime.value = realTime;
+      starTrailUniforms.uSimEpoch.value = curEpoch;
+      starTrailUniforms.uDecayRate.value = galaxyUniforms.uDecayRate.value;
+      starTrailUniforms.uSpread.value = galaxyUniforms.uSpread.value;
+      starTrailUniforms.uStreakSpan.value = THREE.MathUtils.damp(
+        starTrailUniforms.uStreakSpan.value,
+        targetStreakSpan,
+        5.5,
+        rawDt,
+      );
+      starTrailUniforms.uMorphWeights.value.copy(_morphWeights);
+      starTrailUniforms.uTransitionSwirl.value = transitionSwirl;
+      starTrailUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
       // Update Solar Core, Corona, Photon Halo & Accretion Disk with morphology color blending
       const opaPass = hitlRef.current >= 0.88;
@@ -2493,8 +2837,8 @@ export default function SovereignBrain3DCanvas({
       packetInst.instanceMatrix.needsUpdate = true;
       packetMat.color.set(isStone ? '#1C6E46' : '#A7F3D0');
 
-      // Smooth Camera Fly-To / Hub Tracking (zero per-frame allocations)
-      if (cameraFlyActive) {
+      // Smooth Camera Fly-To / Hub Tracking (yields cleanly to GSAP system-switch transitions)
+      if (!gsapActiveRef.current && cameraFlyActive) {
         if (trackedHubId) {
           const tMeta = hubMetas.find((h) => h.hubId === trackedHubId);
           if (tMeta) {
@@ -2521,6 +2865,9 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
+      // Constant slow cinematic camera orbit when Auto-Rotate is enabled
+      controls.autoRotate = autoRotateRef.current && !cameraFlyActive && !gsapActiveRef.current;
+      controls.autoRotateSpeed = 0.72;
       controls.update();
 
       // Render (GPU Bloom Pipeline or Software WebGL Direct Render)
@@ -2530,7 +2877,7 @@ export default function SovereignBrain3DCanvas({
         renderer.render(scene, camera);
       }
 
-      // Throttled 2D Screen-Space Projection for Callout & Emissive Pulse Beacons (16 Hz)
+      // Throttled 2D Screen-Space Projection for Callout, Emissive Beacons & .brain-core-dot-pulse Star Streaks (16 Hz)
       if (now - lastHudSyncMs > 62) {
         lastHudSyncMs = now;
         const anchors: ProjectedNodeAnchor[] = [];
@@ -2578,7 +2925,102 @@ export default function SovereignBrain3DCanvas({
           }
         }
 
+        // Project 10 curated orbital tracer stars for .brain-core-dot-pulse velocity-aligned streaks
+        const streaks: ProjectedStarStreak[] = [];
+        const wSp = _morphWeights.x;
+        const wEl = _morphWeights.y;
+        const wBu = _morphWeights.z;
+        const eNorm = Math.max(-1, Math.min(1, curEpoch / 500));
+        const eProg = (curEpoch + 500) / 1000;
+        const spreadM = (0.72 + galaxyUniforms.uSpread.value * 0.45) * (1 - eNorm * 0.14);
+        const vertM = 1 - eNorm * 0.34 * (1 - wEl * 0.72);
+        const kinR = wSp * 1.0 + wEl * 0.36 + wBu * 1.32;
+        const decayU = galaxyUniforms.uDecayRate.value;
+        const trailSpan = starTrailUniforms.uStreakSpan.value;
+
+        for (let g = 0; g < pulseGuideIndices.length; g++) {
+          const sIdx = pulseGuideIndices[g];
+          const s3 = sIdx * 3;
+          const bx =
+            starPositions[s3] * wSp + starPosElliptical[s3] * wEl + starPosStarburst[s3] * wBu;
+          const by =
+            starPositions[s3 + 1] * wSp +
+            starPosElliptical[s3 + 1] * wEl +
+            starPosStarburst[s3 + 1] * wBu;
+          const bz =
+            starPositions[s3 + 2] * wSp +
+            starPosElliptical[s3 + 2] * wEl +
+            starPosStarburst[s3 + 2] * wBu;
+          const mR =
+            starRadiusMorph[s3] * wSp +
+            starRadiusMorph[s3 + 1] * wEl +
+            starRadiusMorph[s3 + 2] * wBu;
+          const ph = starPhases[sIdx];
+          const cyc = ((eProg * 1.85 + ph * 0.15915494) % 1 + 1) % 1;
+          const dPull = 1 - cyc * 0.56 * Math.max(0, Math.min(1, decayU));
+          const rEff = Math.max(mR * spreadM * dPull, 0.42);
+          const aVel = (0.24 * kinR) / (Math.pow(Math.max(rEff, 0.35), 0.58) + 0.32);
+          const twist = (1 - dPull) * 3.2;
+          const angHead = curEpoch * 0.16 * aVel + twist;
+          const angTail = (curEpoch - trailSpan * 0.65) * 0.16 * aVel + twist;
+
+          const ch = Math.cos(angHead);
+          const sh = Math.sin(angHead);
+          const ct = Math.cos(angTail);
+          const st = Math.sin(angTail);
+          const scaleXZ = spreadM * dPull;
+
+          _streakHeadPos.set(
+            (bx * ch - bz * sh) * scaleXZ,
+            by * vertM,
+            (bx * sh + bz * ch) * scaleXZ,
+          );
+          _streakTailPos.set(
+            (bx * ct - bz * st) * scaleXZ,
+            by * vertM,
+            (bx * st + bz * ct) * scaleXZ,
+          );
+
+          _projVec.copy(_streakHeadPos).project(camera);
+          _projTailVec.copy(_streakTailPos).project(camera);
+
+          if (_projVec.z > -1 && _projVec.z < 1 && _projTailVec.z > -1 && _projTailVec.z < 1) {
+            const hx = (_projVec.x * 0.5 + 0.5) * currentWidth;
+            const hy = (-_projVec.y * 0.5 + 0.5) * currentHeight;
+            const tx = (_projTailVec.x * 0.5 + 0.5) * currentWidth;
+            const ty = (-_projTailVec.y * 0.5 + 0.5) * currentHeight;
+            if (hx > 18 && hx < currentWidth - 18 && hy > 18 && hy < currentHeight - 18) {
+              const dx = hx - tx;
+              const dy = hy - ty;
+              const distPx = Math.hypot(dx, dy);
+              const lengthPx = Math.max(12, Math.min(44, distPx * 1.15));
+              const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+              const accentHex =
+                wBu > 0.5
+                  ? g % 2 === 0
+                    ? '#FB7185'
+                    : '#38BDF8'
+                  : wEl > 0.5
+                    ? '#FBBF24'
+                    : g % 2 === 0
+                      ? '#6FCB9F'
+                      : '#7DD3FC';
+
+              streaks.push({
+                id: g,
+                x: hx,
+                y: hy,
+                angleDeg,
+                lengthPx,
+                accent: isStone ? '#1F3863' : accentHex,
+                delaySec: Number(((g * 0.22) % 2.2).toFixed(2)),
+              });
+            }
+          }
+        }
+
         setProjectedNodes(anchors);
+        setProjectedStarStreaks(streaks);
         setCallout(nextCallout);
       }
 
@@ -2589,6 +3031,12 @@ export default function SovereignBrain3DCanvas({
 
     return () => {
       disposed = true;
+      activeGsapTlRef.current?.kill();
+      activeGsapTlRef.current = null;
+      gsapActiveRef.current = false;
+      isSwitchingOutRef.current = false;
+      cameraRef.current = null;
+      controlsRef.current = null;
       cancelAnimationFrame(rafId);
       window.clearTimeout(syncTimerId);
       if (activeSync && isWebGL2) {
@@ -2611,6 +3059,8 @@ export default function SovereignBrain3DCanvas({
       galaxyMat.dispose();
       nebulaGeo.dispose();
       nebulaMat.dispose();
+      starTrailGeo.dispose();
+      starTrailMat.dispose();
       solarGeo.dispose();
       solarMat.dispose();
       coronaGeo.dispose();
@@ -2658,18 +3108,112 @@ export default function SovereignBrain3DCanvas({
   }, []);
 
   const isLightMode = finish === 'stone';
-  const opaPass = hitlConfidence >= 0.88;
+  const activePresetMeta =
+    GALAXY_TYPE_PRESETS.find((p) => p.id === galaxyPreset) ?? GALAXY_TYPE_PRESETS[0];
+
+  // Phase A of GSAP morph: sweep Spiral Galaxy into top-down vantage before handing off to Solar System ecliptic
+  const handleRequestAlternativeSystem = () => {
+    if (!onToggleAlternativeSystem || isSwitchingOutRef.current) return;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const cam = cameraRef.current;
+    const ctrl = controlsRef.current;
+    const stageEl = stageRef.current;
+
+    if (prefersReducedMotion || !cam || !ctrl) {
+      onToggleAlternativeSystem();
+      return;
+    }
+
+    isSwitchingOutRef.current = true;
+    gsapActiveRef.current = true;
+    activeGsapTlRef.current?.kill();
+
+    const proxy = {
+      x: cam.position.x,
+      y: cam.position.y,
+      z: cam.position.z,
+      tx: ctrl.target.x,
+      ty: ctrl.target.y,
+      tz: ctrl.target.z,
+      fov: cam.fov,
+    };
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        activeGsapTlRef.current = null;
+        onToggleAlternativeSystem();
+      },
+    });
+    tl.to(
+      proxy,
+      {
+        x: 0,
+        y: 16.2,
+        z: 3.0,
+        tx: 0,
+        ty: 0,
+        tz: 0,
+        fov: 52,
+        duration: 0.56,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          cam.position.set(proxy.x, proxy.y, proxy.z);
+          ctrl.target.set(proxy.tx, proxy.ty, proxy.tz);
+          cam.fov = proxy.fov;
+          cam.updateProjectionMatrix();
+          ctrl.update();
+        },
+      },
+      0,
+    );
+    if (stageEl) {
+      tl.to(stageEl, { opacity: 0, duration: 0.24, ease: 'power2.in' }, 0.34);
+    }
+    activeGsapTlRef.current = tl;
+  };
 
   return (
     <div
-      className={`relative w-full h-full min-h-[380px] rounded-[12px] overflow-hidden select-none border ${
-        isLightMode
-          ? 'bg-[#EDEAE2] border-[#D8D2C6]'
-          : 'bg-[#040712] border-[#1F2A48]'
+      ref={stageRef}
+      className={`relative w-full h-full min-h-[380px] rounded-[10px] overflow-hidden select-none ${
+        isLightMode ? 'bg-[#EDEAE2]' : 'bg-[#040712]'
       }`}
     >
       {/* Pure WebGL Spiral Galaxy Mount */}
       <div ref={mountRef} className="w-full h-full" />
+
+      {/* Projected Orbital Star Motion Streaks (.brain-core-dot-pulse animation logic) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {projectedStarStreaks.map((st) => (
+          <div
+            key={st.id}
+            style={{
+              left: `${st.x}px`,
+              top: `${st.y}px`,
+              transform: `translate(-100%, -50%) rotate(${st.angleDeg}deg)`,
+              ...getEmissiveCssVars(st.accent, isLightMode),
+            }}
+            className="absolute flex items-center"
+          >
+            <div
+              style={{
+                width: `${st.lengthPx}px`,
+                animationDelay: `${st.delaySec}s`,
+              }}
+              className="h-[1.5px] rounded-full brain-core-trail-streak"
+            />
+            <div
+              style={{
+                backgroundColor: st.accent,
+                animationDelay: `${st.delaySec}s`,
+              }}
+              className="w-[4px] h-[4px] rounded-full shrink-0 -ml-[2px] brain-core-dot-pulse"
+            />
+          </div>
+        ))}
+      </div>
 
       {/* Projected Emissive Pulse Beacons (synced with active/selected hubs) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -2694,38 +3238,17 @@ export default function SovereignBrain3DCanvas({
         ))}
       </div>
 
-      {/* Top-Left Minimal Observatory Title + Galaxy Type & OPA Readout (No backdrop-blur over WebGL) */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex flex-col gap-1 max-w-[70%]">
-        <div
-          className={`inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] tracking-[0.1em] ${
-            isLightMode
-              ? 'bg-[#FAF8F4]/92 border-[#D4CEC2] text-[#16213A]'
-              : 'bg-[#0A1024]/88 border-[#25345C] text-[#D9E3FA]'
-          }`}
-        >
-          <span className="font-bold">
-            {(
-              GALAXY_TYPE_PRESETS.find((p) => p.id === galaxyPreset)?.shortLabel ??
-              'Andromeda Spiral'
-            ).toUpperCase()}
-          </span>
-          <span className="opacity-40">·</span>
-          <span className="tabular-nums">{formatEpochMyr(simEpoch)}</span>
-          <span className="opacity-40">·</span>
-          <span className={opaPass ? 'text-[#1C6E46] dark:text-[#6FCB9F]' : 'text-amber-500'}>
-            OPA {hitlConfidence.toFixed(2)} {opaPass ? 'PASS' : 'HITL'}
-          </span>
-        </div>
-        {!compact && (
-          <div
-            className={`text-[10px] font-mono px-1 ${
-              isLightMode ? 'text-[#4A5163]' : 'text-[#8E9DC2]'
-            }`}
-          >
-            Drag to orbit · Scroll to zoom · Click hub to inspect · Press H for controls
-          </div>
-        )}
-      </div>
+      {/* Top-Left Informational Galaxy Legend Box (Active Galaxy Type & Gravitational Characteristics) */}
+      <GalaxyLegendBox
+        activePreset={activePresetMeta}
+        isLightMode={isLightMode}
+        simEpoch={simEpoch}
+        spinSpeed={spinSpeed}
+        orbitalDecay={orbitalDecay}
+        starDensity={starDensity}
+        hitlConfidence={hitlConfidence}
+        compact={compact}
+      />
 
       {/* Projected Hub Callout Card (Solid RGBA surface, zero backdrop-filter) */}
       {callout && callout.visible && activeHubMeta && (
@@ -2784,8 +3307,12 @@ export default function SovereignBrain3DCanvas({
         </div>
       )}
 
-      {/* Dedicated Collapsible 3D Neural Core Control Panel with Galaxy Type Presets & Timeline Scrub */}
+      {/* Unified 3D Neural Core Bottom Control Panel */}
       <GalaxyControlPanel
+        systemMode="spiral-galaxy"
+        onToggleAlternativeSystem={
+          onToggleAlternativeSystem ? handleRequestAlternativeSystem : undefined
+        }
         isLightMode={isLightMode}
         dockOpen={dockOpen}
         onToggleDock={() => setDockOpen((v) => !v)}
@@ -2827,12 +3354,18 @@ export default function SovereignBrain3DCanvas({
         onOrbitalSpreadChange={setOrbitalSpread}
         totalStarCapacity={28000}
         activeHubCount={BRAIN_HUBS.length}
+        autoRotate={autoRotate}
+        onToggleAutoRotate={() => setAutoRotate((v) => !v)}
         onReset={() => {
           const baseline = GALAXY_TYPE_PRESETS[0];
+          if (galaxyPreset !== baseline.id) {
+            setMorphProgress(0.05);
+          }
           applyGalaxyTypePreset(baseline);
           handleScrubEpoch(0);
           setPlaybackRate(1);
           setIsPaused(false);
+          setAutoRotate(false);
           setCameraPreset('overview');
         }}
       />

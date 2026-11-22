@@ -305,9 +305,60 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   will-change: transform, opacity, box-shadow;
 }
 
+.brain-core-trail-streak {
+  transform-origin: 100% 50%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--brain-emissive-dim, rgba(111, 203, 159, 0.25)) 45%,
+    var(--brain-emissive-glow, rgba(111, 203, 159, 0.85)) 100%
+  );
+  animation: spenta-brain-core-dot-pulse 2.2s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}
+
 .brain-svg-emissive-pulse {
   animation: spenta-svg-emissive-pulse 2.4s ease-in-out infinite;
   will-change: filter;
+}
+
+/* Semantic Design Tokens — Alternate Core 2: Solar System 3D Map (SolarUniverSite-DESIGN) */
+.solar-map-scope {
+  --solar-bg-void: #040814;
+  --solar-bg-deep: #030507;
+  --solar-bg-panel: rgba(4, 10, 22, 0.76);
+  --solar-bg-strip: rgba(4, 10, 22, 0.66);
+  --solar-bg-chip: rgba(4, 10, 22, 0.72);
+  --solar-bg-select: rgba(8, 18, 38, 0.74);
+  --solar-fg-primary: #FFFFFF;
+  --solar-fg-bright: #F7FBFF;
+  --solar-fg-warm: #FFF5E4;
+  --solar-fg-muted: rgba(226, 236, 244, 0.68);
+  --solar-fg-soft: rgba(230, 237, 255, 0.72);
+  --solar-fg-blue: #C4D6F0;
+  --solar-fg-blue-muted: #A8BEDC;
+  --solar-accent-blue: rgba(72, 142, 255, 0.96);
+  --solar-accent-cobalt: #0B57D0;
+  --solar-accent-amber: rgba(255, 181, 99, 0.74);
+  --solar-accent-amber-bg: rgba(255, 137, 79, 0.14);
+  --solar-accent-amber-fg: #FFE0BB;
+  --solar-border-strong: rgba(151, 196, 255, 0.34);
+  --solar-border-mid: rgba(151, 196, 255, 0.26);
+  --solar-border-subtle: rgba(151, 196, 255, 0.21);
+  --solar-border-cyan: rgba(104, 228, 239, 0.2);
+  --solar-shadow-glow: 0 0 18px 0 rgba(77, 157, 255, 0.1) inset, 0 0 18px 0 rgba(77, 157, 255, 0.14);
+  --solar-shadow-strip: 0 0 28px 0 rgba(77, 157, 255, 0.12);
+  --solar-shadow-card: 0 0 30px 0 rgba(0, 0, 0, 0.22);
+  --solar-radius-tab: 5px;
+  --solar-radius-chip: 6px;
+  --solar-radius-panel: 8px;
+}
+
+.solar-map-scope button:focus-visible,
+.solar-map-scope select:focus-visible,
+.solar-map-scope input[type="range"]:focus-visible {
+  outline: 2px solid var(--solar-accent-blue);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -318,6 +369,7 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   .brain-node-emissive-pulse--selected,
   .brain-node-ring-pulse,
   .brain-core-dot-pulse,
+  .brain-core-trail-streak,
   .brain-svg-emissive-pulse {
     animation: none !important;
   }
@@ -342,7 +394,8 @@ input[type="range"].spenta-slider {
   outline: none;
 }
 
-.dark input[type="range"].spenta-slider {
+.dark input[type="range"].spenta-slider,
+.spenta-observatory-dark input[type="range"].spenta-slider {
   background: #232b4a;
 }
 
@@ -358,7 +411,8 @@ input[type="range"].spenta-slider::-webkit-slider-thumb {
   transition: transform 0.12s ease;
 }
 
-.dark input[type="range"].spenta-slider::-webkit-slider-thumb {
+.dark input[type="range"].spenta-slider::-webkit-slider-thumb,
+.spenta-observatory-dark input[type="range"].spenta-slider::-webkit-slider-thumb {
   background: #8fa6e8;
   border: 2px solid #0b1020;
 }
@@ -376,9 +430,28 @@ input[type="range"].spenta-slider::-moz-range-thumb {
   cursor: pointer;
 }
 
-.dark input[type="range"].spenta-slider::-moz-range-thumb {
+.dark input[type="range"].spenta-slider::-moz-range-thumb,
+.spenta-observatory-dark input[type="range"].spenta-slider::-moz-range-thumb {
   background: #8fa6e8;
   border: 2px solid #0b1020;
+}
+
+/* Solar System Mode (.solar-map-scope) Tokenized Range Slider Overrides */
+.solar-map-scope input[type="range"].spenta-slider {
+  background: var(--solar-border-mid);
+  height: 5px;
+}
+
+.solar-map-scope input[type="range"].spenta-slider::-webkit-slider-thumb {
+  background: var(--solar-accent-amber-fg);
+  border: 2px solid var(--solar-bg-void);
+  box-shadow: 0 0 0 1px var(--solar-accent-amber), 0 0 10px rgba(255, 181, 99, 0.35);
+}
+
+.solar-map-scope input[type="range"].spenta-slider::-moz-range-thumb {
+  background: var(--solar-accent-amber-fg);
+  border: 2px solid var(--solar-bg-void);
+  box-shadow: 0 0 0 1px var(--solar-accent-amber), 0 0 10px rgba(255, 181, 99, 0.35);
 }
 
 /* Print-only Pitch Deck container is hidden on screen */

@@ -12,6 +12,10 @@ export interface GalaxyTypePreset {
   shortLabel: string;
   classification: string;
   description: string;
+  gravityProfile: string;
+  orbitalMechanics: string;
+  escapeDynamics: string;
+  massScale: string;
   spinSpeed: number;
   starDensity: number;
   orbitalDecay: number;
@@ -27,6 +31,10 @@ export const GALAXY_TYPE_PRESETS: GalaxyTypePreset[] = [
     shortLabel: 'Andromeda Spiral',
     classification: 'SA(s)b · Grand-Design Disk',
     description: 'Sweeping 5-arm logarithmic spiral disk with warm core bulge and H-II star-forming knots',
+    gravityProfile: 'Keplerian differential disk with dark-halo flat curve',
+    orbitalMechanics: '5 logarithmic density-wave arms · Stable planar orbits',
+    escapeDynamics: 'Low vertical dispersion · Balanced angular momentum',
+    massScale: '1.5×10¹² M☉ halo',
     spinSpeed: 0.85,
     starDensity: 1.0,
     orbitalDecay: 0.0,
@@ -40,6 +48,10 @@ export const GALAXY_TYPE_PRESETS: GalaxyTypePreset[] = [
     shortLabel: 'Elliptical Dense',
     classification: 'E3 · Triaxial Spheroid',
     description: 'High-density golden triaxial spheroid with 18 ancient globular clusters and 3D shell orbits',
+    gravityProfile: 'Deep triaxial potential well · Velocity-dispersion bound',
+    orbitalMechanics: 'Isotropic 3D shell orbits · 18 ancient globular clusters',
+    escapeDynamics: 'High core escape velocity · Slow bulk precession',
+    massScale: '4.2×10¹² M☉ core',
     spinSpeed: 0.35,
     starDensity: 1.0,
     orbitalDecay: 0.15,
@@ -53,6 +65,10 @@ export const GALAXY_TYPE_PRESETS: GalaxyTypePreset[] = [
     shortLabel: 'Active Starburst',
     classification: 'I0 · Bipolar Superwind',
     description: 'Hyper-luminous starburst nucleus driving ionized crimson and violet bipolar outflow plumes',
+    gravityProfile: 'Compact super-Eddington nucleus · Steep inner gradient',
+    orbitalMechanics: 'High inner orbital shear · Rapid radial inflow torque',
+    escapeDynamics: 'Bipolar ±Y ionized superwind · Elevated tidal decay',
+    massScale: '2.1×10¹¹ M☉ burst',
     spinSpeed: 1.55,
     starDensity: 1.0,
     orbitalDecay: 0.3,

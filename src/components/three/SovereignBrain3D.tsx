@@ -1,7 +1,10 @@
-import React, { Component, Suspense } from 'react';
+import React, { Component, Suspense, useState } from 'react';
 import { BRAIN_HUBS } from '../../data/spentaManifest';
 
 const LazySovereignBrain3DCanvas = React.lazy(() => import('./SovereignBrain3DCanvas'));
+const LazySolarSystemBrain3DCanvas = React.lazy(() => import('./SolarSystemBrain3DCanvas'));
+
+export type NeuralCoreArchitecture = 'spiral-galaxy' | 'solar-map';
 
 interface SovereignBrain3DProps {
   compact?: boolean;
@@ -9,6 +12,7 @@ interface SovereignBrain3DProps {
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
   hubFocusNonce?: number;
+  initialCore?: NeuralCoreArchitecture;
 }
 
 interface ErrorBoundaryState {
@@ -105,34 +109,87 @@ class ThreeErrorBoundary extends Component<
   }
 }
 
-export function SovereignBrain3D(props: SovereignBrain3DProps) {
+export function SovereignBrain3D({
+  initialCore = 'spiral-galaxy',
+  ...props
+}: SovereignBrain3DProps) {
+  const [activeCore, setActiveCore] = useState<NeuralCoreArchitecture>(initialCore);
+  const [transitionOrigin, setTransitionOrigin] = useState<
+    'initial' | 'from-spiral' | 'from-solar'
+  >('initial');
   const isLight = props.polarity === 'light';
+  const isSolar = activeCore === 'solar-map';
+
+  const handleToggleAlternativeSystem = () => {
+    setActiveCore((prev) => {
+      if (prev === 'spiral-galaxy') {
+        setTransitionOrigin('from-spiral');
+        return 'solar-map';
+      }
+      setTransitionOrigin('from-solar');
+      return 'spiral-galaxy';
+    });
+  };
+
   return (
-    <ThreeErrorBoundary
-      polarity={props.polarity}
-      selectedHubId={props.selectedHubId}
-      onSelectHub={props.onSelectHub}
+    <div
+      className={`relative w-full h-full min-h-[460px] rounded-[10px] overflow-hidden ${
+        isSolar || transitionOrigin !== 'initial'
+          ? 'bg-[#040814]'
+          : isLight
+            ? 'bg-[#EDEAE2]'
+            : 'bg-[#040712]'
+      }`}
     >
-      <Suspense
-        fallback={
-          <div
-            className={`w-full h-full min-h-[420px] rounded-[10px] flex flex-col items-center justify-center gap-2 font-mono text-xs ${
-              isLight
-                ? 'bg-[#F2EFE9] text-[#4A5163]'
-                : 'bg-[#0B1020] text-[#C3CCE4]'
-            }`}
-          >
-            <div
-              className={`w-8 h-8 rounded-full border-2 border-t-transparent animate-spin ${
-                isLight ? 'border-[#1F3863]' : 'border-[#8FA6E8]'
-              }`}
-            />
-            <span>Initializing 3D Spiral Galaxy Neural Core…</span>
-          </div>
-        }
+      <ThreeErrorBoundary
+        key={activeCore}
+        polarity={props.polarity}
+        selectedHubId={props.selectedHubId}
+        onSelectHub={props.onSelectHub}
       >
-        <LazySovereignBrain3DCanvas {...props} />
-      </Suspense>
-    </ThreeErrorBoundary>
+        <Suspense
+          fallback={
+            <div
+              className={`w-full h-full min-h-[460px] rounded-[10px] flex flex-col items-center justify-center gap-2 font-mono text-xs ${
+                isSolar
+                  ? 'bg-[#040814] text-[#C4D6F0]'
+                  : isLight
+                    ? 'bg-[#F2EFE9] text-[#4A5163]'
+                    : 'bg-[#0B1020] text-[#C3CCE4]'
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-full border-2 border-t-transparent animate-spin ${
+                  isSolar
+                    ? 'border-[#FFB563]'
+                    : isLight
+                      ? 'border-[#1F3863]'
+                      : 'border-[#8FA6E8]'
+                }`}
+              />
+              <span>
+                {isSolar
+                  ? 'Morphing to Solar System Ecliptic Plane…'
+                  : 'Morphing to Spiral Galaxy Perspective…'}
+              </span>
+            </div>
+          }
+        >
+          {activeCore === 'spiral-galaxy' ? (
+            <LazySovereignBrain3DCanvas
+              {...props}
+              transitionFromSolar={transitionOrigin === 'from-solar'}
+              onToggleAlternativeSystem={handleToggleAlternativeSystem}
+            />
+          ) : (
+            <LazySolarSystemBrain3DCanvas
+              {...props}
+              transitionFromSpiral={transitionOrigin === 'from-spiral'}
+              onToggleAlternativeSystem={handleToggleAlternativeSystem}
+            />
+          )}
+        </Suspense>
+      </ThreeErrorBoundary>
+    </div>
   );
 }
