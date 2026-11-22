@@ -18,6 +18,7 @@ import {
   FileText,
   Plus,
   Printer,
+  ShieldCheck,
   SlidersHorizontal,
   TrendingUp,
   X,
@@ -58,6 +59,7 @@ export function FinancialsView() {
   const [fxRate, setFxRate] = useState<number>(120);
   const [taxRate, setTaxRate] = useState<number>(25);
   const [exitMultiple, setExitMultiple] = useState<number>(10);
+  const [dilutionPct, setDilutionPct] = useState<number>(0);
   const [sortField, setSortField] = useState<SortField>('gmPct');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
@@ -111,9 +113,21 @@ export function FinancialsView() {
   const y4 = modeledSeries[3];
   const y5 = modeledSeries[4];
   const dhakaY1UsdK = Number((64800 / fxRate).toFixed(1));
-  // $500K SAFE at $4.5M post-money cap = ~11.11% pre-dilution ownership
+  const dhakaLoadedHourlyUsd = Number(((dhakaY1UsdK * 1000) / 41600).toFixed(2));
+  // $500K SAFE at $4.5M post-money cap = 11.11% pre-dilution; adjusted for subsequent round dilution
+  const preDilutionOwnership = 500 / 4500;
+  const effectiveOwnership = preDilutionOwnership * (1 - dilutionPct / 100);
+  const effectiveOwnershipPct = Number((effectiveOwnership * 100).toFixed(2));
   const impliedExitEvM = Number(((y5.ebitdaK * exitMultiple) / 1000).toFixed(2));
-  const safeEquityRoiMultiple = Number(((y5.ebitdaK * exitMultiple) / 4500).toFixed(2));
+  const safeExitProceedsM = Number(((y5.ebitdaK * exitMultiple * effectiveOwnership) / 1000).toFixed(2));
+  const safeEquityRoiMultiple = Number(
+    ((y5.ebitdaK * exitMultiple * effectiveOwnership) / 500).toFixed(2),
+  );
+  const safeRoiAt10xPreDil = Number(((y5.ebitdaK * 10 * preDilutionOwnership) / 500).toFixed(2));
+  const safeRoiAt10xSeriesA = Number(
+    ((y5.ebitdaK * 10 * preDilutionOwnership * 0.8) / 500).toFixed(2),
+  );
+  const safeRoiAt15xPreDil = Number(((y5.ebitdaK * 15 * preDilutionOwnership) / 500).toFixed(2));
 
   const summaryData = useMemo<QuarterlyExecutiveSummaryData>(() => {
     const activeRow = modeledSeries[summaryYearIndex] ?? modeledSeries[0];
@@ -155,6 +169,8 @@ export function FinancialsView() {
       fiveYearCapitalEfficiency: y5.capitalEfficiencyMultiple,
       fiveYearCumNetM: Number((y5.cumNetK / 1000).toFixed(3)),
       exitEbitdaMultiple: exitMultiple,
+      dilutionPct,
+      effectiveOwnershipPct,
       safeEquityRoiMultiple,
       impliedExitEvM,
       milestone: activeRow.milestone,
@@ -183,6 +199,8 @@ export function FinancialsView() {
     dhakaY1UsdK,
     y5,
     exitMultiple,
+    dilutionPct,
+    effectiveOwnershipPct,
     safeEquityRoiMultiple,
     impliedExitEvM,
     selectedApps,
@@ -194,14 +212,14 @@ export function FinancialsView() {
     const text = [
       `SPENTA SOVEREIGN OS — ${summaryData.quarter} ${summaryData.fiscalYear} (${summaryData.fiscalLabel}) EXECUTIVE SUMMARY`,
       '========================================================================',
-      `Scenario: ${summaryData.scenarioLabel} | FX: ${summaryData.fxRate} BDT/USD | Tax: ${summaryData.taxRate.toFixed(1)}%`,
+      `Scenario: ${summaryData.scenarioLabel} | FX: ${summaryData.fxRate} BDT/USD | Tax: ${summaryData.taxRate.toFixed(1)}% | Dilution: ${dilutionPct}%`,
       '',
       `[${summaryData.quarter} ${summaryData.fiscalYear} HEADLINE PERFORMANCE — ${q.weightPct}% ANNUAL SHARE]`,
       `  • Quarterly Revenue:   ${formatCompactUsdK(q.revK)} (Annualized Run-Rate: ${formatCompactUsdK(q.revK * 4)}/yr)`,
       `  • Quarterly EBITDA:    ${formatCompactUsdK(q.ebitdaK)} (${q.ebitdaMarginPct.toFixed(1)}% margin)`,
       `  • Quarterly Net Profit:${formatCompactUsdK(q.netProfitK)} (after ${summaryData.taxRate.toFixed(1)}% corp. tax)`,
-      `  • Modeled SAFE Exit:   ${summaryData.safeEquityRoiMultiple.toFixed(2)}x at ${summaryData.exitEbitdaMultiple}x Y5 EBITDA (EV $${summaryData.impliedExitEvM.toFixed(2)}M · ~11.1% cap share)`,
-      `  • Capital Efficiency:  ${summaryData.capitalEfficiencyMultiple.toFixed(2)}x through ${summaryData.fiscalYear} (5-Yr Cum. Net / $500K: ${summaryData.fiveYearCapitalEfficiency.toFixed(2)}x)`,
+      `  • Modeled SAFE Exit:   ${summaryData.safeEquityRoiMultiple.toFixed(2)}x at ${summaryData.exitEbitdaMultiple}x Y5 EBITDA (EV $${summaryData.impliedExitEvM.toFixed(2)}M · ${effectiveOwnershipPct.toFixed(2)}% ownership)`,
+      `  • Capital Efficiency:  ${summaryData.capitalEfficiencyMultiple.toFixed(2)}x through ${summaryData.fiscalYear} (5-Yr Cum. Net / $500K: ${summaryData.fiveYearCapitalEfficiency.toFixed(2)}x — company operating metric)`,
       '',
       `[FULL-YEAR ${summaryData.fiscalYear} RECONCILIATION]`,
       `  • Revenue: ${formatCompactUsdK(summaryData.annualRevK)} | EBITDA: ${formatCompactUsdK(summaryData.annualEbitdaK)} | Net Profit: ${formatCompactUsdK(summaryData.annualNetProfitK)}`,
@@ -294,37 +312,37 @@ export function FinancialsView() {
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="rounded-2xl p-5 bg-[#1F3863] dark:bg-[#141A32] text-white border border-[#1F3863] dark:border-[#6FCB9F]/40">
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#A7E6C6] dark:text-[#6FCB9F]">
-            Capital Ask · Pre-Dilution
+            Capital Ask · {dilutionPct === 0 ? 'Pre-Dilution' : `${dilutionPct}% Post-Seed Dil.`}
           </div>
           <div className="font-mono text-2xl sm:text-3xl font-extrabold mt-1 tabular-nums">
             $500K SAFE
           </div>
-          <div className="text-xs text-[#C6D2EE] dark:text-[#8E96B0] font-mono mt-1">
-            $4.5M Cap (~11.1%) · 20% Disc. · $60K MRR Y1
+          <div className="text-xs text-[#C6D2EE] dark:text-[#8E96B0] font-mono mt-1 tabular-nums">
+            $4.5M Cap ({effectiveOwnershipPct.toFixed(2)}% eff.) · 20% Disc.
           </div>
         </div>
 
         <div className="rounded-2xl p-5 bg-white dark:bg-[#141A32] border border-[#1C6E46]/35 dark:border-[#6FCB9F]/35">
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#1C6E46] dark:text-[#6FCB9F]">
-            Modeled SAFE Exit ROI ({exitMultiple}× EV)
+            Investor SAFE Equity ROI ({exitMultiple}× EV)
           </div>
           <div className="font-mono text-2xl sm:text-3xl font-extrabold text-[#1C6E46] dark:text-[#6FCB9F] mt-1 tabular-nums">
             {safeEquityRoiMultiple.toFixed(2)}×
           </div>
           <div className="text-xs text-[#4A5568] dark:text-[#8E96B0] font-mono mt-1 tabular-nums">
-            Implied Y5 EV ${impliedExitEvM.toFixed(2)}M · ~11.1% cap share
+            ${safeExitProceedsM.toFixed(2)}M proceeds · EV ${impliedExitEvM.toFixed(2)}M
           </div>
         </div>
 
         <div className="rounded-2xl p-5 bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A]">
           <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
-            5-Yr Capital Efficiency (Cum. Net / $500K)
+            Operating Capital Efficiency (Co. Net ÷ $500K)
           </div>
           <div className="font-mono text-2xl sm:text-3xl font-extrabold text-[#16213A] dark:text-[#E7EBF5] mt-1 tabular-nums">
             {y5.capitalEfficiencyMultiple.toFixed(2)}×
           </div>
           <div className="text-xs text-[#4A5568] dark:text-[#8E96B0] font-mono mt-1 tabular-nums">
-            Y4: {y4.capitalEfficiencyMultiple.toFixed(2)}× · Cum. Net ${(y5.cumNetK / 1000).toFixed(3)}M
+            Company Cum. Net ${(y5.cumNetK / 1000).toFixed(3)}M · Y4: {y4.capitalEfficiencyMultiple.toFixed(2)}×
           </div>
         </div>
 
@@ -352,7 +370,7 @@ export function FinancialsView() {
               </h2>
             </div>
             <span className="text-xs font-mono text-[#5F6576] dark:text-[#8E96B0] tabular-nums">
-              FX: {fxRate} BDT/USD · Tax: {taxRate.toFixed(1)}% · Exit: {exitMultiple}×
+              FX: {fxRate} BDT/USD · Tax: {taxRate.toFixed(1)}% · Exit: {exitMultiple}× · Dil: {dilutionPct}%
             </span>
           </div>
 
@@ -471,8 +489,10 @@ export function FinancialsView() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2.5 text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
-            Capital Eff. = Cumulative Company Net Profit ÷ $500K Capital Raised (operating efficiency). Investor SAFE Equity Return depends on exit EV multiple and ~11.1% pre-dilution ownership.
+          <p className="mt-2.5 text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0] leading-relaxed">
+            Audit Separation: <strong className="text-[#16213A] dark:text-[#E7EBF5]">Capital Eff.</strong> = Cumulative Company Net Profit ÷ $500K Raised (company productivity, not investor cash-out).{' '}
+            <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">SAFE Equity ROI</strong> = (Y5 EBITDA × {exitMultiple}× EV × {effectiveOwnershipPct.toFixed(2)}% ownership) ÷ $500K ={' '}
+            <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">{safeEquityRoiMultiple.toFixed(2)}×</strong>.
           </p>
         </section>
 
@@ -565,11 +585,56 @@ export function FinancialsView() {
                 <span>15.0×</span>
               </div>
               <div className="mt-2 text-[11px] font-mono text-[#4A5568] dark:text-[#8E96B0] tabular-nums">
-                SAFE Equity Exit:{' '}
+                SAFE Exit ROI:{' '}
                 <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">
                   {safeEquityRoiMultiple.toFixed(2)}×
                 </strong>{' '}
-                (EV ${impliedExitEvM.toFixed(2)}M)
+                (${safeExitProceedsM.toFixed(2)}M on ${impliedExitEvM.toFixed(2)}M EV)
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5]">
+                  Post-Seed Round Dilution
+                </span>
+                <span className="font-mono text-base sm:text-lg font-extrabold text-[#16213A] dark:text-[#E7EBF5] tabular-nums">
+                  {dilutionPct}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={25}
+                step={5}
+                value={dilutionPct}
+                onChange={(e) => setDilutionPct(Number(e.target.value))}
+                aria-label="Post-seed equity dilution percentage"
+                className="w-full spenta-slider mt-2.5"
+              />
+              <div className="flex items-center justify-between gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setDilutionPct(0)}
+                  className={`flex-1 py-1 px-2 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
+                    dilutionPct === 0
+                      ? 'bg-[#1F3863] text-white border-[#1F3863] dark:bg-[#8FA6E8] dark:text-[#0B1020] dark:border-[#8FA6E8]'
+                      : 'bg-white dark:bg-[#141A32] border-[#E4DFD6] dark:border-[#232B4A] text-[#5F6576] dark:text-[#8E96B0]'
+                  }`}
+                >
+                  0% Pre-Dil. (11.1%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDilutionPct(20)}
+                  className={`flex-1 py-1 px-2 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
+                    dilutionPct === 20
+                      ? 'bg-[#1C6E46] text-white border-[#1C6E46] dark:bg-[#6FCB9F] dark:text-[#0B1020] dark:border-[#6FCB9F]'
+                      : 'bg-white dark:bg-[#141A32] border-[#E4DFD6] dark:border-[#232B4A] text-[#5F6576] dark:text-[#8E96B0]'
+                  }`}
+                >
+                  20% Series A (8.9%)
+                </button>
               </div>
             </div>
 
@@ -579,11 +644,12 @@ export function FinancialsView() {
                 setFxRate(120);
                 setTaxRate(25);
                 setExitMultiple(10);
+                setDilutionPct(0);
                 setScenario('conservative');
               }}
               className="w-full min-h-[38px] py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] cursor-pointer transition-colors"
             >
-              Reset to Baseline (120 BDT · 25% Tax · 10× EV)
+              Reset Baseline (120 BDT · 25% Tax · 10× EV · 0% Dil.)
             </button>
           </div>
 
@@ -595,6 +661,111 @@ export function FinancialsView() {
           </div>
         </section>
       </div>
+
+      {/* Financial & ROI Audit Reconciliation Ledger */}
+      <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="inline-flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.75} />
+            <h2 className="font-bold text-base sm:text-lg text-[#16213A] dark:text-[#E7EBF5]">
+              Financial Model &amp; ROI Audit Reconciliation
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-[#1C6E46] dark:text-[#6FCB9F]">
+            CAPITAL EFFICIENCY ≠ SAFE INVESTOR RETURN
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Formula 1: Operating Capital Efficiency */}
+          <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
+                01 · Operating Capital Efficiency (Company Metric)
+              </span>
+              <span className="font-mono text-sm font-extrabold text-[#16213A] dark:text-[#E7EBF5] tabular-nums">
+                {y5.capitalEfficiencyMultiple.toFixed(2)}×
+              </span>
+            </div>
+            <div className="font-mono text-xs text-[#16213A] dark:text-[#E7EBF5] bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg px-3 py-2 tabular-nums">
+              Cum. 5-Yr Net Profit (${(y5.cumNetK / 1000).toFixed(3)}M) ÷ $500K Raised ={' '}
+              <strong>{y5.capitalEfficiencyMultiple.toFixed(2)}×</strong>
+            </div>
+            <p className="text-xs text-[#4A5568] dark:text-[#A4ADC6] leading-relaxed">
+              Measures internal business cash productivity per dollar of seed capital. Retained earnings belong to the corporate balance sheet and are not distributed 1:1 to a minority SAFE holder.
+            </p>
+          </div>
+
+          {/* Formula 2: Investor SAFE Equity ROI */}
+          <div className="rounded-xl bg-[#1C6E46]/[0.05] dark:bg-[#6FCB9F]/[0.07] border border-[#1C6E46]/35 dark:border-[#6FCB9F]/35 p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-[#1C6E46] dark:text-[#6FCB9F]">
+                02 · Modeled Investor SAFE Exit ROI (Equity Return)
+              </span>
+              <span className="font-mono text-sm font-extrabold text-[#1C6E46] dark:text-[#6FCB9F] tabular-nums">
+                {safeEquityRoiMultiple.toFixed(2)}×
+              </span>
+            </div>
+            <div className="font-mono text-xs text-[#16213A] dark:text-[#E7EBF5] bg-white dark:bg-[#141A32] border border-[#1C6E46]/30 dark:border-[#6FCB9F]/30 rounded-lg px-3 py-2 tabular-nums">
+              (Y5 EBITDA ${y5.ebitdaK.toLocaleString()}K × {exitMultiple}× EV × {effectiveOwnershipPct.toFixed(2)}%) ÷ $500K ={' '}
+              <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">{safeEquityRoiMultiple.toFixed(2)}×</strong>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[11px] font-mono tabular-nums pt-0.5">
+              <div className="rounded-lg bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] px-2.5 py-1.5">
+                <div className="text-[10px] text-[#5F6576] dark:text-[#8E96B0]">10× EV (0% Dil.)</div>
+                <div className="font-bold text-[#16213A] dark:text-[#E7EBF5]">{safeRoiAt10xPreDil.toFixed(2)}×</div>
+              </div>
+              <div className="rounded-lg bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] px-2.5 py-1.5">
+                <div className="text-[10px] text-[#5F6576] dark:text-[#8E96B0]">10× EV (-20% Ser.A)</div>
+                <div className="font-bold text-[#16213A] dark:text-[#E7EBF5]">{safeRoiAt10xSeriesA.toFixed(2)}×</div>
+              </div>
+              <div className="rounded-lg bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] px-2.5 py-1.5">
+                <div className="text-[10px] text-[#5F6576] dark:text-[#8E96B0]">15× EV (0% Dil.)</div>
+                <div className="font-bold text-[#1C6E46] dark:text-[#6FCB9F]">{safeRoiAt15xPreDil.toFixed(2)}×</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Audited Unit-Economics Normalization Strip */}
+        <div className="mt-4 pt-4 border-t border-[#E4DFD6] dark:border-[#232B4A] grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
+              20-FTE Dhaka Hub Rate Reconciliation
+            </div>
+            <div className="font-mono font-bold text-[#16213A] dark:text-[#E7EBF5] mt-1 tabular-nums">
+              ${dhakaLoadedHourlyUsd.toFixed(2)}/hr Loaded · ${dhakaY1UsdK}K/yr
+            </div>
+            <p className="text-[11px] text-[#4A5568] dark:text-[#8E96B0] mt-1 leading-relaxed">
+              64.8M BDT ÷ {fxRate} FX ÷ 41,600 hrs/yr ($11.50/hr base payroll + $1.48/hr enclave overhead vs. $4.78M/yr US/AU 20-FTE pod).
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
+              Tier 3 On-Prem Server PC BOM
+            </div>
+            <div className="font-mono font-bold text-[#16213A] dark:text-[#E7EBF5] mt-1">
+              $8.5K–$10.5K Audited Range
+            </div>
+            <p className="text-[11px] text-[#4A5568] dark:text-[#8E96B0] mt-1 leading-relaxed">
+              Normalized from $7.5K–$8.5K to include 4× RTX 3090 (96GB), 256GB DDR5, 10TB NVMe, 50TB HDD, enterprise 2000W PSU &amp; thermal chassis.
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
+              One-Time Build vs. Quarterly Retainers
+            </div>
+            <div className="font-mono font-bold text-[#16213A] dark:text-[#E7EBF5] mt-1">
+              Strictly Separated in Composer
+            </div>
+            <p className="text-[11px] text-[#4A5568] dark:text-[#8E96B0] mt-1 leading-relaxed">
+              Recurring quarterly SLAs (Cyber Security $8.6K/qtr &amp; AI-Native GEO $6.9K/qtr) are tracked apart from one-time implementation build CapEx.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* Sortable 13-Product Gross Margin Matrix */}
       <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5">
@@ -1020,14 +1191,14 @@ export function FinancialsView() {
                         </div>
                         <div className="flex justify-between gap-2">
                           <dt className="text-[#5F6576] dark:text-[#8E96B0]">SAFE Capital Ask</dt>
-                          <dd className="font-mono font-bold text-[#1C6E46] dark:text-[#6FCB9F]">
-                            $500K · $4.5M Cap (~11.1%)
+                          <dd className="font-mono font-bold text-[#1C6E46] dark:text-[#6FCB9F] tabular-nums">
+                            $500K · $4.5M Cap ({effectiveOwnershipPct.toFixed(2)}% eff.)
                           </dd>
                         </div>
                         <div className="flex justify-between gap-2">
                           <dt className="text-[#5F6576] dark:text-[#8E96B0]">Exit Multiple (Y5)</dt>
                           <dd className="font-mono font-bold text-[#16213A] dark:text-[#E7EBF5] tabular-nums">
-                            {summaryData.exitEbitdaMultiple}× EBITDA → EV ${summaryData.impliedExitEvM.toFixed(2)}M
+                            {summaryData.exitEbitdaMultiple}× EBITDA → EV ${summaryData.impliedExitEvM.toFixed(2)}M ({dilutionPct}% dil.)
                           </dd>
                         </div>
                       </dl>

@@ -75,7 +75,7 @@ const INFOGRAPHIC_INDEX: { id: string; title: string; subtitle: string; keywords
   {
     id: 'financial-edge',
     title: 'Plate 04: FY2027–FY2031 Financial Trajectory & Dual-Shore Edge',
-    subtitle: '$672K to $5.85M conservative scale (6.38x SAFE) · $11.50/hr Dhaka hub',
+    subtitle: '$672K to $5.85M scale · 6.38× Cap. Eff. / 4.2×–6.2× SAFE ROI · $12.98/hr loaded Dhaka hub',
     keywords: 'infographic plate 04 financial trajectory dual shore dhaka safe roi',
   },
 ];

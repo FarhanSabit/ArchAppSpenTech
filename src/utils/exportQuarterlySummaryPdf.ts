@@ -61,6 +61,8 @@ export interface QuarterlyExecutiveSummaryData {
   fiveYearCapitalEfficiency: number;
   fiveYearCumNetM: number;
   exitEbitdaMultiple: number;
+  dilutionPct?: number;
+  effectiveOwnershipPct?: number;
   safeEquityRoiMultiple: number;
   impliedExitEvM: number;
   milestone: string;
@@ -346,12 +348,18 @@ export function exportQuarterlySummaryToPdf(data: QuarterlyExecutiveSummaryData)
   doc.setTextColor(...COLORS.teal);
   doc.text('03 / MODEL ASSUMPTIONS & CAPITAL', padX + 4, y + 6.8);
 
+  const effOwnPct = data.effectiveOwnershipPct ?? 11.11;
+  const dilLabel =
+    data.dilutionPct && data.dilutionPct > 0
+      ? `${effOwnPct.toFixed(1)}% (-${data.dilutionPct}% dil.)`
+      : `~${effOwnPct.toFixed(1)}% pre-dil.`;
+
   const leftRows: [string, string][] = [
     ['Active Scenario', data.scenarioLabel],
     ['BDT / USD FX Rate', `${data.fxRate} BDT (120 base)`],
     ['Effective Corp. Tax', `${data.taxRate.toFixed(1)}% (25.0% base)`],
     ['20-FTE Dhaka Burn', `$${data.dhakaY1UsdK}K/yr ($12.98/hr loaded)`],
-    ['SAFE Terms (~11.1%)', '$500K | $4.5M Cap | 20% Disc.'],
+    [`SAFE (${dilLabel})`, '$500K | $4.5M Cap | 20% Disc.'],
     ['5Y Cap. Eff. / Exit ROI', `${data.fiveYearCapitalEfficiency.toFixed(2)}x CapEff | ${data.safeEquityRoiMultiple.toFixed(2)}x SAFE`],
   ];
 

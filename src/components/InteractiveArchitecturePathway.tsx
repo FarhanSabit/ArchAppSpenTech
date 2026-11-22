@@ -493,7 +493,7 @@ function buildPathwayTree(profile: DeploymentProfileSpec): PathwayTrunkNode[] {
       index: '04',
       title: 'On-Prem Server Matrix & Dual-Shore Delivery',
       subtitle: `${profile.costPosture} · 20-FTE Dhaka R&D Hub`,
-      metric: '4 Tiers · $11.50/hr Pod',
+      metric: '4 Tiers · $12.98/hr Loaded Pod',
       summary:
         'Predictable CapEx server appliances eliminating variable cloud GPU burn, paired with dual-shore San Jose · Australia · Dhaka engineering pods.',
       accentTone: 'navy',

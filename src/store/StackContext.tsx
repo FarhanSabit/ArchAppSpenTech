@@ -136,7 +136,7 @@ function buildInitialAuditLog(): CoreAuditEntry[] {
       action: 'Initialized Server PC Baseline',
       field: 'Target Server Tier',
       previousValue: 'Unassigned',
-      newValue: 'TIER 3 — Spenta Budget Baseline ($7.5K–$8.5K)',
+      newValue: 'TIER 3 — Spenta Budget Baseline ($8.5K–$10.5K)',
     },
   ];
 }

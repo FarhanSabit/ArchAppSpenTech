@@ -39,10 +39,12 @@ interface HubOrbitMeta {
   hubGroup: THREE.Group;
   orbitRingLine: THREE.LineLoop;
   orbitRingMat: THREE.LineBasicMaterial;
+  trailMesh: THREE.Line;
+  trailMat: THREE.ShaderMaterial;
   coreMat: THREE.MeshStandardMaterial;
   shellMat: THREE.MeshPhysicalMaterial;
   gimbalMesh: THREE.Mesh;
-  gimbalMat: THREE.MeshStandardMaterial;
+  gimbalMat: THREE.MeshPhysicalMaterial;
   spireMat: THREE.MeshStandardMaterial;
   filamentLine: THREE.Line;
   filamentGeo: THREE.BufferGeometry;
@@ -96,21 +98,30 @@ const BG_COLORS: Record<ObservatoryFinish, THREE.Color> = {
 
 const CORE_HEX_BY_FINISH: Record<
   ObservatoryFinish,
-  { coreInner: string; coreOuter: string; armPrimary: string; armSecondary: string; armAccent: string }
+  {
+    coreInner: string;
+    coreOuter: string;
+    armPrimary: string;
+    armSecondary: string;
+    armAccent: string;
+    hiiKnot: string;
+  }
 > = {
   cosmos: {
-    coreInner: '#FFF7E0',
+    coreInner: '#FFF8E7',
     coreOuter: '#F59E0B',
-    armPrimary: '#60A5FA',
+    armPrimary: '#7DD3FC',
     armSecondary: '#818CF8',
     armAccent: '#34D399',
+    hiiKnot: '#F472B6',
   },
   nocturnal: {
-    coreInner: '#E8F4FF',
+    coreInner: '#EAF6FF',
     coreOuter: '#6FCB9F',
-    armPrimary: '#8FA6E8',
+    armPrimary: '#93C5FD',
     armSecondary: '#38BDF8',
     armAccent: '#6FCB9F',
+    hiiKnot: '#C084FC',
   },
   stone: {
     coreInner: '#B45309',
@@ -118,6 +129,7 @@ const CORE_HEX_BY_FINISH: Record<
     armPrimary: '#1F3863',
     armSecondary: '#0F766E',
     armAccent: '#1C6E46',
+    hiiKnot: '#9F1239',
   },
 };
 
@@ -221,7 +233,7 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
 
   varying vec3 vColor;
   varying float vTwinkle;
-  varying float vRadiusNorm;
+  varying float vScale;
 
   void main() {
     float r = aRadius * (0.72 + uSpread * 0.45);
@@ -242,13 +254,13 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    float twinkle = 0.76 + 0.24 * sin(uTime * aTwinkle + aPhase);
+    float twinkle = 0.78 + 0.22 * sin(uTime * aTwinkle + aPhase);
     vTwinkle = twinkle;
     vColor = aColor;
-    vRadiusNorm = clamp(r / 15.0, 0.0, 1.0);
+    vScale = aScale;
 
-    float size = aScale * uPixelRatio * (115.0 / max(-mvPosition.z, 1.2));
-    gl_PointSize = clamp(size * twinkle, 1.2, 26.0);
+    float size = aScale * uPixelRatio * (118.0 / max(-mvPosition.z, 1.2));
+    gl_PointSize = clamp(size * twinkle, 1.25, 28.0);
   }
 `;
 
@@ -256,7 +268,7 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
   uniform float uIsLight;
   varying vec3 vColor;
   varying float vTwinkle;
-  varying float vRadiusNorm;
+  varying float vScale;
 
   void main() {
     vec2 uv = gl_PointCoord - 0.5;
@@ -264,12 +276,18 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
     if (dist > 0.5) discard;
 
     // Airy disk bright core + soft optical corona
-    float core = exp(-dist * dist * 34.0);
-    float halo = exp(-dist * dist * 9.5) * 0.65;
-    float alpha = clamp((core + halo) * vTwinkle, 0.0, 1.0);
+    float core = exp(-dist * dist * 38.0);
+    float halo = exp(-dist * dist * 9.8) * 0.62;
 
-    vec3 col = mix(vColor, vec3(1.0), core * (1.0 - uIsLight * 0.72));
-    float finalAlpha = uIsLight > 0.5 ? alpha * 0.72 : alpha * 0.92;
+    // Subtle 4-point optical diffraction cross spikes on brightest supergiant stars
+    float spikeMask = smoothstep(2.15, 3.1, vScale) * (1.0 - uIsLight * 0.65);
+    float spikeH = exp(-abs(uv.y) * 32.0) * exp(-abs(uv.x) * 6.5);
+    float spikeV = exp(-abs(uv.x) * 32.0) * exp(-abs(uv.y) * 6.5);
+    float spikes = (spikeH + spikeV) * 0.48 * spikeMask;
+
+    float alpha = clamp((core + halo + spikes) * vTwinkle, 0.0, 1.0);
+    vec3 col = mix(vColor, vec3(1.0), clamp(core + spikes * 0.5, 0.0, 1.0) * (1.0 - uIsLight * 0.72));
+    float finalAlpha = uIsLight > 0.5 ? alpha * 0.74 : alpha * 0.94;
     gl_FragColor = vec4(col, finalAlpha);
   }
 `;
@@ -448,6 +466,67 @@ const ACCRETION_FRAGMENT_SHADER = /* glsl */ `
   }
 `;
 
+const PHOTON_HALO_VERTEX_SHADER = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const PHOTON_HALO_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColorInner;
+  uniform vec3 uColorOuter;
+  uniform float uIntensity;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 p = vUv - 0.5;
+    float r = length(p);
+    if (r > 0.5) discard;
+
+    // Crisp relativistic photon ring + broad atmospheric corona
+    float ring = exp(-pow((r - 0.24) * 28.0, 2.0)) * 0.85;
+    float glow = exp(-r * r * 14.5) * 0.72;
+    float rays = 0.9 + 0.1 * sin(atan(p.y, p.x) * 8.0 + uTime * 0.9);
+    float energy = (ring + glow) * rays * smoothstep(0.5, 0.22, r);
+
+    vec3 col = mix(uColorOuter, uColorInner, clamp(ring + exp(-r * r * 32.0), 0.0, 1.0));
+    float alpha = energy * uIntensity;
+    if (alpha < 0.008) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+const ORBIT_TRAIL_VERTEX_SHADER = /* glsl */ `
+  uniform float uHeadAngle;
+  uniform float uRadius;
+  uniform float uArcSpan;
+
+  attribute float aTrailT;
+  varying float vTrailT;
+
+  void main() {
+    vTrailT = aTrailT;
+    float theta = uHeadAngle - (1.0 - aTrailT) * uArcSpan;
+    vec3 pos = vec3(cos(theta) * uRadius, 0.0, sin(theta) * uRadius);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  }
+`;
+
+const ORBIT_TRAIL_FRAGMENT_SHADER = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  varying float vTrailT;
+
+  void main() {
+    float alpha = pow(vTrailT, 2.1) * uOpacity;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(uColor, alpha);
+  }
+`;
+
 export default function SovereignBrain3DCanvas({
   compact = false,
   polarity = 'dark',
@@ -533,6 +612,27 @@ export default function SovereignBrain3DCanvas({
     }
   }, [compact]);
 
+  // Cinema Mode keyboard shortcut: press H to toggle Observatory Controls dock
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'h' || e.key === 'H')) {
+        setDockOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const activeHubId = hoveredHubId ?? selectedHubId;
   const activeHubMeta = useMemo(
     () => (activeHubId ? BRAIN_HUBS.find((h) => h.id === activeHubId) ?? null : null),
@@ -555,7 +655,7 @@ export default function SovereignBrain3DCanvas({
     const width = Math.max(container.clientWidth, 300);
     const height = Math.max(container.clientHeight, 340);
 
-    // Software WebGL renderer detection (by renderer string only)
+    // Software WebGL renderer detection (by renderer string only, releasing probe context immediately)
     let isSoftwareGl = false;
     try {
       const probeCanvas = document.createElement('canvas');
@@ -571,6 +671,7 @@ export default function SovereignBrain3DCanvas({
             isSoftwareGl = true;
           }
         }
+        probeGl.getExtension('WEBGL_lose_context')?.loseContext();
       }
     } catch {
       isSoftwareGl = false;
@@ -595,8 +696,11 @@ export default function SovereignBrain3DCanvas({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
+    const maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
     const scene = new THREE.Scene();
     scene.background = BG_COLORS[finishRef.current].clone();
+    scene.fog = new THREE.FogExp2(BG_COLORS[finishRef.current].getHex(), 0.012);
 
     const camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 140);
     camera.position.set(...CAMERA_PRESETS.overview.pos);
@@ -650,9 +754,9 @@ export default function SovereignBrain3DCanvas({
     }
 
     // =========================================================================
-    // 1. 36,000-STAR MULTI-ARM LOGARITHMIC SPIRAL GALAXY (CUSTOM GLSL)
+    // 1. 28,000-STAR MULTI-ARM LOGARITHMIC SPIRAL GALAXY (UNIFIED GPU & SW WEBGL)
     // =========================================================================
-    const starCount = isSoftwareGl ? 10500 : 36000;
+    const starCount = 28000;
     const starPositions = new Float32Array(starCount * 3);
     const starColors = new Float32Array(starCount * 3);
     const starScales = new Float32Array(starCount);
@@ -670,9 +774,11 @@ export default function SovereignBrain3DCanvas({
     const colArm1 = new THREE.Color(paletteInit.armPrimary);
     const colArm2 = new THREE.Color(paletteInit.armSecondary);
     const colAccent = new THREE.Color(paletteInit.armAccent);
+    const colHii = new THREE.Color(paletteInit.hiiKnot);
 
-    // Store structural roles so we can re-tint galaxy when switching Observatory Finish
-    const starRole = new Uint8Array(starCount); // 0=bulge, 1=armPrimary, 2=armSecondary, 3=emeraldCluster, 4=halo
+    // Structural roles for re-tinting on Observatory Finish switches
+    // 0=bulge, 1=armPrimary, 2=armSecondary, 3=emeraldCluster, 4=halo, 5=hiiKnot
+    const starRole = new Uint8Array(starCount);
 
     for (let i = 0; i < starCount; i++) {
       const i3 = i * 3;
@@ -693,9 +799,9 @@ export default function SovereignBrain3DCanvas({
         y = radius * Math.cos(phi) * 0.42;
         z = radius * Math.sin(phi) * Math.sin(theta);
         starRole[i] = 0;
-        starScales[i] = 0.9 + rand() * 2.1;
+        starScales[i] = 0.9 + rand() * 2.2;
       } else if (pick < 0.88) {
-        // 5 Logarithmic spiral arms
+        // 5 Logarithmic spiral arms + warm H-II star-forming knots
         const branchIdx = i % branches;
         const t = Math.pow(rand(), 1.35);
         radius = 1.65 + t * (maxGalaxyRadius - 1.65);
@@ -704,19 +810,24 @@ export default function SovereignBrain3DCanvas({
 
         const scatterScale = (0.28 + Math.pow(t, 1.15) * 1.45) * (rand() < 0.5 ? 1 : -1);
         const radialScatter = Math.pow(rand(), 2.2) * scatterScale;
-        const verticalSpread = Math.pow(rand(), 2.4) * (0.72 * Math.exp(-t * 1.45) + 0.14) * (rand() < 0.5 ? 1 : -1);
+        const verticalSpread =
+          Math.pow(rand(), 2.4) * (0.72 * Math.exp(-t * 1.45) + 0.14) * (rand() < 0.5 ? 1 : -1);
 
         const finalAngle = branchAngle + spinAngle + radialScatter * 0.36;
         x = Math.cos(finalAngle) * radius + radialScatter * 0.35;
         y = verticalSpread;
         z = Math.sin(finalAngle) * radius + (rand() - 0.5) * 0.45 * t;
 
-        if (rand() < 0.18) {
+        const subPick = rand();
+        if (subPick < 0.08) {
+          starRole[i] = 5; // Warm H-II star-forming emission knot
+          starScales[i] = 1.6 + rand() * 2.2;
+        } else if (subPick < 0.24) {
           starRole[i] = 3; // Sovereign Emerald star cluster
-          starScales[i] = 1.4 + rand() * 2.4;
+          starScales[i] = 1.35 + rand() * 2.35;
         } else {
           starRole[i] = branchIdx % 2 === 0 ? 1 : 2;
-          starScales[i] = 0.7 + Math.pow(rand(), 2.0) * 2.8;
+          starScales[i] = 0.72 + Math.pow(rand(), 2.0) * 2.85;
         }
       } else {
         // Deep-space cosmic background starfield dome
@@ -727,7 +838,7 @@ export default function SovereignBrain3DCanvas({
         y = radius * Math.cos(phi) * 0.72;
         z = radius * Math.sin(phi) * Math.sin(theta);
         starRole[i] = 4;
-        starScales[i] = 0.75 + rand() * 1.6;
+        starScales[i] = 0.75 + rand() * 1.65;
       }
 
       starPositions[i3] = x;
@@ -745,6 +856,7 @@ export default function SovereignBrain3DCanvas({
       colArm1.set(p.armPrimary);
       colArm2.set(p.armSecondary);
       colAccent.set(p.armAccent);
+      colHii.set(p.hiiKnot);
 
       for (let i = 0; i < starCount; i++) {
         const i3 = i * 3;
@@ -759,6 +871,8 @@ export default function SovereignBrain3DCanvas({
           _tmpColor.copy(colArm1).lerp(colArm2, Math.min(0.2 + rNorm * 0.95, 1));
         } else if (role === 3) {
           _tmpColor.copy(colAccent).lerp(colHot, 0.22);
+        } else if (role === 5) {
+          _tmpColor.copy(colHii).lerp(colHot, 0.25);
         } else {
           _tmpColor.copy(colArm2).lerp(colHot, targetFinish === 'stone' ? 0.1 : 0.45);
         }
@@ -803,9 +917,9 @@ export default function SovereignBrain3DCanvas({
     scene.add(galaxyPoints);
 
     // =========================================================================
-    // 2. VOLUMETRIC NEBULA & GALACTIC DUST CLOUDS
+    // 2. VOLUMETRIC NEBULA & GALACTIC DUST CLOUDS (UNIFIED COUNT)
     // =========================================================================
-    const nebulaCount = isSoftwareGl ? 380 : 1400;
+    const nebulaCount = 1100;
     const nebPos = new Float32Array(nebulaCount * 3);
     const nebCol = new Float32Array(nebulaCount * 3);
     const nebScales = new Float32Array(nebulaCount);
@@ -888,7 +1002,7 @@ export default function SovereignBrain3DCanvas({
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
-    const solarGeo = new THREE.IcosahedronGeometry(0.96, isSoftwareGl ? 3 : 5);
+    const solarGeo = new THREE.IcosahedronGeometry(0.96, 4);
     const solarUniforms = {
       uTime: { value: 0 },
       uColorHot: { value: new THREE.Color('#FFFBEB') },
@@ -921,6 +1035,27 @@ export default function SovereignBrain3DCanvas({
     const coronaMesh = new THREE.Mesh(coronaGeo, coronaMat);
     coreGroup.add(coronaMesh);
 
+    // Camera-facing Relativistic Photon Ring / Gravitational Halo
+    const photonHaloGeo = new THREE.PlaneGeometry(4.6, 4.6);
+    const photonHaloUniforms = {
+      uTime: { value: 0 },
+      uColorInner: { value: new THREE.Color('#FFF7D6') },
+      uColorOuter: { value: new THREE.Color('#34D399') },
+      uIntensity: { value: finishRef.current === 'stone' ? 0.24 : 0.72 },
+    };
+    const photonHaloMat = new THREE.ShaderMaterial({
+      vertexShader: PHOTON_HALO_VERTEX_SHADER,
+      fragmentShader: PHOTON_HALO_FRAGMENT_SHADER,
+      uniforms: photonHaloUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending:
+        finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
+    });
+    const photonHaloMesh = new THREE.Mesh(photonHaloGeo, photonHaloMat);
+    photonHaloMesh.renderOrder = 3;
+    coreGroup.add(photonHaloMesh);
+
     // Swirling Accretion Disk
     const accretionGeo = new THREE.RingGeometry(1.15, 2.52, 96, 6);
     const accretionUniforms = {
@@ -936,7 +1071,8 @@ export default function SovereignBrain3DCanvas({
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
+      blending:
+        finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
     const accretionDisk = new THREE.Mesh(accretionGeo, accretionMat);
     accretionDisk.rotation.x = -Math.PI / 2;
@@ -988,6 +1124,17 @@ export default function SovereignBrain3DCanvas({
     const proxyGeo = new THREE.SphereGeometry(0.76, 12, 10);
     const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
 
+    // Shared GPU Orbital Comet Trail Geometry (48 segments along trailing arc)
+    const trailSegs = 48;
+    const trailDummyPos = new Float32Array(trailSegs * 3);
+    const trailTAttr = new Float32Array(trailSegs);
+    for (let i = 0; i < trailSegs; i++) {
+      trailTAttr[i] = i / (trailSegs - 1);
+    }
+    const trailGeo = new THREE.BufferGeometry();
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(trailDummyPos, 3));
+    trailGeo.setAttribute('aTrailT', new THREE.BufferAttribute(trailTAttr, 1));
+
     BRAIN_HUBS.forEach((hub, index) => {
       const isLeft = hub.side === 'left';
       const localIdx = index % 4;
@@ -1022,6 +1169,26 @@ export default function SovereignBrain3DCanvas({
       const orbitRingLine = new THREE.LineLoop(orbitRingGeo, orbitRingMat);
       orbitGroup.add(orbitRingLine);
 
+      // GPU-Animated Fading Orbital Comet Wake Arc
+      const trailMat = new THREE.ShaderMaterial({
+        vertexShader: ORBIT_TRAIL_VERTEX_SHADER,
+        fragmentShader: ORBIT_TRAIL_FRAGMENT_SHADER,
+        uniforms: {
+          uHeadAngle: { value: initialAngle },
+          uRadius: { value: baseRadius },
+          uArcSpan: { value: 1.18 },
+          uColor: { value: new THREE.Color(hub.accent) },
+          uOpacity: { value: 0.72 },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending:
+          finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
+      });
+      const trailMesh = new THREE.Line(trailGeo, trailMat);
+      trailMesh.frustumCulled = false;
+      orbitGroup.add(trailMesh);
+
       // Composite Hub Planetary/Station Group
       const hubGroup = new THREE.Group();
       hubGroup.position.set(
@@ -1032,6 +1199,7 @@ export default function SovereignBrain3DCanvas({
       orbitGroup.add(hubGroup);
 
       const bandTex = createPlanetaryBandTexture(hub.accent);
+      bandTex.anisotropy = maxAnisotropy;
       disposableTextures.push(bandTex);
 
       const coreMat = new THREE.MeshStandardMaterial({
@@ -1047,22 +1215,27 @@ export default function SovereignBrain3DCanvas({
 
       const shellMat = new THREE.MeshPhysicalMaterial({
         color: hub.accent,
-        roughness: 0.14,
-        metalness: 0.08,
-        transmission: 0.55,
+        roughness: 0.12,
+        metalness: 0.06,
+        transmission: isSoftwareGl ? 0 : 0.68,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.08,
         transparent: true,
         opacity: 0.42,
-        ior: 1.38,
+        ior: 1.48,
+        depthWrite: false,
       });
       const shellMesh = new THREE.Mesh(hubShellGeo, shellMat);
+      shellMesh.renderOrder = 2;
       hubGroup.add(shellMesh);
 
-      const gimbalMat = new THREE.MeshStandardMaterial({
+      const gimbalMat = new THREE.MeshPhysicalMaterial({
         color: '#E2E8F0',
         emissive: hub.accent,
         emissiveIntensity: 0.28,
-        metalness: 0.85,
+        metalness: 0.9,
         roughness: 0.22,
+        anisotropy: 0.75,
       });
       const gimbalMesh = new THREE.Mesh(hubGimbalGeo, gimbalMat);
       gimbalMesh.rotation.set(Math.PI * 0.42, 0.25, 0);
@@ -1151,6 +1324,8 @@ export default function SovereignBrain3DCanvas({
         hubGroup,
         orbitRingLine,
         orbitRingMat,
+        trailMesh,
+        trailMat,
         coreMat,
         shellMat,
         gimbalMesh,
@@ -1179,7 +1354,13 @@ export default function SovereignBrain3DCanvas({
     const packetGeo = new THREE.SphereGeometry(0.068, 10, 8);
     const packetMat = new THREE.MeshBasicMaterial({ color: '#A7F3D0' });
     const packetInst = new THREE.InstancedMesh(packetGeo, packetMat, totalPackets);
+    packetInst.frustumCulled = false;
     scene.add(packetInst);
+
+    // Pre-compile shaders on hardware GPU (skipped on Software WebGL to avoid stall)
+    if (!isSoftwareGl) {
+      renderer.compile(scene, camera);
+    }
 
     // =========================================================================
     // 5. INTERACTION, RAYCASTING & CAMERA FLY-TO CONTROLLER
@@ -1296,12 +1477,14 @@ export default function SovereignBrain3DCanvas({
     // =========================================================================
     let disposed = false;
     let rafId = 0;
+    let syncTimerId = 0;
+    let activeSync: WebGLSync | null = null;
     let elapsed = 0;
     let lastTime = performance.now();
     let lastAppliedFinish: ObservatoryFinish = finishRef.current;
     let lastHudSyncMs = 0;
 
-    // WebGL2 fenceSync pacing helper for Software WebGL
+    // WebGL2 fenceSync pacing helper for Software WebGL (yields via setTimeout)
     const glCtx = renderer.getContext();
     const isWebGL2 =
       typeof WebGL2RenderingContext !== 'undefined' &&
@@ -1315,24 +1498,26 @@ export default function SovereignBrain3DCanvas({
       const gl2 = glCtx as WebGL2RenderingContext;
       const sync = gl2.fenceSync(gl2.SYNC_GPU_COMMANDS_COMPLETE, 0);
       if (!sync) {
-        rafId = requestAnimationFrame(cb);
+        syncTimerId = window.setTimeout(cb, 80);
         return;
       }
+      activeSync = sync;
       gl2.flush();
       const poll = () => {
         if (disposed) {
           gl2.deleteSync(sync);
+          activeSync = null;
           return;
         }
-        const status = gl2.clientWaitSync(sync, 0, 0);
-        if (status === gl2.TIMEOUT_EXPIRED) {
-          rafId = requestAnimationFrame(poll);
+        if (gl2.getSyncParameter(sync, gl2.SYNC_STATUS) === gl2.UNSIGNALED) {
+          syncTimerId = window.setTimeout(poll, 5);
         } else {
           gl2.deleteSync(sync);
-          rafId = requestAnimationFrame(cb);
+          activeSync = null;
+          syncTimerId = window.setTimeout(cb, 80);
         }
       };
-      rafId = requestAnimationFrame(poll);
+      syncTimerId = window.setTimeout(poll, 5);
     };
 
     const tick = () => {
@@ -1360,6 +1545,12 @@ export default function SovereignBrain3DCanvas({
         nebulaMat.needsUpdate = true;
         accretionMat.blending = nextBlend;
         accretionMat.needsUpdate = true;
+        photonHaloMat.blending = nextBlend;
+        photonHaloMat.needsUpdate = true;
+        for (let h = 0; h < hubMetas.length; h++) {
+          hubMetas[h].trailMat.blending = nextBlend;
+          hubMetas[h].trailMat.needsUpdate = true;
+        }
 
         if (bloomPass) {
           bloomPass.strength = isStone ? 0.14 : 0.62;
@@ -1367,8 +1558,11 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
-      // Smoothly lerp scene background & lighting
+      // Smoothly lerp scene background, exponential fog & lighting
       (scene.background as THREE.Color).lerp(BG_COLORS[curFinish], Math.min(1, rawDt * 6));
+      if (scene.fog instanceof THREE.FogExp2) {
+        scene.fog.color.copy(scene.background as THREE.Color);
+      }
       hemiLight.intensity = isStone ? 1.35 : 0.9;
       solarPointLight.intensity = isStone ? 2.6 : 4.2;
 
@@ -1388,7 +1582,7 @@ export default function SovereignBrain3DCanvas({
       nebulaUniforms.uSpread.value = galaxyUniforms.uSpread.value;
       nebulaUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
-      // Update Solar Core, Corona & Accretion Disk
+      // Update Solar Core, Corona, Relativistic Photon Halo & Accretion Disk
       const opaPass = hitlRef.current >= 0.88;
       solarUniforms.uTime.value = elapsed;
       solarUniforms.uPulse.value = 0.5 + 0.5 * Math.sin(elapsed * 2.2);
@@ -1406,6 +1600,14 @@ export default function SovereignBrain3DCanvas({
 
       coronaUniforms.uColor.value.set(opaPass ? '#6FCB9F' : '#F59E0B');
       coronaUniforms.uIntensity.value = isStone ? 0.25 : 0.68;
+
+      photonHaloUniforms.uTime.value = elapsed;
+      photonHaloUniforms.uColorInner.value.set(
+        isStone ? '#B45309' : curFinish === 'nocturnal' ? '#E0F2FE' : '#FFF7D6',
+      );
+      photonHaloUniforms.uColorOuter.value.set(opaPass ? '#34D399' : '#F59E0B');
+      photonHaloUniforms.uIntensity.value = isStone ? 0.24 : 0.72;
+      photonHaloMesh.quaternion.copy(camera.quaternion);
 
       accretionUniforms.uTime.value = elapsed;
       accretionUniforms.uInnerCol.value.set(isStone ? '#B45309' : '#FDE68A');
@@ -1457,10 +1659,21 @@ export default function SovereignBrain3DCanvas({
         const isSelected = curSelectedHub === meta.hubId;
         const isHovered = curHovered === meta.hubId;
 
-        // Advance Keplerian orbital position
+        // Advance Keplerian orbital position & GPU trailing wake
         meta.currentAngle += rawDt * meta.orbitSpeed * effectiveSpeed;
         const curOrbitR = meta.baseRadius * spreadScale;
         meta.orbitRingLine.scale.setScalar(spreadScale);
+        meta.trailMat.uniforms.uHeadAngle.value = meta.currentAngle;
+        meta.trailMat.uniforms.uRadius.value = curOrbitR;
+        meta.trailMat.uniforms.uOpacity.value = isSelected
+          ? 0.92
+          : isHovered
+            ? 0.76
+            : isActiveHub
+              ? 0.56
+              : isStone
+                ? 0.34
+                : 0.24;
         meta.hubGroup.position.set(
           Math.cos(meta.currentAngle) * curOrbitR,
           Math.sin(elapsed * 1.1 + h) * 0.08,
@@ -1659,6 +1872,11 @@ export default function SovereignBrain3DCanvas({
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
+      window.clearTimeout(syncTimerId);
+      if (activeSync && isWebGL2) {
+        (glCtx as WebGL2RenderingContext).deleteSync(activeSync);
+        activeSync = null;
+      }
       resizeObserver.disconnect();
       controls.removeEventListener('start', handleControlStart);
       controls.dispose();
@@ -1679,6 +1897,8 @@ export default function SovereignBrain3DCanvas({
       solarMat.dispose();
       coronaGeo.dispose();
       coronaMat.dispose();
+      photonHaloGeo.dispose();
+      photonHaloMat.dispose();
       accretionGeo.dispose();
       accretionMat.dispose();
       opaRingGeo.dispose();
@@ -1692,12 +1912,14 @@ export default function SovereignBrain3DCanvas({
       satGeo.dispose();
       proxyGeo.dispose();
       proxyMat.dispose();
+      trailGeo.dispose();
       packetGeo.dispose();
       packetMat.dispose();
 
       hubMetas.forEach((m) => {
         m.orbitRingLine.geometry.dispose();
         m.orbitRingMat.dispose();
+        m.trailMat.dispose();
         m.coreMat.dispose();
         m.shellMat.dispose();
         m.gimbalMat.dispose();
@@ -1775,7 +1997,7 @@ export default function SovereignBrain3DCanvas({
               isLightMode ? 'text-[#4A5163]' : 'text-[#8E9DC2]'
             }`}
           >
-            Drag to orbit · Scroll to zoom · Click any orbiting hub to inspect
+            Drag to orbit · Scroll to zoom · Click hub to inspect · Press H for controls
           </div>
         )}
       </div>

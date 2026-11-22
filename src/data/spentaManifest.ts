@@ -952,7 +952,7 @@ export const BLUEPRINT_PILLARS: BlueprintPillar[] = [
     engine: 'operations',
     summary:
       '4-Tier local Server PC blueprints ($3.2K–$15.3K) hardened with AMD SEV-SNP / Intel TDX enclaves and continuous VAPT compliance SLAs.',
-    metrics: ['Tier 3 $7.5K–$8.5K Base', 'AMD SEV-SNP / TDX', '24/7 Managed SLA'],
+    metrics: ['Tier 3 $8.5K–$10.5K Base', 'AMD SEV-SNP / TDX', '24/7 Managed SLA'],
     apps: ['cyber_sla'],
     tags: ['HIPAA', 'SOC 2', 'ISO 27001', 'BB ICT v4.0', 'Mac Studio M3 Ultra'],
   },
@@ -1130,7 +1130,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     ],
     callout: {
       label: 'Core Differentiator',
-      text: 'Zero cloud PII exfiltration + mathematical 0.88 HITL governance + $7.5K–$8.5K on-prem Server PC baseline.',
+      text: 'Zero cloud PII exfiltration + mathematical 0.88 HITL governance + $8.5K–$10.5K on-prem Server PC baseline.',
     },
     speakerNotes:
       'Emphasize the dual moat: technical sovereignty (local LLaMA 3.2 Vision + OPA governance) plus structural cost arbitrage via our Dhaka engineering hub.',
@@ -1351,7 +1351,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     theme: 'dark',
     kpis: [
       { label: 'Tier 4 Edge', value: '$3.2K–$4.2K', accent: 'teal' },
-      { label: 'Tier 3 Baseline', value: '$7.5K–$8.5K', accent: 'emerald' },
+      { label: 'Tier 3 Baseline', value: '$8.5K–$10.5K', accent: 'emerald' },
       { label: 'Tier 2 MoE Rack', value: '$11.5K–$14.5K', accent: 'amber' },
       { label: 'Tier 1 M3 Ultra', value: '$14.1K–$15.3K', accent: 'emerald' },
     ],
@@ -1362,7 +1362,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
       'Tier 4 (33B–70B Edge): 2× used RTX 3090 (48GB VRAM) + 128GB DDR5 at 25–45 tok/s.',
     ],
     speakerNotes:
-      'Clients avoid unpredictable per-token cloud bills that explode at scale. One $8K Tier 3 server pays for itself in 90 days vs cloud GPU APIs.',
+      'Clients avoid unpredictable per-token cloud bills that explode at scale. One $9.5K Tier 3 server pays for itself in 90–120 days vs cloud GPU APIs.',
   },
   {
     num: 15,

@@ -60,12 +60,12 @@ const BENCHMARK_QUICK_ACTIONS: { label: string; prompt: string }[] = [
   {
     label: 'AI Inference TCO',
     prompt:
-      'Compare latest 2026 enterprise on-premises GPU server AI inference TCO & latency benchmarks against cloud LLM API pricing, and position Spenta Tier-3 ($7.5K–$8.5K) hardware.',
+      'Compare latest 2026 enterprise on-premises GPU server AI inference TCO & latency benchmarks against cloud LLM API pricing, and position Spenta Tier-3 ($8.5K–$10.5K) hardware.',
   },
   {
     label: 'ERP ROI Benchmarks',
     prompt:
-      'What are the latest 2026 enterprise ERP implementation cost, timeline, and ROI industry benchmarks compared to Spenta Sovereign ERP & Dhaka dual-shore delivery ($11.50/hr)?',
+      'What are the latest 2026 enterprise ERP implementation cost, timeline, and ROI industry benchmarks compared to Spenta Sovereign ERP & Dhaka dual-shore delivery ($12.98/hr loaded; $11.50/hr base)?',
   },
   {
     label: 'Fintech ICR & Compliance',
@@ -82,8 +82,8 @@ const STARTER_PROMPTS: Record<Persona, string[]> = {
   ],
   investor: [
     'Compare Spenta 29.1%–76.3% conservative gross margins against current 2026 Enterprise ERP & AI SaaS industry benchmarks.',
-    'Break down the 6.38x 5-year net return on the $500K SAFE at 25% tax.',
-    'How does Spenta Dhaka R&D ($11.50/hr) compare to current global offshore engineering cost benchmarks?',
+    'Separate Spenta 6.38x 5-year Capital Efficiency from modeled 4.2x–6.2x SAFE Exit ROI at 10x–15x Y5 EBITDA.',
+    'How does Spenta Dhaka R&D ($12.98/hr fully loaded; $11.50/hr base) compare to current global offshore engineering cost benchmarks?',
   ],
   market: [
     'What are the latest 2026 AI, ERP, and Fintech enterprise adoption & ROI benchmarks?',

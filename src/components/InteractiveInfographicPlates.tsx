@@ -1593,7 +1593,7 @@ function Plate04FinancialEdge({
             fontWeight="800"
             fontFamily="JetBrains Mono, monospace"
           >
-            6.38× 5-YR NET RETURN · 76.3% XR GM
+            6.38× CAP. EFF. · 4.2×–6.2× SAFE ROI · 76.3% XR GM
           </text>
 
           {/* Left Chart Card */}
@@ -1850,8 +1850,8 @@ function Plate04FinancialEdge({
                   code: 'SEED SAFE',
                   title: '$500K SAFE · $4.5M Valuation Cap',
                   summary:
-                    'Reconciled 5-year conservative projection delivers $3.189M cumulative net profit (6.38× return) backed by captive distribution.',
-                  metric: '20% Discount · 6.38× Net',
+                    'Reconciled 5-year conservative projection delivers $3.189M cumulative net profit (6.38× operating capital efficiency) and 4.2×–6.2× modeled SAFE equity ROI at 10×–15× Y5 EBITDA.',
+                  metric: '6.38× Cap. Eff. · 4.2×–6.2× SAFE',
                   status: 'CONSERVATIVE BASE',
                   hint: 'See Capital Engine tab',
                   accent: 'emerald',
@@ -1881,7 +1881,7 @@ function Plate04FinancialEdge({
               fontSize="8.3"
               fontFamily="JetBrains Mono, monospace"
             >
-              Cum. 5-Yr Net Profit: $3.189M (Conservative)
+              6.38× Cap. Eff. ($3.189M Net) · 4.2×–6.2× SAFE ROI
             </text>
           </g>
 
