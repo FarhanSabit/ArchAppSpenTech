@@ -18,6 +18,7 @@ import {
   SPENTA_CONTACT_EMAIL,
 } from '../data/spentaManifest';
 import { SavedProposal, useStack } from '../store/StackContext';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 import { DesignComparisonTable } from './DesignComparisonTable';
 import { PromptThemeStudio } from './PromptThemeStudio';
 
@@ -136,12 +137,10 @@ export function ResourcesView() {
   };
 
   const copyBrief = async (key: string, text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyTextWithFallback(text);
+    if (ok) {
       setCopiedId(key);
       window.setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      setCopiedId(null);
     }
   };
 
@@ -150,34 +149,34 @@ export function ResourcesView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.14em]">
+          <div className="text-[11px] font-mono text-[#1C6E46] dark:text-[#6FCB9F] uppercase tracking-[0.14em]">
             ENTERPRISE PROOFS · REGULATORY COMPLIANCE · AGENT PROMPT PACK
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-1">
             Resources — Case Studies, Proposals &amp; Prompt Studio
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-3xl">
+          <p className="text-xs sm:text-sm text-[#4A5568] dark:text-[#A4ADC6] mt-1 max-w-3xl">
             Inspect verified deployments and compliance controls, build a stack-aware proposal routed to{' '}
-            <span className="font-mono text-zinc-950 dark:text-zinc-100">{SPENTA_CONTACT_EMAIL}</span>, or download the P0/P1/P2 coding-agent Markdown prompt pack and 4-theme design studio.
+            <span className="font-mono text-[#16213A] dark:text-[#E7EBF5]">{SPENTA_CONTACT_EMAIL}</span>, or download the P0/P1/P2 coding-agent Markdown prompt pack and 4-theme design studio.
           </p>
         </div>
 
         <div
           role="tablist"
           aria-label="Resources workspace view"
-          className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] shrink-0 self-start lg:self-auto"
+          className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] shrink-0 self-start lg:self-auto"
         >
           <button
             type="button"
             role="tab"
             aria-selected={resourcesMode === 'proofs'}
             onClick={() => setResourcesMode('proofs')}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               resourcesMode === 'proofs'
-                ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
             }`}
           >
             Proofs &amp; Proposals
@@ -187,10 +186,10 @@ export function ResourcesView() {
             role="tab"
             aria-selected={resourcesMode === 'studio'}
             onClick={() => setResourcesMode('studio')}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               resourcesMode === 'studio'
-                ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
             }`}
           >
             Prompt Pack &amp; Theme Studio
@@ -206,8 +205,8 @@ export function ResourcesView() {
           <section className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-500" strokeWidth={1.5} />
-            <h2 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50">
+            <Building2 className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.5} />
+            <h2 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5]">
               Verified Enterprise Case Studies ({filteredCases.length})
             </h2>
           </div>
@@ -218,10 +217,10 @@ export function ResourcesView() {
                 key={sec}
                 type="button"
                 onClick={() => setSectorFilter(sec)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                className={`min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   sectorFilter === sec
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'bg-white dark:bg-[#111315] text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-white/[0.08] hover:border-emerald-500/40'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'bg-white dark:bg-[#141A32] text-[#4A5568] dark:text-[#A4ADC6] border border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863]/45 dark:hover:border-[#8FA6E8]/45'
                 }`}
               >
                 {sec}
@@ -234,46 +233,46 @@ export function ResourcesView() {
           {filteredCases.map((cs) => (
             <article
               key={cs.id}
-              className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 flex flex-col justify-between hover:border-emerald-500/40 transition-colors"
+              className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5 flex flex-col justify-between hover:border-[#1F3863]/45 dark:hover:border-[#8FA6E8]/45 transition-colors"
             >
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
-                  <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase">
+                  <span className="text-[#1C6E46] dark:text-[#6FCB9F] font-bold uppercase">
                     {cs.sector}
                   </span>
-                  <span className="text-zinc-500 dark:text-zinc-400">
+                  <span className="text-[#5F6576] dark:text-[#8E96B0]">
                     {cs.region} · {cs.deployment}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-1.5">
-                  <h3 className="text-base sm:text-lg font-extrabold text-zinc-950 dark:text-zinc-50">
+                  <h3 className="text-base sm:text-lg font-extrabold text-[#16213A] dark:text-[#E7EBF5]">
                     {cs.client}
                   </h3>
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400 shrink-0">
+                  <span className="text-[10px] font-mono uppercase text-[#5F6576] dark:text-[#8E96B0] shrink-0">
                     Verified Production
                   </span>
                 </div>
-                <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
+                <div className="text-xs font-semibold text-[#4A5568] dark:text-[#A4ADC6] mt-0.5">
                   {cs.solution}
                 </div>
 
-                <div className="mt-3 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 font-mono text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                <div className="mt-3 px-3 py-2 rounded-lg bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/12 border border-[#1C6E46]/25 dark:border-[#6FCB9F]/30 font-mono text-xs font-bold text-[#1C6E46] dark:text-[#6FCB9F]">
                   {cs.headlineMetric}
                 </div>
 
-                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed mt-3">
+                <p className="text-xs text-[#4A5568] dark:text-[#A4ADC6] leading-relaxed mt-3">
                   {cs.summary}
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-zinc-200/80 dark:border-white/[0.08] flex items-center justify-between gap-2">
-                <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
+              <div className="mt-4 pt-3 border-t border-[#E4DFD6] dark:border-[#232B4A] flex items-center justify-between gap-2">
+                <span className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0] truncate">
                   {cs.metrics[0]}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleLoadCaseStudyApps(cs.appIds)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#1C6E46] dark:text-[#6FCB9F] hover:underline shrink-0 cursor-pointer"
                 >
                   <Layers className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>Load Pattern ({cs.appIds.length})</span>
@@ -285,10 +284,10 @@ export function ResourcesView() {
       </section>
 
       {/* Compliance Readiness Badges */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5">
+      <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5">
         <div className="inline-flex items-center gap-2 mb-4">
-          <ShieldCheck className="w-4 h-4 text-emerald-500" strokeWidth={1.5} />
-          <h2 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50">
+          <ShieldCheck className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.5} />
+          <h2 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5]">
             Sovereign Compliance &amp; Regulatory Readiness
           </h2>
         </div>
@@ -297,25 +296,25 @@ export function ResourcesView() {
           {COMPLIANCE_FRAMEWORKS.map((fw) => (
             <article
               key={fw.id}
-              className="rounded-xl bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-4 flex flex-col justify-between"
+              className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-4 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xs font-extrabold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded">
+                  <span className="font-mono text-xs font-extrabold bg-[#1C6E46]/12 dark:bg-[#6FCB9F]/15 text-[#1C6E46] dark:text-[#6FCB9F] border border-[#1C6E46]/30 dark:border-[#6FCB9F]/35 px-2.5 py-0.5 rounded">
                     {fw.code}
                   </span>
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
+                  <span className="text-[10px] font-mono uppercase text-[#5F6576] dark:text-[#8E96B0]">
                     SLA Compliant
                   </span>
                 </div>
-                <h3 className="font-bold text-sm text-zinc-950 dark:text-zinc-100 mt-2.5">
+                <h3 className="font-bold text-sm text-[#16213A] dark:text-[#E7EBF5] mt-2.5">
                   {fw.name}
                 </h3>
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-1">{fw.scope}</p>
-                <ul className="mt-3 space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300">
+                <p className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6] mt-1">{fw.scope}</p>
+                <ul className="mt-3 space-y-1.5 text-xs text-[#4A5568] dark:text-[#A4ADC6]">
                   {fw.controls.map((ctrl) => (
                     <li key={ctrl} className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                      <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0 mt-0.5" />
                       <span>{ctrl}</span>
                     </li>
                   ))}
@@ -332,7 +331,7 @@ export function ResourcesView() {
       {/* Stack-Aware Proposal Request Form */}
       <section
         id="spenta-proposal-form"
-        className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 sm:p-6 scroll-mt-20"
+        className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5 sm:p-6 scroll-mt-20"
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Pre-Populated Stack Context */}
@@ -341,28 +340,28 @@ export function ResourcesView() {
               <div className="text-[11px] font-mono font-bold uppercase tracking-[0.14em] text-[#E11D48]">
                 STACK-AWARE ENTERPRISE BRIEF
               </div>
-              <h2 className="text-lg sm:text-xl font-extrabold text-zinc-950 dark:text-zinc-50 mt-1">
+              <h2 className="text-lg sm:text-xl font-extrabold text-[#16213A] dark:text-[#E7EBF5] mt-1">
                 Request a Tailored Sovereign Architecture Proposal
               </h2>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
+              <p className="text-xs text-[#4A5568] dark:text-[#A4ADC6] mt-1 leading-relaxed">
                 Automatically attaches your live Stack Composer selection, hardware tier sizing, and verified integrations. Submissions save locally with instant JSON export and a ready-to-send{' '}
-                <span className="font-mono text-zinc-900 dark:text-zinc-200">
+                <span className="font-mono text-[#16213A] dark:text-[#E7EBF5]">
                   {SPENTA_CONTACT_EMAIL}
                 </span>{' '}
                 email draft.
               </p>
             </div>
 
-            <div className="rounded-xl bg-[#09090B] border border-emerald-500/35 text-white p-4 space-y-3">
+            <div className="rounded-xl bg-[#0F1529] border border-[#6FCB9F]/35 text-[#E7EBF5] p-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-emerald-400">
+                <span className="text-[#6FCB9F]">
                   PRE-POPULATED STACK · {deploymentProfile.switcherLabel.toUpperCase()}
                 </span>
-                <span className="tabular-nums text-zinc-300">{selectedApps.length} / 13 Modules</span>
+                <span className="tabular-nums text-[#A4ADC6]">{selectedApps.length} / 13 Modules</span>
               </div>
 
               {selectedApps.length === 0 ? (
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-[#8E96B0]">
                   No modules currently selected. Open App Vault or Stack Composer to pick modules.
                 </p>
               ) : (
@@ -370,7 +369,7 @@ export function ResourcesView() {
                   {selectedApps.map((app) => (
                     <span
                       key={app.id}
-                      className="text-[11px] font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 px-2 py-0.5 rounded"
+                      className="text-[11px] font-mono bg-[#6FCB9F]/15 border border-[#6FCB9F]/30 text-[#A7E6C7] px-2 py-0.5 rounded"
                     >
                       {app.shortName}
                     </span>
@@ -378,16 +377,16 @@ export function ResourcesView() {
                 </div>
               )}
 
-              <div className="pt-2 border-t border-white/[0.08] grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+              <div className="pt-2 border-t border-[#232B4A] grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
                 <div>
-                  <span className="text-zinc-400 block text-[10px]">EST. BUILD SCOPE</span>
+                  <span className="text-[#8E96B0] block text-[10px]">EST. BUILD SCOPE</span>
                   <span className="text-base font-bold text-white">
                     ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K
                   </span>
                 </div>
                 <div>
-                  <span className="text-zinc-400 block text-[10px]">RECOMMENDED SERVER</span>
-                  <span className="text-base font-bold text-amber-400">{tierSpec.code}</span>
+                  <span className="text-[#8E96B0] block text-[10px]">RECOMMENDED SERVER</span>
+                  <span className="text-base font-bold text-amber-300">{tierSpec.code}</span>
                 </div>
               </div>
             </div>
@@ -397,7 +396,7 @@ export function ResourcesView() {
                 type="button"
                 disabled={selectedApps.length === 0}
                 onClick={() => exportStackJson()}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 disabled:opacity-50 text-xs font-semibold text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 disabled:opacity-50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
                 <span>Export Stack JSON</span>
@@ -406,10 +405,10 @@ export function ResourcesView() {
                 type="button"
                 disabled={selectedApps.length === 0}
                 onClick={() => copyBrief('current', buildExecutiveBrief())}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 disabled:opacity-50 text-xs font-semibold text-zinc-900 dark:text-zinc-100 cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 disabled:opacity-50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] whitespace-nowrap shrink-0 cursor-pointer"
               >
                 {copiedId === 'current' ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
                 )}
@@ -423,7 +422,7 @@ export function ResourcesView() {
             <form onSubmit={handleSubmitProposal} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                  <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                     Organization / Institution *
                   </label>
                   <input
@@ -432,11 +431,11 @@ export function ResourcesView() {
                     value={organization}
                     onChange={(e) => setOrganization(e.target.value)}
                     placeholder="e.g., Bank / Apollo Hospital Group"
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#5F6576] dark:placeholder:text-[#8E96B0] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                  <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                     Contact Name *
                   </label>
                   <input
@@ -445,14 +444,14 @@ export function ResourcesView() {
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     placeholder="Your full name"
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#5F6576] dark:placeholder:text-[#8E96B0] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                  <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                     Work Email *
                   </label>
                   <input
@@ -461,12 +460,12 @@ export function ResourcesView() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.com"
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#5F6576] dark:placeholder:text-[#8E96B0] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                  <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                     Deployment Preference
                   </label>
                   <select
@@ -476,7 +475,7 @@ export function ResourcesView() {
                         e.target.value as 'On-Prem' | 'Private VPC' | 'Air-Gap' | 'SaaS',
                       )
                     }
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                   >
                     <option value="On-Prem">On-Prem Server PC (Tier 1–4)</option>
                     <option value="Private VPC">Private Sovereign VPC</option>
@@ -486,13 +485,13 @@ export function ResourcesView() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                  <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                     Target Timeline
                   </label>
                   <select
                     value={timeline}
                     onChange={(e) => setTimeline(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-emerald-500"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                   >
                     <option>Immediate Discovery (30 Days)</option>
                     <option>Q2–Q3 Pilot (60–90 Days)</option>
@@ -503,7 +502,7 @@ export function ResourcesView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-200 mb-1">
+                <label className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] mb-1">
                   Compliance Scope, Site Count or Custom Requirements
                 </label>
                 <textarea
@@ -511,13 +510,13 @@ export function ResourcesView() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Share bed count, branch count, BB ICT v4.0 / HIPAA needs, or SAFE diligence questions..."
-                  className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 text-sm bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#5F6576] dark:placeholder:text-[#8E96B0] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="inline-flex items-center justify-center gap-2 bg-[#E11D48] hover:bg-[#BE123C] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 min-h-[44px] bg-[#E11D48] hover:bg-[#BE123C] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
               >
                 <Send className="w-4 h-4" strokeWidth={1.75} />
                 <span>Save Proposal &amp; Prepare Email Draft</span>
@@ -525,22 +524,22 @@ export function ResourcesView() {
             </form>
 
             {lastSubmitted && (
-              <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/35 p-4 text-xs text-emerald-900 dark:text-emerald-200 space-y-2.5">
+              <div className="mt-4 rounded-xl bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/12 border border-[#1C6E46]/30 dark:border-[#6FCB9F]/35 p-4 text-xs text-[#16213A] dark:text-[#E7EBF5] space-y-2.5">
                 <div className="flex items-center gap-2 font-bold text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <CheckCircle2 className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F]" />
                   <span>Proposal saved locally for {lastSubmitted.organization}</span>
                 </div>
-                <p className="opacity-90">
+                <p className="text-[#4A5568] dark:text-[#A4ADC6]">
                   Your architecture brief ({lastSubmitted.appIds.length} modules · $
                   {(lastSubmitted.estimatedBuildUsd / 1000).toFixed(1)}K build · Tier{' '}
                   {lastSubmitted.recommendedTier}) is saved in your browser. Export JSON or open your email draft to{' '}
-                  <span className="font-mono">{SPENTA_CONTACT_EMAIL}</span>:
+                  <span className="font-mono text-[#16213A] dark:text-[#E7EBF5]">{SPENTA_CONTACT_EMAIL}</span>:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => downloadProposalJson(lastSubmitted)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-950 text-white font-semibold cursor-pointer"
+                    className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] font-semibold cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download Proposal JSON</span>
@@ -550,7 +549,7 @@ export function ResourcesView() {
                       `Spenta Proposal Request — ${lastSubmitted.organization} (${lastSubmitted.appIds.length} Modules)`,
                       `Organization: ${lastSubmitted.organization}\nContact: ${lastSubmitted.contactName} (${lastSubmitted.email})\nDeployment: ${lastSubmitted.deployment}\nTimeline: ${lastSubmitted.timeline}\nNotes: ${lastSubmitted.notes || 'None'}`,
                     )}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 font-bold"
+                    className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg bg-[#1C6E46] dark:bg-[#6FCB9F] text-white dark:text-[#0B1020] font-bold"
                   >
                     <Mail className="w-3.5 h-3.5" />
                     <span>Open Email Draft ({SPENTA_CONTACT_EMAIL})</span>
@@ -563,25 +562,25 @@ export function ResourcesView() {
 
         {/* Locally Saved Proposals History */}
         {savedProposals.length > 0 && (
-          <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-white/[0.08]">
-            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
+          <div className="mt-6 pt-5 border-t border-[#E4DFD6] dark:border-[#232B4A]">
+            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mb-3">
               Locally Saved Proposal Briefs ({savedProposals.length})
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {savedProposals.map((prop) => (
                 <div
                   key={prop.id}
-                  className="rounded-xl bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-3.5 flex items-start justify-between gap-3 text-xs"
+                  className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3.5 flex items-start justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
-                    <div className="font-bold text-zinc-950 dark:text-zinc-100 truncate">
+                    <div className="font-bold text-[#16213A] dark:text-[#E7EBF5] truncate">
                       {prop.organization} · {prop.contactName}
                     </div>
-                    <div className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5 tabular-nums">
+                    <div className="font-mono text-[11px] text-[#1C6E46] dark:text-[#6FCB9F] mt-0.5 tabular-nums">
                       {prop.appIds.length} apps · ${(prop.estimatedBuildUsd / 1000).toFixed(1)}K · Tier{' '}
                       {prop.recommendedTier} · {prop.deployment}
                     </div>
-                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
+                    <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0] mt-0.5 truncate">
                       {prop.appNames.join(', ') || 'Custom Inquiry'}
                     </div>
                   </div>
@@ -589,7 +588,7 @@ export function ResourcesView() {
                     <button
                       type="button"
                       onClick={() => downloadProposalJson(prop)}
-                      className="p-1.5 rounded bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40 cursor-pointer"
+                      className="p-2 rounded bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] text-[#4A5568] dark:text-[#A4ADC6] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 cursor-pointer"
                       title="Download JSON"
                       aria-label={`Download JSON for ${prop.organization}`}
                     >
@@ -600,7 +599,7 @@ export function ResourcesView() {
                         `Spenta Proposal Request — ${prop.organization}`,
                         `Organization: ${prop.organization}\nContact: ${prop.contactName} (${prop.email})\nDeployment: ${prop.deployment}\nTimeline: ${prop.timeline}\nNotes: ${prop.notes || 'None'}`,
                       )}
-                      className="p-1.5 rounded bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/40"
+                      className="p-2 rounded bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] text-[#4A5568] dark:text-[#A4ADC6] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50"
                       title="Open email draft"
                       aria-label={`Email draft for ${prop.organization}`}
                     >
@@ -609,7 +608,7 @@ export function ResourcesView() {
                     <button
                       type="button"
                       onClick={() => deleteProposal(prop.id)}
-                      className="p-1.5 rounded bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] text-zinc-400 hover:text-[#E11D48] cursor-pointer"
+                      className="p-2 rounded bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] text-[#5F6576] dark:text-[#8E96B0] hover:text-[#E11D48] cursor-pointer"
                       title="Delete saved brief"
                       aria-label={`Delete ${prop.organization}`}
                     >

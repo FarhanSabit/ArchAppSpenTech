@@ -8,12 +8,53 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+:root {
+  --spenta-canvas: #faf8f4;
+  --spenta-band: #f2efe9;
+  --spenta-surface: #ffffff;
+  --spenta-border: #e4dfd6;
+  --spenta-border-strong: #cfc8bc;
+  --spenta-ink: #16213a;
+  --spenta-body: #4a5163;
+  --spenta-muted: #5f6576;
+  --spenta-brand: #1f3863;
+  --spenta-brand-hover: #12233f;
+  --spenta-brand-tint: #eef3fb;
+  --spenta-positive: #1c6e46;
+  --spenta-caution: #8a5c10;
+  --spenta-danger: #bf000f;
+}
+
+.dark {
+  --spenta-canvas: #0b1020;
+  --spenta-band: #0f1529;
+  --spenta-surface: #141a32;
+  --spenta-border: #232b4a;
+  --spenta-border-strong: #2e3862;
+  --spenta-ink: #e7ebf5;
+  --spenta-body: #c3cce4;
+  --spenta-muted: #8d97b5;
+  --spenta-brand: #8fa6e8;
+  --spenta-brand-hover: #7fa6ff;
+  --spenta-brand-tint: #161d3a;
+  --spenta-positive: #6fcb9f;
+  --spenta-caution: #e0b063;
+  --spenta-danger: #ff6568;
+}
+
 @layer base {
   html {
     font-family: var(--font-sans);
     scroll-behavior: smooth;
+    background-color: var(--spenta-canvas);
+    color: var(--spenta-ink);
+    color-scheme: light;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   code,
@@ -24,22 +65,110 @@
   }
 }
 
+/* Unified Stone Light & Nocturnal Navy theme wrapper + token utility classes */
+@layer components {
+  .spenta-theme-view {
+    background-color: var(--spenta-canvas);
+    color: var(--spenta-ink);
+    border-color: var(--spenta-border);
+    accent-color: var(--spenta-brand);
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .spenta-theme-view ::selection {
+    background-color: var(--spenta-brand);
+    color: var(--spenta-surface);
+  }
+
+  .dark .spenta-theme-view ::selection {
+    background-color: var(--spenta-brand);
+    color: var(--spenta-canvas);
+  }
+
+  .spenta-canvas {
+    background-color: var(--spenta-canvas);
+    color: var(--spenta-ink);
+  }
+
+  .spenta-band {
+    background-color: var(--spenta-band);
+    color: var(--spenta-ink);
+    border-color: var(--spenta-border);
+  }
+
+  .spenta-surface {
+    background-color: var(--spenta-surface);
+    color: var(--spenta-ink);
+    border-color: var(--spenta-border);
+  }
+
+  .spenta-border {
+    border-color: var(--spenta-border);
+  }
+
+  .spenta-border-strong {
+    border-color: var(--spenta-border-strong);
+  }
+
+  .spenta-ink {
+    color: var(--spenta-ink);
+  }
+
+  .spenta-body {
+    color: var(--spenta-body);
+  }
+
+  .spenta-muted {
+    color: var(--spenta-muted);
+  }
+
+  .spenta-brand {
+    color: var(--spenta-brand);
+  }
+
+  .spenta-brand-bg {
+    background-color: var(--spenta-brand);
+    color: var(--spenta-surface);
+  }
+
+  .dark .spenta-brand-bg {
+    color: var(--spenta-canvas);
+  }
+
+  .spenta-brand-tint {
+    background-color: var(--spenta-brand-tint);
+    border-color: var(--spenta-border);
+  }
+
+  .spenta-positive {
+    color: var(--spenta-positive);
+  }
+
+  .spenta-caution {
+    color: var(--spenta-caution);
+  }
+
+  .spenta-danger {
+    color: var(--spenta-danger);
+  }
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Subtle 24x24 Swiss architectural grid for hero surfaces */
+/* Subtle 24x24 Swiss architectural grid harmonized to Stone & Nocturnal palettes */
 .bg-obsidian-grid {
   background-image:
-    linear-gradient(to right, rgba(9, 9, 11, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(9, 9, 11, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(31, 56, 99, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(31, 56, 99, 0.055) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
 .dark .bg-obsidian-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(143, 166, 232, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(143, 166, 232, 0.055) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
@@ -180,35 +309,35 @@
   scrollbar-width: none;
 }
 
-/* Crisp custom slider for HITL & Financial Sensitivity controls */
+/* Crisp custom slider for HITL & Financial Sensitivity controls (Stone / Nocturnal) */
 input[type="range"].spenta-slider {
   -webkit-appearance: none;
   appearance: none;
   height: 5px;
   border-radius: 999px;
-  background: #d4d4d8;
+  background: #cfc8bc;
   outline: none;
 }
 
 .dark input[type="range"].spenta-slider {
-  background: #27272a;
+  background: #232b4a;
 }
 
 input[type="range"].spenta-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: #09090b;
-  border: 2px solid #10b981;
+  background: #1f3863;
+  border: 2px solid #faf8f4;
   cursor: pointer;
   transition: transform 0.12s ease;
 }
 
 .dark input[type="range"].spenta-slider::-webkit-slider-thumb {
-  background: #fafafa;
-  border: 2px solid #10b981;
+  background: #8fa6e8;
+  border: 2px solid #0b1020;
 }
 
 input[type="range"].spenta-slider::-webkit-slider-thumb:hover {
@@ -216,17 +345,17 @@ input[type="range"].spenta-slider::-webkit-slider-thumb:hover {
 }
 
 input[type="range"].spenta-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
-  background: #09090b;
-  border: 2px solid #10b981;
+  background: #1f3863;
+  border: 2px solid #faf8f4;
   cursor: pointer;
 }
 
 .dark input[type="range"].spenta-slider::-moz-range-thumb {
-  background: #fafafa;
-  border: 2px solid #10b981;
+  background: #8fa6e8;
+  border: 2px solid #0b1020;
 }
 
 /* Print-only Pitch Deck container is hidden on screen */
@@ -262,7 +391,8 @@ input[type="range"].spenta-slider::-moz-range-thumb {
   body,
   .dark body,
   #root,
-  main {
+  main,
+  .spenta-theme-view {
     background: #ffffff !important;
     color: #09090b !important;
     margin: 0 !important;

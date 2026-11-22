@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Box,
   Check,
   ChevronDown,
   ChevronRight,
   Download,
   GitBranch,
   Layers,
+  Link2,
   Moon,
   Plus,
   RotateCcw,
@@ -29,6 +31,8 @@ import {
 import { downloadMarkdownFile } from '../data/promptThemeStudioData';
 import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
+import { usePathwayBrainSync } from '../hooks/usePathwayBrainSync';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 import {
   ActivationHistoryEntry,
   PathwayHopPlayback,
@@ -669,6 +673,7 @@ export function InteractiveArchitecturePathway({
   onPolarityChange,
 }: InteractiveArchitecturePathwayProps) {
   const {
+    activeTab,
     selectedIds,
     toggleApp,
     hitlConfidence,
@@ -676,7 +681,15 @@ export function InteractiveArchitecturePathway({
     deploymentTarget,
     deploymentProfile,
     setDeploymentTarget,
+    buildShareUrl,
   } = useStack();
+  const {
+    activeBrainSelection,
+    syncPathwayNode,
+    inspectPathwayNodeInBrain,
+    resolveHubForNode,
+  } = usePathwayBrainSync();
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Global synchronized Deployment Provider Swapping
   const activeProfile = deploymentProfile;
@@ -777,6 +790,15 @@ export function InteractiveArchitecturePathway({
       prev.includes(currentHop.branchId) ? prev : [...prev, currentHop.branchId],
     );
     setInspectedBranchId(currentHop.branchId);
+    const hopTrunk = tree.find((t) => t.id === currentHop.trunkId);
+    const hopBranch = hopTrunk?.branches.find((b) => b.id === currentHop.branchId);
+    syncPathwayNode({
+      trunkId: currentHop.trunkId,
+      branchId: currentHop.branchId,
+      appId: hopBranch?.appId,
+      nodeCode: currentHop.nodeCode,
+      nodeTitle: hopBranch?.title ?? currentHop.title,
+    });
 
     const pendingSource = pendingHistorySourceRef.current;
     pendingHistorySourceRef.current = null;
@@ -792,7 +814,7 @@ export function InteractiveArchitecturePathway({
       label: currentHop.title,
       source: pendingSource ?? 'step',
     });
-  }, [activeTrace, activeHopIdx, currentHop, pushHistoryEntry]);
+  }, [activeTrace, activeHopIdx, currentHop, pushHistoryEntry, syncPathwayNode, tree]);
 
   // Clean autoplay timer scaled by playbackSpeed and cleared on pause, step, or unmount
   useEffect(() => {
@@ -885,8 +907,17 @@ export function InteractiveArchitecturePathway({
         prev.includes(target.branchId) ? prev : [...prev, target.branchId],
       );
       setInspectedBranchId(target.branchId);
+      const targetTrunk = tree.find((t) => t.id === target.trunkId);
+      const targetBranch = targetTrunk?.branches.find((b) => b.id === target.branchId);
+      syncPathwayNode({
+        trunkId: target.trunkId,
+        branchId: target.branchId,
+        appId: targetBranch?.appId,
+        nodeCode: target.nodeCode,
+        nodeTitle: targetBranch?.title ?? target.label,
+      });
     },
-    [navHistory.entries, activeTraceId, activeHopIdx],
+    [navHistory.entries, activeTraceId, activeHopIdx, syncPathwayNode, tree],
   );
 
   const handleHistoryBack = () => {
@@ -923,6 +954,15 @@ export function InteractiveArchitecturePathway({
       prev.includes(branch.id) ? prev.filter((item) => item !== branch.id) : [...prev, branch.id],
     );
 
+    const owningTrunk = tree.find((t) => t.branches.some((b) => b.id === branch.id));
+    syncPathwayNode({
+      trunkId: owningTrunk?.id,
+      branchId: branch.id,
+      appId: branch.appId,
+      nodeCode: branch.code,
+      nodeTitle: branch.title,
+    });
+
     const matchedHopIdx = activeTrace.hops.findIndex((h) => h.branchId === branch.id);
     if (matchedHopIdx >= 0) {
       pendingHistorySourceRef.current = 'branch';
@@ -930,7 +970,6 @@ export function InteractiveArchitecturePathway({
       return;
     }
 
-    const owningTrunk = tree.find((t) => t.branches.some((b) => b.id === branch.id));
     if (owningTrunk) {
       setActiveHopIdx(-1);
       pushHistoryEntry({
@@ -975,6 +1014,50 @@ export function InteractiveArchitecturePathway({
     window.setTimeout(() => setExportedFlag(false), 1800);
   };
 
+  const handleCopyPathwayLink = async () => {
+    const ok = await copyTextWithFallback(buildShareUrl({ tab: activeTab }));
+    if (ok) {
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  const inspectedBrainHub = useMemo(() => {
+    if (!inspectedContext) return null;
+    return resolveHubForNode({
+      trunkId: inspectedContext.trunk.id,
+      branchId: inspectedContext.branch.id,
+      appId: inspectedContext.branch.appId,
+      nodeCode: inspectedContext.branch.code,
+      nodeTitle: inspectedContext.branch.title,
+    });
+  }, [inspectedContext, resolveHubForNode]);
+
+  const handleInspectBranchIn3D = useCallback(
+    (trunkId: string, branch: PathwayBranchNode) => {
+      inspectPathwayNodeInBrain({
+        trunkId,
+        branchId: branch.id,
+        appId: branch.appId,
+        nodeCode: branch.code,
+        nodeTitle: branch.title,
+        open3D: true,
+        returnTab: activeTab,
+        returnLabel: activeTab === 'Resources' ? 'Studio Pathway' : 'Architecture Pathway',
+      });
+    },
+    [activeTab, inspectPathwayNodeInBrain],
+  );
+
+  const handleInspectActiveHopIn3D = useCallback(() => {
+    if (!currentHop) return;
+    const owningTrunk = tree.find((t) => t.id === currentHop.trunkId);
+    const branch = owningTrunk?.branches.find((b) => b.id === currentHop.branchId);
+    if (owningTrunk && branch) {
+      handleInspectBranchIn3D(owningTrunk.id, branch);
+    }
+  }, [currentHop, handleInspectBranchIn3D, tree]);
+
   const focusLinkedAppBranch = (appId: string) => {
     const targetBranchId = `branch-app-${appId}`;
     const owningTrunk = tree.find((t) => t.branches.some((b) => b.id === targetBranchId));
@@ -987,6 +1070,13 @@ export function InteractiveArchitecturePathway({
       setExpandedBranches((prev) => [...prev, targetBranchId]);
     }
     setInspectedBranchId(targetBranchId);
+    syncPathwayNode({
+      trunkId: owningTrunk?.id,
+      branchId: targetBranchId,
+      appId,
+      nodeCode: targetBranch?.code,
+      nodeTitle: targetBranch?.title,
+    });
 
     const matchedHopIdx = activeTrace.hops.findIndex((h) => h.branchId === targetBranchId);
     if (matchedHopIdx >= 0) {
@@ -1007,7 +1097,7 @@ export function InteractiveArchitecturePathway({
     }
   };
 
-  // Explicit OITS Dhaka palette tokens scoped cleanly to this container
+  // Spenta Stone Light & Nocturnal Navy palette tokens scoped cleanly to this container
   const canvasClass = isDark
     ? 'bg-[#0B1020] text-[#E7EBF5] border-[#232B4A]'
     : 'bg-[#FAF8F4] text-[#16213A] border-[#E4DFD6]';
@@ -1146,6 +1236,18 @@ export function InteractiveArchitecturePathway({
           </button>
           <button
             type="button"
+            onClick={handleCopyPathwayLink}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${cardClass}`}
+          >
+            {linkCopied ? (
+              <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={2} />
+            ) : (
+              <Link2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+            )}
+            <span>{linkCopied ? 'Link Copied' : 'Share Link'}</span>
+          </button>
+          <button
+            type="button"
             onClick={handleExportPathwayMd}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               isDark
@@ -1239,6 +1341,7 @@ export function InteractiveArchitecturePathway({
         onHistoryBack={handleHistoryBack}
         onHistoryForward={handleHistoryForward}
         onJumpToHistory={applyHistoryAtIndex}
+        onInspectHopIn3D={handleInspectActiveHopIn3D}
       />
 
       {/* Contextual Hover Tooltip Strip */}
@@ -2284,19 +2387,56 @@ export function InteractiveArchitecturePathway({
                 </p>
               </div>
 
+              {/* Direct 3D Brain Hub Deep-Link CTA */}
+              {inspectedBrainHub && (
+                <div
+                  className={`rounded-lg border p-3 flex flex-col gap-2 ${
+                    isDark
+                      ? 'bg-[#141A32] border-[#8FA6E8]/35'
+                      : 'bg-[#EEF3FB]/70 border-[#1F3863]/25'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 font-mono text-[10px]">
+                    <span className={isDark ? 'text-[#8FA6E8] font-bold' : 'text-[#1F3863] font-bold'}>
+                      3D Neural Core Hub {inspectedBrainHub.hubNum}
+                    </span>
+                    <span className={`truncate ${mutedText}`}>{inspectedBrainHub.hubLabel}</span>
+                  </div>
+                  {activeBrainSelection.hubId === inspectedBrainHub.hubId && (
+                    <div className={`font-mono text-[10px] ${isDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]'}`}>
+                      Active 3D Brain selection synced to Hub {inspectedBrainHub.hubNum}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleInspectBranchIn3D(inspectedContext.trunk.id, inspectedContext.branch)
+                    }
+                    className={`w-full min-h-[38px] py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isDark
+                        ? 'bg-[#8FA6E8] text-[#0B1020] hover:bg-[#A6B9F0]'
+                        : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
+                    }`}
+                  >
+                    <Box className="w-3.5 h-3.5" strokeWidth={1.8} />
+                    <span>Inspect in 3D Brain (Hub {inspectedBrainHub.hubNum})</span>
+                  </button>
+                </div>
+              )}
+
               {/* Stack Composer Sync Action if Linked to a Spenta Module */}
               {inspectedContext.branch.appId && (
                 <button
                   type="button"
                   onClick={() => toggleApp(inspectedContext.branch.appId!)}
-                  className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`w-full min-h-[38px] py-2 px-3 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
                     selectedIds.includes(inspectedContext.branch.appId)
                       ? isDark
                         ? 'bg-[#6FCB9F] text-[#0B1020]'
                         : 'bg-[#1C6E46] text-white'
                       : isDark
-                        ? 'bg-[#8FA6E8] text-[#0B1020] hover:bg-[#7FA6FF]'
-                        : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
+                        ? 'bg-[#141A32] border border-[#8FA6E8] text-[#8FA6E8] hover:bg-[#1B2547]'
+                        : 'bg-white border border-[#1F3863] text-[#1F3863] hover:bg-[#EEF3FB]'
                   }`}
                 >
                   {selectedIds.includes(inspectedContext.branch.appId) ? (

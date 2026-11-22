@@ -25,8 +25,8 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 h-14 bg-white/85 dark:bg-[#09090B]/85 backdrop-blur-md text-zinc-900 dark:text-zinc-100 border-b border-zinc-200 dark:border-white/[0.08] transition-colors no-print">
-      <div className="max-w-[1440px] mx-auto px-3.5 sm:px-6 h-full flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 h-14 bg-[#FAF8F4]/92 dark:bg-[#0B1020]/92 backdrop-blur-md text-[#16213A] dark:text-[#E7EBF5] border-b border-[#E4DFD6] dark:border-[#232B4A] transition-colors no-print">
+      <div className="max-w-[1440px] mx-auto px-3.5 sm:px-6 h-full flex items-center justify-between gap-2.5 sm:gap-3">
         {/* Zone 1: Brand Wordmark + Subtle Hairline Divider */}
         <button
           type="button"
@@ -35,8 +35,8 @@ export function Navbar() {
           aria-label="Spenta Sovereign OS Home"
         >
           <SpentaLogo className="h-7" tone={theme === 'dark' ? 'dark-bg' : 'light-bg'} />
-          <span className="hidden 2xl:block h-4 w-px bg-zinc-200 dark:bg-white/15" />
-          <span className="hidden 2xl:inline-block text-[11px] font-mono font-medium tracking-[0.12em] text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+          <span className="hidden 2xl:block h-4 w-px bg-[#CFC8BC] dark:bg-[#232B4A]" />
+          <span className="hidden 2xl:inline-block text-[11px] font-mono font-medium tracking-[0.12em] text-[#5F6576] dark:text-[#8E96B0] whitespace-nowrap">
             SOVEREIGN OS
           </span>
         </button>
@@ -55,13 +55,13 @@ export function Navbar() {
                 onClick={() => handleSelectTab(tab)}
                 className={`relative whitespace-nowrap shrink-0 px-2.5 xl:px-3 py-1.5 rounded-md text-xs xl:text-[13px] font-medium transition-colors cursor-pointer ${
                   active
-                    ? 'text-zinc-950 dark:text-zinc-50 bg-zinc-100 dark:bg-white/[0.07]'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-zinc-100/70 dark:hover:bg-white/[0.04]'
+                    ? 'text-[#16213A] dark:text-[#E7EBF5] bg-[#F2EFE9] dark:bg-[#141A32]'
+                    : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5] hover:bg-[#F2EFE9]/70 dark:hover:bg-[#141A32]/70'
                 }`}
               >
                 {tab}
                 {active && (
-                  <span className="absolute inset-x-2.5 -bottom-[11px] h-[2px] bg-emerald-500 rounded-full" />
+                  <span className="absolute inset-x-2.5 -bottom-[11px] h-[2px] bg-[#1F3863] dark:bg-[#8FA6E8] rounded-full" />
                 )}
               </button>
             );
@@ -73,13 +73,13 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setCommandPaletteOpen(true)}
-            className="inline-flex items-center gap-2 h-8 px-2.5 rounded-md bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/20 text-zinc-600 dark:text-zinc-300 text-xs transition-colors cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-2 h-9 sm:h-8 px-2.5 rounded-md bg-[#F2EFE9] dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863] dark:hover:border-[#8FA6E8] text-[#4A5163] dark:text-[#C8D0E4] text-xs transition-colors cursor-pointer whitespace-nowrap"
             aria-label="Open Command Palette (Cmd+K)"
             title="Command Palette (⌘K)"
           >
             <Search className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-            <span className="hidden xl:inline text-zinc-500 dark:text-zinc-400">Search…</span>
-            <kbd className="hidden sm:inline-block font-mono text-[10px] text-zinc-500 dark:text-zinc-400 bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-white/10 px-1 py-0.5 rounded leading-none">
+            <span className="hidden xl:inline text-[#5F6576] dark:text-[#8E96B0]">Search…</span>
+            <kbd className="hidden sm:inline-block font-mono text-[10px] text-[#5F6576] dark:text-[#8E96B0] bg-white dark:bg-[#0B1020] border border-[#E4DFD6] dark:border-[#232B4A] px-1 py-0.5 rounded leading-none">
               ⌘K
             </kbd>
           </button>
@@ -87,20 +87,22 @@ export function Navbar() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="inline-flex items-center justify-center gap-1.5 h-8 px-2 rounded-md bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08] hover:border-zinc-300 dark:hover:border-white/20 text-zinc-700 dark:text-zinc-300 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2.5 sm:px-2 rounded-md bg-[#F2EFE9] dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863] dark:hover:border-[#8FA6E8] text-[#16213A] dark:text-[#E7EBF5] text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
             aria-label={
-              paletteMode === 'nocturnal' ? 'Switch to Stone light theme' : 'Switch to Nocturnal dark theme'
+              paletteMode === 'nocturnal'
+                ? 'Switch to Stone light theme'
+                : 'Switch to Nocturnal dark theme'
             }
             title={
               paletteMode === 'nocturnal'
-                ? 'Active: Nocturnal (Click for Stone)'
-                : 'Active: Stone (Click for Nocturnal)'
+                ? 'Active: Nocturnal Navy (Click for Stone)'
+                : 'Active: Stone Light (Click for Nocturnal)'
             }
           >
             {paletteMode === 'nocturnal' ? (
-              <Sun className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Sun className="w-3.5 h-3.5 text-[#8FA6E8]" strokeWidth={1.6} />
             ) : (
-              <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Moon className="w-3.5 h-3.5 text-[#1F3863]" strokeWidth={1.6} />
             )}
             <span className="hidden xl:inline">
               {paletteMode === 'nocturnal' ? 'Nocturnal' : 'Stone'}
@@ -110,7 +112,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setDrawerOpen(!drawerOpen)}
-            className="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3.5 rounded-md bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 h-9 sm:h-8 px-2.5 sm:px-3.5 rounded-md bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             <Layers className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
             <span className="hidden sm:inline">Stack Composer</span>
@@ -123,14 +125,14 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((v) => !v)}
-            className="lg:hidden inline-flex items-center justify-center w-8 h-8 rounded-md text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-md text-[#16213A] dark:text-[#E7EBF5] hover:bg-[#F2EFE9] dark:hover:bg-[#141A32] transition-colors cursor-pointer shrink-0"
             aria-label="Toggle navigation menu"
             aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? (
-              <X className="w-4 h-4" strokeWidth={1.5} />
+              <X className="w-4 h-4" strokeWidth={1.75} />
             ) : (
-              <Menu className="w-4 h-4" strokeWidth={1.5} />
+              <Menu className="w-4 h-4" strokeWidth={1.75} />
             )}
           </button>
         </div>
@@ -138,8 +140,8 @@ export function Navbar() {
 
       {/* Responsive Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#0C0E10] px-4 py-3 space-y-3 shadow-xl">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+        <div className="lg:hidden border-b border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] px-4 py-3.5 space-y-3 shadow-xl">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {NAV_TABS.map((tab) => {
               const active = activeTab === tab;
               return (
@@ -147,10 +149,10 @@ export function Navbar() {
                   key={tab}
                   type="button"
                   onClick={() => handleSelectTab(tab)}
-                  className={`px-3 py-2.5 rounded-md text-xs font-medium text-left transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-3 py-2.5 rounded-lg text-xs font-medium text-left transition-colors cursor-pointer ${
                     active
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold'
-                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05] border border-transparent'
+                      ? 'bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] font-semibold'
+                      : 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#C8D0E4] hover:border-[#1F3863] dark:hover:border-[#8FA6E8] border border-[#E4DFD6] dark:border-[#232B4A]'
                   }`}
                 >
                   {tab}
@@ -159,14 +161,14 @@ export function Navbar() {
             })}
           </div>
 
-          <div className="pt-2 border-t border-zinc-200 dark:border-white/[0.08] flex items-center justify-between gap-2">
+          <div className="pt-2.5 border-t border-[#E4DFD6] dark:border-[#232B4A] flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
                 setCommandPaletteOpen(true);
               }}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-md bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08] text-xs font-medium text-zinc-700 dark:text-zinc-300 cursor-pointer"
+              className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] text-xs font-medium text-[#16213A] dark:text-[#E7EBF5] cursor-pointer"
             >
               <Search className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>Command Search</span>
@@ -177,7 +179,7 @@ export function Navbar() {
                 setMobileMenuOpen(false);
                 setAiAssistantOpen(true);
               }}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-xs font-medium text-emerald-700 dark:text-emerald-400 cursor-pointer"
+              className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-[#1C6E46]/12 dark:bg-[#6FCB9F]/15 border border-[#1C6E46]/35 dark:border-[#6FCB9F]/35 text-xs font-semibold text-[#1C6E46] dark:text-[#6FCB9F] cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>AI Advisor</span>

@@ -8,6 +8,7 @@ interface SovereignBrain3DProps {
   polarity?: 'light' | 'dark';
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
+  hubFocusNonce?: number;
 }
 
 interface ErrorBoundaryState {

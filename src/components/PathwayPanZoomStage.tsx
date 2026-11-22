@@ -47,7 +47,9 @@ export function PathwayPanZoomStage({
   const [scaleState, setScaleState] = useState<number>(1);
   const [wheelZoomEnabled, setWheelZoomEnabled] = useState<boolean>(false);
   const [panOnlyMode, setPanOnlyMode] = useState<boolean>(false);
-  const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
+  const [showMiniMap, setShowMiniMap] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
+  );
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [panSnapshot, setPanSnapshot] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [viewportDims, setViewportDims] = useState<{ w: number; h: number }>({ w: 720, h: 640 });
@@ -349,7 +351,7 @@ export function PathwayPanZoomStage({
             applyScale(1.25);
           }
         }}
-        className={`relative overflow-hidden select-none min-h-[540px] ${
+        className={`relative overflow-hidden select-none min-h-[420px] sm:min-h-[540px] ${
           isDark ? 'bg-[#0B1020]' : 'bg-[#FAF8F4]'
         }`}
         style={{

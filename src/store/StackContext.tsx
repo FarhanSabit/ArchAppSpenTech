@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  BRAIN_HUBS,
   NavTab,
   SERVER_TIERS,
   SPENTA_APPS,
@@ -15,6 +16,18 @@ import {
   DeploymentTargetId,
 } from '../data/deploymentProfiles';
 import { PaletteMode, ThemeMode, useTheme } from '../context/ThemeContext';
+import {
+  buildShareableUrl,
+  clearShareUrlParams,
+  ParsedShareSnapshot,
+  parseShareUrlParams,
+} from '../utils/shareUrlCodec';
+import {
+  ActiveBrainSelection,
+  LinkPathwayNodeOptions,
+  PathwayBrainLinkTarget,
+  resolveBrainHubForPathwayNode,
+} from '../utils/pathwayBrainLink';
 
 const STACK_STORAGE_KEY = 'spenta_sovereign_stack_v1';
 const PROPOSALS_STORAGE_KEY = 'spenta_saved_proposals_v1';
@@ -154,8 +167,21 @@ export interface StackMetrics {
 }
 
 export interface PendingNavFocus {
-  type: 'app' | 'slide' | 'infographic' | 'layer' | 'tier' | 'case' | 'blueprint' | 'studio';
+  type:
+    | 'app'
+    | 'slide'
+    | 'infographic'
+    | 'layer'
+    | 'tier'
+    | 'case'
+    | 'blueprint'
+    | 'studio'
+    | 'brain-hub';
   id: string;
+  appId?: string;
+  open3D?: boolean;
+  returnTab?: NavTab;
+  returnLabel?: string;
   ts: number;
 }
 
@@ -236,6 +262,26 @@ interface StackContextValue {
   resetCoreLayerConfig: (layerId: CoreLayerId, actor?: string) => void;
   logCoreAuditEvent: (entry: Omit<CoreAuditEntry, 'id' | 'timestamp'>) => void;
   clearCoreAuditLog: () => void;
+  sharedSnapshotSummary: string | null;
+  dismissSharedSnapshot: () => void;
+  resetToLocalDefaults: () => void;
+  buildShareUrl: (overrides?: {
+    tab?: NavTab;
+    hubId?: string | null;
+    brainMode?: '3d' | 'radar';
+  }) => string;
+  activeBrainSelection: ActiveBrainSelection;
+  selectBrainHub: (
+    hubId: string,
+    options?: {
+      appId?: string;
+      source?: ActiveBrainSelection['source'];
+      pathwayBranchId?: string;
+      pathwayNodeCode?: string;
+      pathwayNodeTitle?: string;
+    },
+  ) => void;
+  linkPathwayNodeToBrain: (options: LinkPathwayNodeOptions) => PathwayBrainLinkTarget;
 }
 
 const StackContext = createContext<StackContextValue | null>(null);
@@ -310,21 +356,70 @@ function loadStoredDeploymentTarget(): DeploymentTargetId {
 
 export function StackProvider({ children }: { children: React.ReactNode }) {
   const { theme, paletteMode, setTheme, setPaletteMode, toggleTheme } = useTheme();
+  const [initialShareSnapshot] = useState<ParsedShareSnapshot | null>(() => parseShareUrlParams());
+  const [sharedSnapshotSummary, setSharedSnapshotSummary] = useState<string | null>(
+    () => initialShareSnapshot?.summary ?? null,
+  );
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<NavTab>('App Vault');
-  const [pendingNavFocus, setPendingNavFocus] = useState<PendingNavFocus | null>(null);
+  const [activeTab, setActiveTab] = useState<NavTab>(
+    () => initialShareSnapshot?.activeTab ?? 'App Vault',
+  );
+  const [pendingNavFocus, setPendingNavFocus] = useState<PendingNavFocus | null>(() => {
+    if (initialShareSnapshot?.hubId) {
+      return {
+        type: 'brain-hub',
+        id: initialShareSnapshot.hubId,
+        open3D: initialShareSnapshot.brainMode !== 'radar',
+        ts: Date.now(),
+      };
+    }
+    return null;
+  });
+  const [activeBrainSelection, setActiveBrainSelection] = useState<ActiveBrainSelection>(() => {
+    const initialHubId = initialShareSnapshot?.hubId;
+    if (initialHubId && BRAIN_HUBS.some((h) => h.id === initialHubId)) {
+      const firstApp = SPENTA_APPS.find((a) => a.hubId === initialHubId);
+      return {
+        hubId: initialHubId,
+        appId: firstApp?.id,
+        source: 'url',
+        nonce: 1,
+      };
+    }
+    return {
+      hubId: 'fintech',
+      appId: 'icr_ops',
+      source: 'brain',
+      nonce: 0,
+    };
+  });
   const [aiAssistantOpen, setAiAssistantOpen] = useState<boolean>(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => loadStoredIds());
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    () => initialShareSnapshot?.selectedIds ?? loadStoredIds(),
+  );
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [autoNotice, setAutoNotice] = useState<string | null>(null);
-  const [hitlConfidence, setHitlConfidence] = useState<number>(0.91);
+  const [hitlConfidence, setHitlConfidence] = useState<number>(
+    () => initialShareSnapshot?.hitlConfidence ?? 0.91,
+  );
   const [savedProposals, setSavedProposals] = useState<SavedProposal[]>(() => loadStoredProposals());
-  const [deploymentTarget, setDeploymentTargetState] = useState<DeploymentTargetId>(() =>
-    loadStoredDeploymentTarget(),
+  const [deploymentTarget, setDeploymentTargetState] = useState<DeploymentTargetId>(
+    () => initialShareSnapshot?.deploymentTarget ?? loadStoredDeploymentTarget(),
   );
-  const [coreLayerConfigs, setCoreLayerConfigs] = useState<Record<CoreLayerId, LayerConfig>>(() =>
-    loadStoredCoreConfigs(),
-  );
+  const [coreLayerConfigs, setCoreLayerConfigs] = useState<Record<CoreLayerId, LayerConfig>>(() => {
+    if (initialShareSnapshot?.deploymentTarget) {
+      const presets = DEPLOYMENT_PROFILES[initialShareSnapshot.deploymentTarget].layerPresets;
+      return {
+        L1: { ...presets.L1 },
+        L2: { ...presets.L2 },
+        L3: { ...presets.L3 },
+        L4: { ...presets.L4 },
+        L5: { ...presets.L5 },
+        L6: { ...presets.L6 },
+      };
+    }
+    return loadStoredCoreConfigs();
+  });
   const [architectureUpdatedAt, setArchitectureUpdatedAt] = useState<string>(() =>
     new Date().toISOString(),
   );
@@ -332,13 +427,60 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
 
   const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
 
-  const navigateToItem = (tab: NavTab, focus?: Omit<PendingNavFocus, 'ts'>) => {
+  const navigateToItem = useCallback((tab: NavTab, focus?: Omit<PendingNavFocus, 'ts'>) => {
     setActiveTab(tab);
     setPendingNavFocus(focus ? { ...focus, ts: Date.now() } : null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const clearPendingNavFocus = () => setPendingNavFocus(null);
+  const clearPendingNavFocus = useCallback(() => setPendingNavFocus(null), []);
+
+  const selectBrainHub = useCallback<StackContextValue['selectBrainHub']>((hubId, options) => {
+    const validHub = BRAIN_HUBS.find((h) => h.id === hubId) ?? BRAIN_HUBS[0];
+    const resolvedAppId =
+      options?.appId && SPENTA_APPS.some((a) => a.id === options.appId)
+        ? options.appId
+        : SPENTA_APPS.find((a) => a.hubId === validHub.id)?.id;
+
+    setActiveBrainSelection((prev) => ({
+      hubId: validHub.id,
+      appId: resolvedAppId,
+      source: options?.source ?? 'brain',
+      pathwayBranchId: options?.pathwayBranchId,
+      pathwayNodeCode: options?.pathwayNodeCode,
+      pathwayNodeTitle: options?.pathwayNodeTitle,
+      nonce: prev.nonce + 1,
+    }));
+  }, []);
+
+  const linkPathwayNodeToBrain = useCallback<StackContextValue['linkPathwayNodeToBrain']>(
+    (options) => {
+      const target = resolveBrainHubForPathwayNode(options);
+      setActiveBrainSelection((prev) => ({
+        hubId: target.hubId,
+        appId: target.appId,
+        source: 'pathway',
+        pathwayBranchId: options.branchId,
+        pathwayNodeCode: options.nodeCode,
+        pathwayNodeTitle: options.nodeTitle,
+        nonce: prev.nonce + 1,
+      }));
+
+      if (options.navigateToBrain) {
+        navigateToItem('The Brain', {
+          type: 'brain-hub',
+          id: target.hubId,
+          appId: target.appId,
+          open3D: options.open3D !== false,
+          returnTab: options.returnTab,
+          returnLabel: options.returnLabel,
+        });
+      }
+
+      return target;
+    },
+    [navigateToItem],
+  );
 
   const appMap = useMemo(
     () => Object.fromEntries(SPENTA_APPS.map((app) => [app.id, app])) as Record<string, SpentaApp>,
@@ -748,6 +890,44 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     setCoreAuditLog([]);
   };
 
+  const dismissSharedSnapshot = () => {
+    setSharedSnapshotSummary(null);
+    clearShareUrlParams();
+  };
+
+  const resetToLocalDefaults = () => {
+    setSelectedIds(DEFAULT_SELECTED_IDS);
+    setDeploymentTargetState('on-prem');
+    setCoreLayerConfigs({ ...DEFAULT_CORE_LAYER_CONFIGS });
+    setHitlConfidence(0.91);
+    setPaletteMode('nocturnal');
+    setActiveBrainSelection((prev) => ({
+      hubId: 'fintech',
+      appId: 'icr_ops',
+      source: 'brain',
+      nonce: prev.nonce + 1,
+    }));
+    setSharedSnapshotSummary(null);
+    clearShareUrlParams();
+    setAutoNotice('Restored default Spenta Sovereign OS baseline configuration');
+  };
+
+  const buildShareUrl: StackContextValue['buildShareUrl'] = (overrides) =>
+    buildShareableUrl({
+      selectedIds,
+      deploymentTarget,
+      paletteMode,
+      activeTab: overrides?.tab ?? activeTab,
+      hitlConfidence,
+      hubId:
+        overrides?.hubId !== undefined
+          ? overrides.hubId
+          : (overrides?.tab ?? activeTab) === 'The Brain'
+            ? activeBrainSelection.hubId
+            : null,
+      brainMode: overrides?.brainMode,
+    });
+
   return (
     <StackContext.Provider
       value={{
@@ -794,6 +974,13 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         resetCoreLayerConfig,
         logCoreAuditEvent,
         clearCoreAuditLog,
+        sharedSnapshotSummary,
+        dismissSharedSnapshot,
+        resetToLocalDefaults,
+        buildShareUrl,
+        activeBrainSelection,
+        selectBrainHub,
+        linkPathwayNodeToBrain,
       }}
     >
       {children}

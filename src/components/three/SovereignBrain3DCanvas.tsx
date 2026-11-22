@@ -11,6 +11,7 @@ interface SovereignBrain3DCanvasProps {
   polarity?: 'light' | 'dark';
   onSelectHub?: (hubId: string) => void;
   selectedHubId?: string | null;
+  hubFocusNonce?: number;
 }
 
 type CameraPreset = 'overview' | 'operations' | 'experience' | 'top';
@@ -225,6 +226,7 @@ export default function SovereignBrain3DCanvas({
   polarity = 'dark',
   onSelectHub,
   selectedHubId = null,
+  hubFocusNonce = 0,
 }: SovereignBrain3DCanvasProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const { selectedIds, hitlConfidence, toggleApp } = useStack();
@@ -232,7 +234,9 @@ export default function SovereignBrain3DCanvas({
   const [projectedCallout, setProjectedCallout] = useState<ProjectedCallout | null>(null);
   const [projectedAnchors, setProjectedAnchors] = useState<ProjectedNodeAnchor[]>([]);
   const [contextLost, setContextLost] = useState(false);
-  const [dockCollapsed, setDockCollapsed] = useState(false);
+  const [dockCollapsed, setDockCollapsed] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 480 : false,
+  );
   const [activePreset, setActivePreset] = useState<CameraPreset>('overview');
   const [materialFinish, setMaterialFinish] = useState<MaterialFinish>(
     polarity === 'light' ? 'heritage-light' : 'heritage-dark',
@@ -269,6 +273,23 @@ export default function SovereignBrain3DCanvas({
       pendingPulseHubRef.current = selectedHubId;
     }
   }, [selectedHubId]);
+
+  useEffect(() => {
+    if (!hubFocusNonce || !selectedHubId) return;
+    pendingPulseHubRef.current = selectedHubId;
+    const isOpsHemisphere = ['healthcare', 'fintech', 'enterprise', 'infra'].includes(
+      selectedHubId,
+    );
+    const preset: CameraPreset = isOpsHemisphere ? 'operations' : 'experience';
+    setActivePreset(preset);
+    const cfg = CAMERA_PRESETS[preset];
+    targetCamPosRef.current = new THREE.Vector3(
+      cfg.pos[0],
+      cfg.pos[1],
+      compact ? cfg.pos[2] * 0.96 : cfg.pos[2],
+    );
+    targetLookAtRef.current = new THREE.Vector3(cfg.target[0], cfg.target[1], cfg.target[2]);
+  }, [hubFocusNonce, selectedHubId, compact]);
 
   useEffect(() => {
     onSelectHubRef.current = onSelectHub;

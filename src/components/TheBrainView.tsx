@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   Box,
   Brain,
   Check,
   CheckCircle2,
   ExternalLink,
   Globe,
+  Link2,
   Loader2,
   Moon,
   Plus,
@@ -24,11 +26,14 @@ import {
   BLUEPRINT_PILLARS,
   BRAIN_HUBS,
   HITL_SAMPLE_EVENTS,
+  NavTab,
   SPENTA_APPS,
 } from '../data/spentaManifest';
 import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
+import { usePathwayBrainSync } from '../hooks/usePathwayBrainSync';
 import { SovereignBrain3D } from './three/SovereignBrain3D';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 import brainStoneSculptImg from '../assets/images/brain_stone_sculpt_1795257685678.jpg';
 import brainNocturnalCoreImg from '../assets/images/brain_nocturnal_core_1795257688515.jpg';
 import brainDualSynapseImg from '../assets/images/brain_dual_synapse_1795257687722.jpg';
@@ -144,14 +149,25 @@ export function TheBrainView() {
     appMap,
     pendingNavFocus,
     clearPendingNavFocus,
+    navigateToItem,
+    buildShareUrl,
     setAiAssistantOpen,
   } = useStack();
 
-  const [visualMode, setVisualMode] = useState<'radar' | '3d'>('radar');
+  const {
+    activeBrainSelection,
+    activeHub,
+    activeApp,
+    selectBrainNode,
+  } = usePathwayBrainSync();
+
+  const [visualMode, setVisualMode] = useState<'radar' | '3d'>(() =>
+    activeBrainSelection.source === 'pathway' ? '3d' : 'radar',
+  );
   const [backdropVariant, setBackdropVariant] = useState<BrainBackdropVariantId>('auto');
   const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
-  const [selectedHubId, setSelectedHubId] = useState<string | null>('fintech');
-  const [focusedAppId, setFocusedAppId] = useState<string>('icr_ops');
+  const [returnContext, setReturnContext] = useState<{ tab: NavTab; label: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState<boolean>(false);
   const [hoveredRadarId, setHoveredRadarId] = useState<string | null>(null);
   const [blueprintTab, setBlueprintTab] = useState<'pillars' | 'verticals'>('pillars');
   const [blueprintQuery, setBlueprintQuery] = useState('');
@@ -160,6 +176,10 @@ export function TheBrainView() {
   const [groundError, setGroundError] = useState<string | null>(null);
   const [groundResult, setGroundResult] = useState<GroundedBriefState | null>(null);
 
+  const selectedHubId = activeBrainSelection.hubId;
+  const focusedAppId = activeApp.id;
+  const hubFocusNonce = activeBrainSelection.nonce;
+
   useEffect(() => {
     if (pendingNavFocus?.type === 'blueprint') {
       const q = pendingNavFocus.id;
@@ -167,23 +187,49 @@ export function TheBrainView() {
       setBlueprintTab(isVert ? 'verticals' : 'pillars');
       setBlueprintQuery(q);
       clearPendingNavFocus();
+      return;
     }
-  }, [pendingNavFocus, clearPendingNavFocus]);
+
+    if (pendingNavFocus?.type === 'brain-hub') {
+      const validHub = BRAIN_HUBS.find((h) => h.id === pendingNavFocus.id) ?? BRAIN_HUBS[0];
+      const nextAppId =
+        pendingNavFocus.appId && appMap[pendingNavFocus.appId]
+          ? pendingNavFocus.appId
+          : SPENTA_APPS.find((a) => a.hubId === validHub.id)?.id;
+      if (
+        activeBrainSelection.hubId !== validHub.id ||
+        activeBrainSelection.appId !== nextAppId
+      ) {
+        selectBrainNode(validHub.id, nextAppId, 'brain');
+      }
+      setVisualMode(pendingNavFocus.open3D === false ? 'radar' : '3d');
+      if (pendingNavFocus.returnTab) {
+        setReturnContext({
+          tab: pendingNavFocus.returnTab,
+          label: pendingNavFocus.returnLabel ?? 'Pathway',
+        });
+      }
+      clearPendingNavFocus();
+    }
+  }, [
+    pendingNavFocus,
+    clearPendingNavFocus,
+    appMap,
+    activeBrainSelection.hubId,
+    activeBrainSelection.appId,
+    selectBrainNode,
+  ]);
 
   // Bidirectional 3D Hub <-> Architecture Profile synchronization
   const handleSelect3DHub = (hubId: string) => {
-    setSelectedHubId(hubId);
     const hubApps = SPENTA_APPS.filter((a) => a.hubId === hubId);
-    if (hubApps.length > 0) {
-      setFocusedAppId(hubApps[0].id);
-    }
+    selectBrainNode(hubId, hubApps[0]?.id, 'brain');
   };
 
   const handleSelectRadarApp = (appId: string) => {
-    setFocusedAppId(appId);
     const app = appMap[appId];
     if (app) {
-      setSelectedHubId(app.hubId);
+      selectBrainNode(app.hubId, appId, 'brain');
     }
   };
 
@@ -216,10 +262,6 @@ export function TheBrainView() {
   const passGate = hitlConfidence >= 0.88;
   const inspectedApp = appMap[hoveredRadarId ?? focusedAppId] ?? SPENTA_APPS[0];
   const inspectedInStack = selectedIds.includes(inspectedApp.id);
-  const activeHub = useMemo(
-    () => BRAIN_HUBS.find((h) => h.id === (selectedHubId ?? inspectedApp.hubId)) ?? BRAIN_HUBS[0],
-    [selectedHubId, inspectedApp.hubId],
-  );
   const hubSiblingApps = useMemo(
     () => SPENTA_APPS.filter((a) => a.hubId === activeHub.id),
     [activeHub.id],
@@ -267,7 +309,7 @@ export function TheBrainView() {
 
   const isDark = brainPolarity === 'dark';
 
-  // OITS Dhaka Swiss Editorial Palette Classes
+  // Spenta Stone Light & Nocturnal Navy Editorial Palette Classes
   const surfaceCard = isDark
     ? 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5]'
     : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#16213A]';
@@ -283,7 +325,7 @@ export function TheBrainView() {
   const greenInk = isDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]';
   const amberInk = isDark ? 'text-[#E0B063]' : 'text-[#8A5C10]';
 
-  // Radar SVG OITS Dhaka Tokens
+  // Radar SVG Stone / Nocturnal Tokens
   const rNavy = isDark ? '#8FA6E8' : '#1F3863';
   const rGreen = isDark ? '#6FCB9F' : '#1C6E46';
   const rAmber = isDark ? '#E0B063' : '#8A5C10';
@@ -308,7 +350,7 @@ export function TheBrainView() {
 
   return (
     <div className="space-y-6">
-      {/* OITS Dhaka Editorial Header with Theme-Matched 3D Abstract Backdrop Texture */}
+      {/* Spenta Editorial Header with Theme-Matched 3D Abstract Backdrop Texture */}
       <section className={`relative overflow-hidden rounded-[10px] border p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors ${bandSurface}`}>
         {activeBackdropAsset && (
           <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
@@ -342,6 +384,25 @@ export function TheBrainView() {
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
+          {returnContext && (
+            <button
+              type="button"
+              onClick={() => {
+                const targetTab = returnContext.tab;
+                setReturnContext(null);
+                navigateToItem(targetTab);
+              }}
+              className={`inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                isDark
+                  ? 'bg-[#141A32] border-[#6FCB9F]/50 text-[#6FCB9F] hover:bg-[#1B2547]'
+                  : 'bg-white border-[#1C6E46]/40 text-[#1C6E46] hover:bg-[#EBF6F0]'
+              }`}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.8} />
+              <span>Return to {returnContext.label}</span>
+            </button>
+          )}
+
           {/* Radar vs 3D Segmented Toggle */}
           <div
             role="group"
@@ -378,7 +439,37 @@ export function TheBrainView() {
             </button>
           </div>
 
-          {/* Local OITS Dhaka Stone Light / Nocturnal Dark Toggle */}
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await copyTextWithFallback(
+                buildShareUrl({
+                  tab: 'The Brain',
+                  hubId: activeHub.id,
+                  brainMode: visualMode,
+                }),
+              );
+              if (ok) {
+                setLinkCopied(true);
+                window.setTimeout(() => setLinkCopied(false), 2000);
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 min-h-[36px] px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              isDark
+                ? 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5] hover:border-[#8FA6E8]'
+                : 'bg-white border-[#E4DFD6] text-[#16213A] hover:border-[#1F3863]'
+            }`}
+            title="Copy shareable link focused on this Brain Hub"
+          >
+            {linkCopied ? (
+              <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={2} />
+            ) : (
+              <Link2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+            )}
+            <span>{linkCopied ? 'Copied' : 'Share View'}</span>
+          </button>
+
+          {/* Local Spenta Dhaka Stone Light / Nocturnal Dark Toggle */}
           <div
             role="group"
             aria-label="The Brain Spenta Dhaka polarity"
@@ -725,7 +816,7 @@ export function TheBrainView() {
             </>
           ) : (
             <div
-              className={`flex-1 min-h-[470px] rounded-[10px] overflow-hidden border ${
+              className={`flex-1 min-h-[390px] sm:min-h-[470px] lg:min-h-[520px] rounded-[10px] overflow-hidden border ${
                 isDark ? 'border-[#232B4A] bg-[#0B1020]' : 'border-[#E4DFD6] bg-[#F2EFE9]'
               }`}
             >
@@ -733,6 +824,7 @@ export function TheBrainView() {
                 compact
                 polarity={brainPolarity}
                 selectedHubId={selectedHubId}
+                hubFocusNonce={hubFocusNonce}
                 onSelectHub={handleSelect3DHub}
               />
             </div>
@@ -748,6 +840,12 @@ export function TheBrainView() {
                 <div className={`text-[10px] font-mono font-semibold ${brandInk}`}>
                   HUB {activeHub.num} · {activeHub.label} · {inspectedApp.engine} engine
                 </div>
+                {activeBrainSelection.source === 'pathway' && activeBrainSelection.pathwayNodeTitle && (
+                  <div className={`text-[11px] font-mono mt-0.5 ${greenInk}`}>
+                    Synced from Pathway · {activeBrainSelection.pathwayNodeCode ? `${activeBrainSelection.pathwayNodeCode} — ` : ''}
+                    {activeBrainSelection.pathwayNodeTitle}
+                  </div>
+                )}
                 <h2 className="text-base font-bold mt-0.5 leading-snug">
                   {inspectedApp.name}
                 </h2>
@@ -793,7 +891,7 @@ export function TheBrainView() {
                     <button
                       key={sib.id}
                       type="button"
-                      onClick={() => setFocusedAppId(sib.id)}
+                      onClick={() => selectBrainNode(activeHub.id, sib.id, 'brain')}
                       className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
                         isCurrent ? 'brain-node-emissive-pulse' : ''
                       } ${

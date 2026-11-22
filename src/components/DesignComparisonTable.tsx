@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, ExternalLink, Moon, Sun, Table2 } from 'lucide-react';
 import { useStack } from '../store/StackContext';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 
 export type DesignPillar = 'visual-style' | 'typography' | 'spacing' | 'color-palette';
 
@@ -190,7 +191,7 @@ function SwatchRow({ hexes, isDark }: { hexes: string[]; isDark: boolean }) {
           key={hex}
           title={hex}
           className={`inline-flex items-center gap-1 text-[10px] font-mono ${
-            isDark ? 'text-zinc-400' : 'text-zinc-500'
+            isDark ? 'text-[#8E96B0]' : 'text-[#5F6576]'
           }`}
         >
           <span
@@ -219,6 +220,10 @@ export function DesignComparisonTable({
   const [tableTheme, setTableTheme] = useState<'light' | 'dark'>(portalTheme);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    setTableTheme(portalTheme);
+  }, [portalTheme]);
+
   const isTableDark = tableTheme === 'dark';
 
   const visibleRows = useMemo(() => {
@@ -227,12 +232,10 @@ export function DesignComparisonTable({
   }, [activePillar]);
 
   const handleCopyMarkdown = async () => {
-    try {
-      await navigator.clipboard.writeText(buildMarkdownTable(visibleRows));
+    const ok = await copyTextWithFallback(buildMarkdownTable(visibleRows));
+    if (ok) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
     }
   };
 
@@ -240,9 +243,9 @@ export function DesignComparisonTable({
     <section className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
         <div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">{kicker}</div>
-          <h2 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
-            <Table2 className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
+          <div className="text-xs text-[#5F6576] dark:text-[#8E96B0]">{kicker}</div>
+          <h2 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-0.5 flex items-center gap-2">
+            <Table2 className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0" strokeWidth={1.5} />
             <span>{heading}</span>
           </h2>
         </div>
@@ -251,7 +254,7 @@ export function DesignComparisonTable({
           <div
             role="tablist"
             aria-label="Filter design comparison criteria"
-            className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]"
+            className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
           >
             {PILLAR_FILTERS.map((filter) => {
               const active = activePillar === filter.id;
@@ -262,10 +265,10 @@ export function DesignComparisonTable({
                   role="tab"
                   aria-selected={active}
                   onClick={() => setActivePillar(filter.id)}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     active
-                      ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                      ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                      : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                   }`}
                 >
                   {filter.label}
@@ -278,45 +281,45 @@ export function DesignComparisonTable({
           <div
             role="group"
             aria-label="Comparison table color mode"
-            className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]"
+            className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
           >
             <button
               type="button"
               aria-pressed={!isTableDark}
               onClick={() => setTableTheme('light')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 !isTableDark
-                  ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-zinc-50 shadow-xs'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  ? 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#E7EBF5] shadow-xs'
+                  : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
               }`}
-              title="Preview comparison table in Light Mode"
+              title="Preview comparison table in Stone Light Mode"
             >
               <Sun className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-              <span>Light</span>
+              <span>Stone</span>
             </button>
             <button
               type="button"
               aria-pressed={isTableDark}
               onClick={() => setTableTheme('dark')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 isTableDark
-                  ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020] shadow-xs'
+                  : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
               }`}
-              title="Preview comparison table in Dark Mode"
+              title="Preview comparison table in Nocturnal Navy Mode"
             >
               <Moon className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-              <span>Dark</span>
+              <span>Nocturnal</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={handleCopyMarkdown}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#111315] hover:border-emerald-500/40 text-xs font-semibold text-zinc-900 dark:text-zinc-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
             ) : (
               <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
             )}
@@ -328,8 +331,8 @@ export function DesignComparisonTable({
       <div
         className={`rounded-xl border overflow-hidden transition-colors duration-200 ${
           isTableDark
-            ? 'border-white/[0.1] bg-[#111315] text-zinc-100'
-            : 'border-zinc-200 bg-white text-zinc-900'
+            ? 'border-[#232B4A] bg-[#141A32] text-[#E7EBF5]'
+            : 'border-[#E4DFD6] bg-white text-[#16213A]'
         }`}
       >
         <div className="overflow-x-auto">
@@ -338,16 +341,16 @@ export function DesignComparisonTable({
               <tr
                 className={`border-b transition-colors duration-200 ${
                   isTableDark
-                    ? 'border-white/[0.08] bg-[#0C0E10]'
-                    : 'border-zinc-200 bg-zinc-50'
+                    ? 'border-[#232B4A] bg-[#0F1529]'
+                    : 'border-[#E4DFD6] bg-[#F2EFE9]'
                 }`}
               >
                 <th
                   scope="col"
                   className={`sticky left-0 z-10 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-wider w-[190px] border-r transition-colors duration-200 ${
                     isTableDark
-                      ? 'bg-[#0C0E10] text-zinc-400 border-white/[0.06]'
-                      : 'bg-zinc-50 text-zinc-500 border-zinc-200'
+                      ? 'bg-[#0F1529] text-[#8E96B0] border-[#232B4A]'
+                      : 'bg-[#F2EFE9] text-[#5F6576] border-[#E4DFD6]'
                   }`}
                 >
                   Design Criterion
@@ -355,21 +358,21 @@ export function DesignComparisonTable({
                 <th scope="col" className="px-4 py-3 align-top">
                   <div
                     className={`font-bold ${
-                      isTableDark ? 'text-emerald-400' : 'text-emerald-700'
+                      isTableDark ? 'text-[#6FCB9F]' : 'text-[#1C6E46]'
                     }`}
                   >
                     Odoo (Spenta OS)
                   </div>
                   <div
                     className={`text-[11px] font-normal mt-0.5 ${
-                      isTableDark ? 'text-zinc-400' : 'text-zinc-500'
+                      isTableDark ? 'text-[#8E96B0]' : 'text-[#5F6576]'
                     }`}
                   >
                     Current Portal · spenta.tech
                   </div>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
+                  <div className={`font-bold ${isTableDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}`}>
                     Spenta Web
                   </div>
                   <a
@@ -378,8 +381,8 @@ export function DesignComparisonTable({
                     rel="noreferrer"
                     className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
                       isTableDark
-                        ? 'text-zinc-400 hover:text-emerald-400'
-                        : 'text-zinc-500 hover:text-emerald-600'
+                        ? 'text-[#8E96B0] hover:text-[#6FCB9F]'
+                        : 'text-[#5F6576] hover:text-[#1C6E46]'
                     }`}
                   >
                     <span>spenta-web-v2</span>
@@ -387,7 +390,7 @@ export function DesignComparisonTable({
                   </a>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
+                  <div className={`font-bold ${isTableDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}`}>
                     MMIS Intel Dashboards
                   </div>
                   <a
@@ -396,8 +399,8 @@ export function DesignComparisonTable({
                     rel="noreferrer"
                     className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
                       isTableDark
-                        ? 'text-zinc-400 hover:text-emerald-400'
-                        : 'text-zinc-500 hover:text-emerald-600'
+                        ? 'text-[#8E96B0] hover:text-[#6FCB9F]'
+                        : 'text-[#5F6576] hover:text-[#1C6E46]'
                     }`}
                   >
                     <span>mmis-intel-dashboards-v2</span>
@@ -405,7 +408,7 @@ export function DesignComparisonTable({
                   </a>
                 </th>
                 <th scope="col" className="px-4 py-3 align-top">
-                  <div className={`font-bold ${isTableDark ? 'text-zinc-100' : 'text-zinc-950'}`}>
+                  <div className={`font-bold ${isTableDark ? 'text-[#E7EBF5]' : 'text-[#16213A]'}`}>
                     Spenta Dhaka
                   </div>
                   <a
@@ -414,8 +417,8 @@ export function DesignComparisonTable({
                     rel="noreferrer"
                     className={`inline-flex items-center gap-1 text-[11px] font-normal mt-0.5 transition-colors ${
                       isTableDark
-                        ? 'text-zinc-400 hover:text-emerald-400'
-                        : 'text-zinc-500 hover:text-emerald-600'
+                        ? 'text-[#8E96B0] hover:text-[#6FCB9F]'
+                        : 'text-[#5F6576] hover:text-[#1C6E46]'
                     }`}
                   >
                     <span>spenta-dhaka</span>
@@ -427,28 +430,28 @@ export function DesignComparisonTable({
 
             <tbody
               className={`divide-y ${
-                isTableDark ? 'divide-white/[0.06]' : 'divide-zinc-200'
+                isTableDark ? 'divide-[#232B4A]' : 'divide-[#E4DFD6]'
               }`}
             >
               {visibleRows.map((row) => (
                 <tr
                   key={row.id}
                   className={`transition-colors ${
-                    isTableDark ? 'hover:bg-white/[0.025]' : 'hover:bg-zinc-50/90'
+                    isTableDark ? 'hover:bg-[#0F1529]/60' : 'hover:bg-[#FAF8F4]'
                   }`}
                 >
                   <th
                     scope="row"
                     className={`sticky left-0 z-10 px-4 py-3 text-left font-semibold border-r align-top transition-colors duration-200 ${
                       isTableDark
-                        ? 'bg-[#111315] text-zinc-100 border-white/[0.06]'
-                        : 'bg-white text-zinc-950 border-zinc-200'
+                        ? 'bg-[#141A32] text-[#E7EBF5] border-[#232B4A]'
+                        : 'bg-white text-[#16213A] border-[#E4DFD6]'
                     }`}
                   >
                     <div>{row.dimension}</div>
                     <div
                       className={`text-[10px] font-mono font-normal mt-0.5 ${
-                        isTableDark ? 'text-zinc-400' : 'text-zinc-500'
+                        isTableDark ? 'text-[#8E96B0]' : 'text-[#5F6576]'
                       }`}
                     >
                       {row.pillarLabel}
@@ -457,8 +460,8 @@ export function DesignComparisonTable({
                   <td
                     className={`px-4 py-3 font-medium leading-relaxed align-top ${
                       isTableDark
-                        ? 'text-zinc-100 bg-emerald-500/[0.05]'
-                        : 'text-zinc-900 bg-emerald-500/[0.04]'
+                        ? 'text-[#E7EBF5] bg-[#6FCB9F]/[0.06]'
+                        : 'text-[#16213A] bg-[#1C6E46]/[0.05]'
                     }`}
                   >
                     <div>{row.odoo}</div>
@@ -466,7 +469,7 @@ export function DesignComparisonTable({
                   </td>
                   <td
                     className={`px-4 py-3 leading-relaxed align-top ${
-                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                      isTableDark ? 'text-[#A4ADC6]' : 'text-[#4A5568]'
                     }`}
                   >
                     <div>{row.oitsWeb}</div>
@@ -476,7 +479,7 @@ export function DesignComparisonTable({
                   </td>
                   <td
                     className={`px-4 py-3 leading-relaxed align-top ${
-                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                      isTableDark ? 'text-[#A4ADC6]' : 'text-[#4A5568]'
                     }`}
                   >
                     <div>{row.mmis}</div>
@@ -484,7 +487,7 @@ export function DesignComparisonTable({
                   </td>
                   <td
                     className={`px-4 py-3 leading-relaxed align-top ${
-                      isTableDark ? 'text-zinc-300' : 'text-zinc-700'
+                      isTableDark ? 'text-[#A4ADC6]' : 'text-[#4A5568]'
                     }`}
                   >
                     <div>{row.oitsDhaka}</div>

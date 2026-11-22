@@ -33,6 +33,7 @@ import {
   STARTER_RECIPES,
 } from '../data/spentaManifest';
 import { useStack } from '../store/StackContext';
+import { usePathwayBrainSync } from '../hooks/usePathwayBrainSync';
 import { SovereignBrain3D } from './three/SovereignBrain3D';
 
 type VaultViewMode = 'matrix' | 'grid' | 'brain3d';
@@ -82,7 +83,7 @@ function EvidenceLabel({ app }: { app: SpentaApp }) {
     app.proofClient.includes('X Ltd') ||
     app.proofClient.includes('bKash');
   return (
-    <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+    <span className="text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
       {isProd ? 'Verified Production' : 'Validated Deployment'}
     </span>
   );
@@ -90,6 +91,7 @@ function EvidenceLabel({ app }: { app: SpentaApp }) {
 
 export function SpentaBrainVault() {
   const {
+    theme,
     selectedIds,
     selectedApps,
     appMap,
@@ -109,7 +111,7 @@ export function SpentaBrainVault() {
   const [engineFilter, setEngineFilter] = useState<'all' | EngineType>('all');
   const [deployFilter, setDeployFilter] = useState<'all' | DeploymentMode>('all');
   const [hoveredAppId, setHoveredAppId] = useState<string | null>(null);
-  const [selectedHubId3D, setSelectedHubId3D] = useState<string | null>('fintech');
+  const { activeBrainSelection, selectBrainNode } = usePathwayBrainSync();
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'app') {
@@ -161,35 +163,35 @@ export function SpentaBrainVault() {
 
   return (
     <div className="space-y-5">
-      {/* Compact Swiss Obsidian-Grid Workspace Hero */}
-      <section className="relative overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] bg-obsidian-grid">
+      {/* Compact Swiss Architectural Workspace Hero */}
+      <section className="relative overflow-hidden rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] bg-obsidian-grid">
         <div className="p-4 sm:p-6">
           <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
             <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-mono uppercase tracking-[0.14em] text-[#1C6E46] dark:text-[#6FCB9F]">
                 <span>SPENTA COMPOSABLE APP VAULT</span>
-                <span className="text-zinc-300 dark:text-zinc-700">·</span>
-                <span className="text-zinc-500 dark:text-zinc-400">13 SOVEREIGN MODULES</span>
-                <span className="text-zinc-300 dark:text-zinc-700">·</span>
-                <span className="text-zinc-500 dark:text-zinc-400">L1–L6 CORE KERNEL</span>
+                <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
+                <span className="text-[#5F6576] dark:text-[#8E96B0]">13 SOVEREIGN MODULES</span>
+                <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
+                <span className="text-[#5F6576] dark:text-[#8E96B0]">L1–L6 CORE KERNEL</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-1.5 leading-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-1.5 leading-tight">
                 Compose Verified Sovereign AI, ERP, Fintech &amp; Spatial XR Stacks
               </h1>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#4A5568] dark:text-[#A4ADC6] mt-2 max-w-2xl leading-relaxed">
                 Select modules across Operations and Experience hemispheres to verify native integrations, illuminate active L1–L6 layers, and size your air-gapped server baseline in real time.
               </p>
             </div>
 
             {/* 3-Way View Mode Switcher */}
-            <div className="inline-flex flex-wrap rounded-xl bg-zinc-100 dark:bg-[#18181B] p-1 border border-zinc-200 dark:border-white/[0.08] self-start xl:self-auto shrink-0">
+            <div className="inline-flex flex-wrap rounded-xl bg-[#F2EFE9] dark:bg-[#0F1529] p-1 border border-[#E4DFD6] dark:border-[#232B4A] self-start xl:self-auto shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode('matrix')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   viewMode === 'matrix'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Network className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -198,10 +200,10 @@ export function SpentaBrainVault() {
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   viewMode === 'grid'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Grid2x2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -210,10 +212,10 @@ export function SpentaBrainVault() {
               <button
                 type="button"
                 onClick={() => setViewMode('brain3d')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   viewMode === 'brain3d'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Box className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -223,22 +225,22 @@ export function SpentaBrainVault() {
           </div>
 
           {/* Filter Bar & 1-Click Starter Recipes */}
-          <div className="mt-5 pt-4 border-t border-zinc-200/80 dark:border-white/[0.08] flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="mt-5 pt-4 border-t border-[#E4DFD6] dark:border-[#232B4A] flex flex-col xl:flex-row xl:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px] sm:flex-initial sm:w-64">
-                <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
+                <Search className="w-3.5 h-3.5 text-[#5F6576] dark:text-[#8E96B0] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" strokeWidth={1.5} />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter apps, proofs, specs..."
-                  className="w-full pl-8 pr-8 py-1.5 text-xs bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.1] rounded-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full min-h-[38px] sm:min-h-[34px] pl-8 pr-8 py-1.5 text-xs bg-[#FAF8F4] dark:bg-[#0B1020] border border-[#E4DFD6] dark:border-[#232B4A] rounded-lg text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#7D8599] dark:placeholder:text-[#707B9C] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6576] hover:text-[#16213A] dark:hover:text-[#E7EBF5] cursor-pointer"
                     aria-label="Clear filter"
                   >
                     <X className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -246,16 +248,16 @@ export function SpentaBrainVault() {
                 )}
               </div>
 
-              <div className="inline-flex flex-wrap rounded-lg bg-zinc-100 dark:bg-[#09090B] p-0.5 border border-zinc-200 dark:border-white/[0.08]">
+              <div className="inline-flex flex-wrap rounded-lg bg-[#F2EFE9] dark:bg-[#0B1020] p-0.5 border border-[#E4DFD6] dark:border-[#232B4A]">
                 {(['all', 'operations', 'experience', 'fusion'] as const).map((eng) => (
                   <button
                     key={eng}
                     type="button"
                     onClick={() => setEngineFilter(eng)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-md text-[11px] font-semibold capitalize transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       engineFilter === eng
-                        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                        : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                     }`}
                   >
                     {eng === 'all' ? 'All Engines' : eng}
@@ -263,16 +265,16 @@ export function SpentaBrainVault() {
                 ))}
               </div>
 
-              <div className="inline-flex flex-wrap rounded-lg bg-zinc-100 dark:bg-[#09090B] p-0.5 border border-zinc-200 dark:border-white/[0.08]">
+              <div className="inline-flex flex-wrap rounded-lg bg-[#F2EFE9] dark:bg-[#0B1020] p-0.5 border border-[#E4DFD6] dark:border-[#232B4A]">
                 {(['all', 'On-Prem', 'Private VPC', 'SaaS'] as const).map((dep) => (
                   <button
                     key={dep}
                     type="button"
                     onClick={() => setDeployFilter(dep)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                    className={`px-2.5 py-1.5 sm:py-1 rounded-md text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       deployFilter === dep
-                        ? 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        ? 'bg-[#1C6E46] text-white dark:bg-[#6FCB9F] dark:text-[#0B1020]'
+                        : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                     }`}
                   >
                     {dep === 'all' ? 'Any Deploy' : dep}
@@ -282,8 +284,8 @@ export function SpentaBrainVault() {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1">
-                <Sparkles className="w-3 h-3 text-emerald-500" strokeWidth={1.5} />
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mr-1">
+                <Sparkles className="w-3 h-3 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.5} />
                 Recipes:
               </span>
               {STARTER_RECIPES.map((recipe) => (
@@ -291,7 +293,7 @@ export function SpentaBrainVault() {
                   key={recipe.id}
                   type="button"
                   onClick={() => applyRecipe(recipe.id)}
-                  className="text-[11px] px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-semibold transition-colors cursor-pointer"
+                  className="text-[11px] px-2.5 py-1.5 sm:py-1 rounded-lg border border-[#1C6E46]/25 dark:border-[#6FCB9F]/30 bg-[#1C6E46]/8 dark:bg-[#6FCB9F]/10 hover:bg-[#1C6E46]/15 dark:hover:bg-[#6FCB9F]/20 text-[#1C6E46] dark:text-[#6FCB9F] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   title={recipe.description}
                 >
                   {recipe.name}
@@ -301,7 +303,7 @@ export function SpentaBrainVault() {
                 <button
                   type="button"
                   onClick={clearStack}
-                  className="text-[11px] px-2 py-1 text-zinc-500 dark:text-zinc-400 hover:text-[#E11D48] font-medium cursor-pointer"
+                  className="text-[11px] px-2 py-1 text-[#5F6576] dark:text-[#8E96B0] hover:text-[#E11D48] font-medium whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   Reset
                 </button>
@@ -311,11 +313,11 @@ export function SpentaBrainVault() {
         </div>
 
         {/* Governance & Engineering Marquee Ticker */}
-        <div className="border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50/90 dark:bg-[#09090B]/90 overflow-hidden py-2">
-          <div className="animate-spenta-marquee flex items-center gap-8 text-[10px] font-mono tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+        <div className="border-t border-[#E4DFD6] dark:border-[#232B4A] bg-[#F2EFE9]/90 dark:bg-[#0F1529]/90 overflow-hidden py-2">
+          <div className="animate-spenta-marquee flex items-center gap-8 text-[10px] font-mono tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
             {[...GOVERNANCE_MARQUEE_ITEMS, ...GOVERNANCE_MARQUEE_ITEMS].map((item, idx) => (
               <span key={`${item}-${idx}`} className="inline-flex items-center gap-3 shrink-0">
-                <span className="w-1 h-1 rounded-full bg-emerald-500/80" />
+                <span className="w-1 h-1 rounded-full bg-[#1C6E46] dark:bg-[#6FCB9F]" />
                 <span>{item}</span>
               </span>
             ))}
@@ -325,15 +327,15 @@ export function SpentaBrainVault() {
 
       {/* Auto-Dependency Toast Banner */}
       {autoNotice && (
-        <div className="px-4 py-2.5 rounded-xl bg-zinc-950 dark:bg-[#111315] text-emerald-200 border border-emerald-500/35 text-xs font-mono flex items-center justify-between gap-3">
+        <div className="px-4 py-2.5 rounded-xl bg-[#1F3863] dark:bg-[#141A32] text-[#E7EBF5] border border-[#6FCB9F]/40 text-xs font-mono flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" strokeWidth={1.5} />
+            <Zap className="w-3.5 h-3.5 text-[#6FCB9F] shrink-0" strokeWidth={1.5} />
             <span>{autoNotice}</span>
           </span>
           <button
             type="button"
             onClick={() => setAutoNotice(null)}
-            className="text-emerald-400 hover:text-white cursor-pointer"
+            className="text-[#6FCB9F] hover:text-white cursor-pointer"
             aria-label="Dismiss notice"
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
@@ -342,34 +344,34 @@ export function SpentaBrainVault() {
       )}
 
       {/* Live Compact Stack Summary Strip */}
-      <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-zinc-700 dark:text-zinc-300 tabular-nums">
+      <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[#4A5568] dark:text-[#A4ADC6] tabular-nums">
           <span>
-            <strong className="text-emerald-700 dark:text-emerald-400">{selectedApps.length}</strong> / 13 Modules
+            <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">{selectedApps.length}</strong> / 13 Modules
           </span>
-          <span className="text-zinc-300 dark:text-zinc-700">·</span>
+          <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span>
-            Build Scope: <strong className="text-zinc-950 dark:text-zinc-50">${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K</strong>
+            Build Scope: <strong className="text-[#16213A] dark:text-[#E7EBF5]">${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K</strong>
           </span>
-          <span className="text-zinc-300 dark:text-zinc-700">·</span>
+          <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span>
-            Blended GM: <strong className="text-emerald-700 dark:text-emerald-400">{stackMetrics.blendedGmPct.toFixed(1)}%</strong>
+            Blended GM: <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">{stackMetrics.blendedGmPct.toFixed(1)}%</strong>
           </span>
-          <span className="text-zinc-300 dark:text-zinc-700">·</span>
+          <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span className="inline-flex items-center gap-1.5">
-            <Cpu className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
-            <strong className="text-zinc-950 dark:text-zinc-50">{tierSpec.code}</strong>
-            <span className="text-zinc-500 dark:text-zinc-400">({tierSpec.capex})</span>
+            <Cpu className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.5} />
+            <strong className="text-[#16213A] dark:text-[#E7EBF5]">{tierSpec.code}</strong>
+            <span className="text-[#5F6576] dark:text-[#8E96B0]">({tierSpec.capex})</span>
           </span>
-          <span className="text-zinc-300 dark:text-zinc-700">·</span>
+          <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span>
-            <strong className="text-zinc-950 dark:text-zinc-50">{stackMetrics.synergyPairs.length}</strong> Verified Synergies
+            <strong className="text-[#16213A] dark:text-[#E7EBF5]">{stackMetrics.synergyPairs.length}</strong> Verified Synergies
           </span>
         </div>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-[#E11D48] hover:text-[#BE123C] cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-[#E11D48] hover:text-[#BE123C] whitespace-nowrap shrink-0 cursor-pointer"
         >
           <span>Inspect &amp; Export Stack</span>
           <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -378,25 +380,25 @@ export function SpentaBrainVault() {
 
       {/* VIEW 1: STRICTLY ORTHOGONAL RESPONSIVE BENTO ARCHITECTURE MATRIX */}
       {viewMode === 'matrix' && (
-        <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
+        <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E4DFD6] dark:border-[#232B4A]">
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-zinc-950 dark:text-zinc-50">
+              <h2 className="text-sm sm:text-base font-bold text-[#16213A] dark:text-[#E7EBF5]">
                 Spenta Sovereign AI Brain — Orthogonal Architecture Matrix
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              <p className="text-xs text-[#5F6576] dark:text-[#8E96B0] mt-0.5">
                 Left: Operations Engine (Hubs 01–04) · Center: Live L1–L6 Core Processor · Right: Experience &amp; IR4 Engine (Hubs 05–08)
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> In Stack
+                <span className="w-2 h-2 rounded-full bg-[#1C6E46] dark:bg-[#6FCB9F]" /> In Stack
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-500" /> Native Synergy
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600" /> Available
+                <span className="w-2 h-2 rounded-full bg-[#B9B2A5] dark:bg-[#3A456B]" /> Available
               </span>
             </div>
           </div>
@@ -405,7 +407,7 @@ export function SpentaBrainVault() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
             {/* LEFT HEMISPHERE: OPERATIONS ENGINE (HUBS 01-04) */}
             <div className="lg:col-span-4 space-y-3">
-              <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
                 <span>Operations Engine</span>
                 <span>Hubs 01–04</span>
               </div>
@@ -417,25 +419,25 @@ export function SpentaBrainVault() {
                     key={hub.id}
                     className={`rounded-xl border p-3 transition-colors ${
                       selectedInHub > 0
-                        ? 'border-emerald-500/35 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.04]'
-                        : 'border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E10]'
+                        ? 'border-[#1C6E46]/35 dark:border-[#6FCB9F]/35 bg-[#1C6E46]/[0.04] dark:bg-[#6FCB9F]/[0.05]'
+                        : 'border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-2.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-zinc-500 dark:text-zinc-400">
+                        <span className="text-[#5F6576] dark:text-[#8E96B0]">
                           <HubIcon hubId={hub.id} />
                         </span>
                         <div className="min-w-0">
-                          <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                          <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                             HUB {hub.num} · {hub.keyLayers.join('/')}
                           </div>
-                          <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                          <h3 className="text-xs font-bold text-[#16213A] dark:text-[#E7EBF5] truncate">
                             {hub.label}
                           </h3>
                         </div>
                       </div>
-                      <span className="font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-400 shrink-0">
+                      <span className="font-mono text-[10px] tabular-nums text-[#1C6E46] dark:text-[#6FCB9F] shrink-0">
                         {selectedInHub}/{hubApps.length}
                       </span>
                     </div>
@@ -458,10 +460,10 @@ export function SpentaBrainVault() {
                               isDimmed ? 'opacity-35' : 'opacity-100'
                             } ${
                               isSelected
-                                ? 'bg-zinc-950 text-white border-emerald-500/60 dark:bg-[#181B1E] dark:border-emerald-500/60'
+                                ? 'bg-[#1F3863] text-white border-[#1F3863] dark:bg-[#1B2547] dark:border-[#6FCB9F]/60'
                                 : isSynergy
-                                  ? 'bg-amber-500/10 border-amber-500/60 text-zinc-900 dark:text-zinc-100'
-                                  : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-white/[0.08] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100'
+                                  ? 'bg-amber-500/10 border-amber-500/60 text-[#16213A] dark:text-[#E7EBF5]'
+                                  : 'bg-white dark:bg-[#141A32] border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863]/40 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5]'
                             }`}
                           >
                             <div className="min-w-0">
@@ -469,8 +471,8 @@ export function SpentaBrainVault() {
                               <div
                                 className={`text-[10px] font-mono tabular-nums mt-0.5 ${
                                   isSelected
-                                    ? 'text-emerald-300'
-                                    : 'text-zinc-500 dark:text-zinc-400'
+                                    ? 'text-[#A7E6C6]'
+                                    : 'text-[#5F6576] dark:text-[#8E96B0]'
                                 }`}
                               >
                                 ${(app.setupUsd / 1000).toFixed(1)}K · {app.gmPct.toFixed(1)}% GM · T{app.minServerTier}
@@ -479,8 +481,8 @@ export function SpentaBrainVault() {
                             <span
                               className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
                                 isSelected
-                                  ? 'bg-emerald-500 text-zinc-950'
-                                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'
+                                  ? 'bg-[#6FCB9F] text-[#0B1020]'
+                                  : 'bg-[#F2EFE9] dark:bg-[#1D2545] text-[#5F6576] dark:text-[#8E96B0]'
                               }`}
                             >
                               {isSelected ? (
@@ -500,23 +502,23 @@ export function SpentaBrainVault() {
 
             {/* CENTER COLUMN: SPENTA CORE L1-L6 LIVE PROCESSOR */}
             <div className="lg:col-span-4 flex flex-col">
-              <div className="flex items-center justify-between px-1 mb-3 text-[10px] font-mono uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">
+              <div className="flex items-center justify-between px-1 mb-3 text-[10px] font-mono uppercase tracking-[0.14em] text-[#1C6E46] dark:text-[#6FCB9F]">
                 <span>Sovereign Core Bus</span>
                 <span>L1–L6 Live</span>
               </div>
 
-              <div className="flex-1 rounded-xl border border-emerald-500/35 bg-zinc-950 dark:bg-[#09090B] text-zinc-100 p-4 flex flex-col justify-between gap-4">
+              <div className="flex-1 rounded-xl border border-[#232B4A] bg-[#0F1529] dark:bg-[#0B1020] text-[#E7EBF5] p-4 flex flex-col justify-between gap-4">
                 <div>
-                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/[0.08]">
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-[#232B4A]">
                     <div>
-                      <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-emerald-400">
+                      <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#6FCB9F]">
                         SPENTA CORE KERNEL
                       </div>
                       <div className="text-base font-extrabold text-white mt-0.5">
                         {hoveredApp ? hoveredApp.shortName : 'Active Composed Stack'}
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-mono text-emerald-300">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#6FCB9F]/15 border border-[#6FCB9F]/35 text-[10px] font-mono text-[#6FCB9F]">
                       <Layers className="w-3 h-3" strokeWidth={1.5} />
                       {activeLayersDisplay.size}/6 Layers
                     </span>
@@ -532,8 +534,8 @@ export function SpentaBrainVault() {
                           key={layer.id}
                           className={`rounded-lg border px-3 py-2 transition-all ${
                             isActive
-                              ? 'bg-emerald-500/12 border-emerald-500/45 text-white'
-                              : 'bg-[#111315] border-white/[0.06] text-zinc-500'
+                              ? 'bg-[#6FCB9F]/12 border-[#6FCB9F]/45 text-white'
+                              : 'bg-[#141A32] border-[#232B4A] text-[#7F89A8]'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -541,19 +543,19 @@ export function SpentaBrainVault() {
                               <span
                                 className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded ${
                                   isActive
-                                    ? 'bg-emerald-500 text-zinc-950'
-                                    : 'bg-zinc-800 text-zinc-400'
+                                    ? 'bg-[#6FCB9F] text-[#0B1020]'
+                                    : 'bg-[#1D2545] text-[#8E96B0]'
                                 }`}
                               >
                                 {layer.id}
                               </span>
                               <span className="text-xs font-semibold truncate">{layer.title}</span>
                             </div>
-                            <span className="font-mono text-[10px] tabular-nums shrink-0 text-zinc-400">
+                            <span className="font-mono text-[10px] tabular-nums shrink-0 text-[#8E96B0]">
                               {countOnLayer > 0 ? `${countOnLayer} mod` : 'idle'}
                             </span>
                           </div>
-                          <div className="text-[10px] font-mono text-zinc-400 mt-1 truncate">
+                          <div className="text-[10px] font-mono text-[#8E96B0] mt-1 truncate">
                             {layer.subtitle}
                           </div>
                         </div>
@@ -563,40 +565,40 @@ export function SpentaBrainVault() {
                 </div>
 
                 {/* Live Kernel Telemetry & Inspected Module Readout */}
-                <div className="rounded-lg bg-[#111315] border border-white/[0.08] p-3 space-y-2">
+                <div className="rounded-lg bg-[#141A32] border border-[#232B4A] p-3 space-y-2">
                   {hoveredApp ? (
                     <>
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-[#6FCB9F]">
                         Inspecting Module · {hoveredApp.engine} engine
                       </div>
-                      <p className="text-xs text-zinc-200 leading-relaxed">{hoveredApp.tagline}</p>
-                      <div className="text-[10px] font-mono text-zinc-400">
+                      <p className="text-xs text-[#D8DFEE] leading-relaxed">{hoveredApp.tagline}</p>
+                      <div className="text-[10px] font-mono text-[#8E96B0]">
                         Proof: {hoveredApp.proofClient} · Deploy: {hoveredApp.deployment.join(' / ')}
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between text-[10px] font-mono text-emerald-400">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#6FCB9F]">
                         <span>OPA 0.88 HITL GATE ACTIVE</span>
                         <span>ZERO CLOUD EGRESS</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 pt-1 font-mono tabular-nums">
-                        <div className="rounded bg-[#09090B] border border-white/[0.06] p-2">
-                          <div className="text-[10px] text-zinc-400">Target Server</div>
+                        <div className="rounded bg-[#0B1020] border border-[#232B4A] p-2">
+                          <div className="text-[10px] text-[#8E96B0]">Target Server</div>
                           <div className="text-xs font-bold text-white mt-0.5">{tierSpec.code}</div>
-                          <div className="text-[10px] text-emerald-400">{tierSpec.capex}</div>
+                          <div className="text-[10px] text-[#6FCB9F]">{tierSpec.capex}</div>
                         </div>
-                        <div className="rounded bg-[#09090B] border border-white/[0.06] p-2">
-                          <div className="text-[10px] text-zinc-400">Stack Scope</div>
+                        <div className="rounded bg-[#0B1020] border border-[#232B4A] p-2">
+                          <div className="text-[10px] text-[#8E96B0]">Stack Scope</div>
                           <div className="text-xs font-bold text-white mt-0.5">
                             ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K
                           </div>
-                          <div className="text-[10px] text-emerald-400">
+                          <div className="text-[10px] text-[#6FCB9F]">
                             {stackMetrics.blendedGmPct.toFixed(1)}% Blended GM
                           </div>
                         </div>
                       </div>
-                      <p className="text-[11px] text-zinc-400 leading-snug pt-0.5">
+                      <p className="text-[11px] text-[#8E96B0] leading-snug pt-0.5">
                         Hover any module to trace its L1–L6 bindings and native integrations; click to toggle in your stack.
                       </p>
                     </>
@@ -607,7 +609,7 @@ export function SpentaBrainVault() {
 
             {/* RIGHT HEMISPHERE: EXPERIENCE & IR4 ENGINE (HUBS 05-08) */}
             <div className="lg:col-span-4 space-y-3">
-              <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center justify-between px-1 text-[10px] font-mono uppercase tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
                 <span>Experience &amp; IR4 Engine</span>
                 <span>Hubs 05–08</span>
               </div>
@@ -619,25 +621,25 @@ export function SpentaBrainVault() {
                     key={hub.id}
                     className={`rounded-xl border p-3 transition-colors ${
                       selectedInHub > 0
-                        ? 'border-emerald-500/35 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.04]'
-                        : 'border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E10]'
+                        ? 'border-[#1C6E46]/35 dark:border-[#6FCB9F]/35 bg-[#1C6E46]/[0.04] dark:bg-[#6FCB9F]/[0.05]'
+                        : 'border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529]'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-2.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-zinc-500 dark:text-zinc-400">
+                        <span className="text-[#5F6576] dark:text-[#8E96B0]">
                           <HubIcon hubId={hub.id} />
                         </span>
                         <div className="min-w-0">
-                          <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                          <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                             HUB {hub.num} · {hub.keyLayers.join('/')}
                           </div>
-                          <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                          <h3 className="text-xs font-bold text-[#16213A] dark:text-[#E7EBF5] truncate">
                             {hub.label}
                           </h3>
                         </div>
                       </div>
-                      <span className="font-mono text-[10px] tabular-nums text-emerald-700 dark:text-emerald-400 shrink-0">
+                      <span className="font-mono text-[10px] tabular-nums text-[#1C6E46] dark:text-[#6FCB9F] shrink-0">
                         {selectedInHub}/{hubApps.length}
                       </span>
                     </div>
@@ -660,10 +662,10 @@ export function SpentaBrainVault() {
                               isDimmed ? 'opacity-35' : 'opacity-100'
                             } ${
                               isSelected
-                                ? 'bg-zinc-950 text-white border-emerald-500/60 dark:bg-[#181B1E] dark:border-emerald-500/60'
+                                ? 'bg-[#1F3863] text-white border-[#1F3863] dark:bg-[#1B2547] dark:border-[#6FCB9F]/60'
                                 : isSynergy
-                                  ? 'bg-amber-500/10 border-amber-500/60 text-zinc-900 dark:text-zinc-100'
-                                  : 'bg-white dark:bg-[#111315] border-zinc-200 dark:border-white/[0.08] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100'
+                                  ? 'bg-amber-500/10 border-amber-500/60 text-[#16213A] dark:text-[#E7EBF5]'
+                                  : 'bg-white dark:bg-[#141A32] border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863]/40 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5]'
                             }`}
                           >
                             <div className="min-w-0">
@@ -671,8 +673,8 @@ export function SpentaBrainVault() {
                               <div
                                 className={`text-[10px] font-mono tabular-nums mt-0.5 ${
                                   isSelected
-                                    ? 'text-emerald-300'
-                                    : 'text-zinc-500 dark:text-zinc-400'
+                                    ? 'text-[#A7E6C6]'
+                                    : 'text-[#5F6576] dark:text-[#8E96B0]'
                                 }`}
                               >
                                 ${(app.setupUsd / 1000).toFixed(1)}K · {app.gmPct.toFixed(1)}% GM · T{app.minServerTier}
@@ -681,8 +683,8 @@ export function SpentaBrainVault() {
                             <span
                               className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
                                 isSelected
-                                  ? 'bg-emerald-500 text-zinc-950'
-                                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-500 dark:text-zinc-400'
+                                  ? 'bg-[#6FCB9F] text-[#0B1020]'
+                                  : 'bg-[#F2EFE9] dark:bg-[#1D2545] text-[#5F6576] dark:text-[#8E96B0]'
                               }`}
                             >
                               {isSelected ? (
@@ -707,8 +709,8 @@ export function SpentaBrainVault() {
       {viewMode === 'grid' && (
         <div className="space-y-7">
           {groupedByCategory.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-10 text-center">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-10 text-center">
+              <p className="text-sm font-semibold text-[#16213A] dark:text-[#E7EBF5]">
                 No Spenta modules match your current filters.
               </p>
               <button
@@ -718,7 +720,7 @@ export function SpentaBrainVault() {
                   setEngineFilter('all');
                   setDeployFilter('all');
                 }}
-                className="mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                className="mt-3 text-xs font-semibold text-[#1C6E46] dark:text-[#6FCB9F] hover:underline cursor-pointer"
               >
                 Reset all filters
               </button>
@@ -727,10 +729,10 @@ export function SpentaBrainVault() {
             groupedByCategory.map(({ category, apps }) => (
               <section key={category}>
                 <div className="flex items-center justify-between mb-3 px-0.5">
-                  <h2 className="text-[11px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-600 dark:text-zinc-400">
+                  <h2 className="text-[11px] font-mono font-bold uppercase tracking-[0.14em] text-[#5F6576] dark:text-[#8E96B0]">
                     {category}
                   </h2>
-                  <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 tabular-nums">
+                  <span className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0] tabular-nums">
                     {apps.length} {apps.length === 1 ? 'module' : 'modules'}
                   </span>
                 </div>
@@ -748,18 +750,18 @@ export function SpentaBrainVault() {
                         onClick={() => toggleApp(app.id)}
                         className={`rounded-xl p-5 border transition-all cursor-pointer flex flex-col justify-between ${
                           isSelected
-                            ? 'bg-zinc-950 text-white border-emerald-500/70 dark:bg-[#161B19] dark:border-emerald-500/60'
-                            : 'bg-white dark:bg-[#111315] text-zinc-900 dark:text-zinc-100 border-zinc-200 dark:border-white/[0.08] hover:border-emerald-500/40'
+                            ? 'bg-[#1F3863] text-white border-[#1F3863] dark:bg-[#1A2444] dark:border-[#6FCB9F]/60'
+                            : 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#E7EBF5] border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863]/40 dark:hover:border-[#8FA6E8]/50'
                         }`}
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2 mb-3">
                             <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider flex-wrap">
-                              <span className={isSelected ? 'text-emerald-400 font-semibold' : 'text-emerald-700 dark:text-emerald-400 font-semibold'}>
+                              <span className={isSelected ? 'text-[#6FCB9F] font-semibold' : 'text-[#1C6E46] dark:text-[#6FCB9F] font-semibold'}>
                                 {app.engine}
                               </span>
-                              <span className={isSelected ? 'text-zinc-600' : 'text-zinc-300 dark:text-zinc-700'}>·</span>
-                              <span className={isSelected ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'}>
+                              <span className={isSelected ? 'text-white/30' : 'text-[#D4CEC2] dark:text-[#2F3A60]'}>·</span>
+                              <span className={isSelected ? 'text-[#C6D2EE]' : 'text-[#5F6576] dark:text-[#8E96B0]'}>
                                 {app.deployment.join(' / ')}
                               </span>
                             </div>
@@ -767,15 +769,15 @@ export function SpentaBrainVault() {
                             <span
                               className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                 isSelected
-                                  ? 'bg-emerald-500 text-zinc-950'
-                                  : 'bg-zinc-100 dark:bg-white/[0.06] text-zinc-700 dark:text-zinc-300'
+                                  ? 'bg-[#6FCB9F] text-[#0B1020]'
+                                  : 'bg-[#F2EFE9] dark:bg-[#1D2545] text-[#16213A] dark:text-[#C9D2E6]'
                               }`}
                             >
                               {isSelected ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4" strokeWidth={1.5} />}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 mb-1">
+                          <div className={`flex items-center gap-2 mb-1 ${isSelected ? 'text-[#C6D2EE]' : 'text-[#5F6576] dark:text-[#8E96B0]'}`}>
                             <HubIcon hubId={app.hubId} />
                             <EvidenceLabel app={app} />
                           </div>
@@ -783,7 +785,7 @@ export function SpentaBrainVault() {
                           <h3 className="font-bold text-base leading-snug">{app.name}</h3>
                           <p
                             className={`text-xs leading-relaxed mt-1.5 ${
-                              isSelected ? 'text-zinc-300' : 'text-zinc-600 dark:text-zinc-400'
+                              isSelected ? 'text-[#D6DFF2]' : 'text-[#4A5568] dark:text-[#A4ADC6]'
                             }`}
                           >
                             {app.tagline}
@@ -791,10 +793,10 @@ export function SpentaBrainVault() {
 
                           <div
                             className={`mt-3 text-[11px] font-mono ${
-                              isSelected ? 'text-zinc-300' : 'text-zinc-500 dark:text-zinc-400'
+                              isSelected ? 'text-[#C6D2EE]' : 'text-[#5F6576] dark:text-[#8E96B0]'
                             }`}
                           >
-                            Proof: <span className={isSelected ? 'text-white' : 'text-zinc-800 dark:text-zinc-200'}>{app.proofClient}</span>
+                            Proof: <span className={isSelected ? 'text-white' : 'text-[#16213A] dark:text-[#E7EBF5]'}>{app.proofClient}</span>
                           </div>
 
                           {(app.depends.length > 0 || activeSynergies.length > 0) && (
@@ -808,7 +810,7 @@ export function SpentaBrainVault() {
                                 </span>
                               ))}
                               {activeSynergies.length > 0 && (
-                                <span className={isSelected ? 'text-emerald-300' : 'text-emerald-700 dark:text-emerald-400'}>
+                                <span className={isSelected ? 'text-[#6FCB9F]' : 'text-[#1C6E46] dark:text-[#6FCB9F]'}>
                                   {activeSynergies.length} active synergy link{activeSynergies.length > 1 ? 's' : ''}
                                 </span>
                               )}
@@ -819,8 +821,8 @@ export function SpentaBrainVault() {
                         <div
                           className={`mt-4 pt-3 border-t flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums ${
                             isSelected
-                              ? 'border-white/[0.1] text-emerald-300'
-                              : 'border-zinc-200/80 dark:border-white/[0.08] text-zinc-600 dark:text-zinc-400'
+                              ? 'border-white/15 text-[#A7E6C6]'
+                              : 'border-[#E4DFD6] dark:border-[#232B4A] text-[#5F6576] dark:text-[#8E96B0]'
                           }`}
                         >
                           <span>{app.setupLabel}</span>
@@ -839,11 +841,13 @@ export function SpentaBrainVault() {
 
       {/* VIEW 3: 3D SOVEREIGN NEURAL CORE */}
       {viewMode === 'brain3d' && (
-        <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-[#09090B] p-3 sm:p-4">
-          <div className="h-[460px] sm:h-[540px] w-full">
+        <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-[#F2EFE9] dark:bg-[#0B1020] p-3 sm:p-4">
+          <div className="h-[390px] sm:h-[520px] w-full">
             <SovereignBrain3D
-              selectedHubId={selectedHubId3D}
-              onSelectHub={(hubId) => setSelectedHubId3D(hubId)}
+              selectedHubId={activeBrainSelection.hubId}
+              hubFocusNonce={activeBrainSelection.nonce}
+              onSelectHub={(hubId) => selectBrainNode(hubId, undefined, 'vault')}
+              polarity={theme}
             />
           </div>
         </section>

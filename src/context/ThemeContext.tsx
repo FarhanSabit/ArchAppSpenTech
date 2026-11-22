@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { parseShareThemeParam } from '../utils/shareUrlCodec';
 
 export type ThemeMode = 'light' | 'dark';
 export type PaletteMode = 'stone' | 'nocturnal';
@@ -9,7 +10,7 @@ const LEGACY_THEME_STORAGE_KEY = 'spenta_theme_v1';
 interface ThemeContextValue {
   /** 'light' corresponds to Stone; 'dark' corresponds to Nocturnal */
   theme: ThemeMode;
-  /** Semantic OITS Dhaka palette identifier persisted to localStorage */
+  /** Semantic Spenta Dhaka palette identifier persisted to localStorage */
   paletteMode: PaletteMode;
   isDark: boolean;
   setTheme: (next: ThemeMode) => void;
@@ -28,6 +29,8 @@ function themeToPalette(theme: ThemeMode): PaletteMode {
 }
 
 function loadInitialPalette(): PaletteMode {
+  const sharedTheme = parseShareThemeParam();
+  if (sharedTheme) return sharedTheme;
   try {
     const storedPalette = window.localStorage.getItem(PALETTE_STORAGE_KEY);
     if (storedPalette === 'stone' || storedPalette === 'nocturnal') {

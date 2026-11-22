@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  Box,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -75,6 +76,7 @@ interface PathwayHopPlaybackProps {
   onHistoryBack: () => void;
   onHistoryForward: () => void;
   onJumpToHistory: (index: number) => void;
+  onInspectHopIn3D?: () => void;
 }
 
 function formatCumulativeLatency(ms: number): string {
@@ -104,6 +106,7 @@ export function PathwayHopPlayback({
   onHistoryBack,
   onHistoryForward,
   onJumpToHistory,
+  onInspectHopIn3D,
 }: PathwayHopPlaybackProps) {
   const totalHops = activeTrace.hops.length;
   const currentHop = activeHopIdx >= 0 ? activeTrace.hops[activeHopIdx] ?? null : null;
@@ -680,6 +683,20 @@ export function PathwayHopPlayback({
               <span style={{ color: activeGreen }} className="font-bold">
                 SLA {currentHop.latencyTarget}
               </span>
+              {onInspectHopIn3D && (
+                <button
+                  type="button"
+                  onClick={onInspectHopIn3D}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-sans text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    isDark
+                      ? 'bg-[#8FA6E8] text-[#0B1020] hover:bg-[#A6B9F0]'
+                      : 'bg-[#1F3863] text-white hover:bg-[#12233F]'
+                  }`}
+                >
+                  <Box className="w-3 h-3" strokeWidth={1.8} />
+                  <span>View Hop in 3D</span>
+                </button>
+              )}
             </div>
           </div>
 

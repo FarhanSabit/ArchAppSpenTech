@@ -271,19 +271,19 @@ export function PitchDeckView() {
   return (
     <div className="space-y-5 print:space-y-0">
       {/* Header Bar */}
-      <section className="rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-3 no-print pitch-deck-nav">
+      <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-3 no-print pitch-deck-nav">
         <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 dark:text-emerald-400 uppercase tracking-[0.14em]">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-[#1C6E46] dark:text-[#6FCB9F] uppercase tracking-[0.14em]">
             <Presentation className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>18-SLIDE MASTER INVESTOR DECK · RECONCILED FY2027–FY2031</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-0.5">
             Pitch Deck — Spenta Sovereign OS Investor Presentation
           </h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="hidden 2xl:inline-flex items-center gap-1.5 text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] px-2.5 py-1.5 rounded-lg">
+          <span className="hidden 2xl:inline-flex items-center gap-1.5 text-xs font-mono text-[#5F6576] dark:text-[#8E96B0] bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] px-2.5 py-1.5 rounded-lg">
             <Keyboard className="w-3.5 h-3.5" strokeWidth={1.5} /> ← / → Arrows
           </span>
 
@@ -291,7 +291,7 @@ export function PitchDeckView() {
             type="button"
             disabled={pdfState === 'exporting'}
             onClick={() => handleExportPdf('current')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>Slide {String(activeSlide.num).padStart(2, '0')} PDF</span>
@@ -301,7 +301,7 @@ export function PitchDeckView() {
             type="button"
             disabled={pdfState === 'exporting'}
             onClick={() => setExportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
             title="Configure PDF theme, slide range, speaker notes & stack appendix"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -312,7 +312,7 @@ export function PitchDeckView() {
             type="button"
             disabled={pdfState === 'exporting'}
             onClick={() => handleExportPdf('all')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors cursor-pointer disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
           >
             {pdfState === 'exporting' ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -333,7 +333,7 @@ export function PitchDeckView() {
           <button
             type="button"
             onClick={handlePrintPitchDeck}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] hover:border-emerald-500/40 text-zinc-900 dark:text-zinc-100 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             title="Print full 18-slide .pitch-deck-print-deck to PDF via browser print dialog"
           >
             <Printer className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -343,10 +343,10 @@ export function PitchDeckView() {
           <button
             type="button"
             onClick={() => setShowNotes((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
               showNotes
-                ? 'bg-zinc-950 text-white border-zinc-950 dark:bg-emerald-500 dark:text-zinc-950 dark:border-emerald-500'
-                : 'bg-white dark:bg-[#18181B] text-zinc-900 dark:text-zinc-100 border-zinc-200 dark:border-white/[0.12] hover:border-emerald-500/40'
+                ? 'bg-[#1F3863] text-white border-[#1F3863] dark:bg-[#8FA6E8] dark:text-[#0B1020] dark:border-[#8FA6E8]'
+                : 'bg-[#FAF8F4] dark:bg-[#0F1529] text-[#16213A] dark:text-[#E7EBF5] border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50'
             }`}
           >
             <FileText className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -357,8 +357,8 @@ export function PitchDeckView() {
 
       {/* Main Deck Stage + Slide Jump Rail (Screen Interactive View) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pitch-deck-screen-only">
-        <aside className="lg:col-span-3 rounded-2xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-3 max-h-[260px] lg:max-h-[640px] overflow-y-auto order-2 lg:order-1 no-print pitch-deck-nav">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-2 pb-2 border-b border-zinc-200 dark:border-white/[0.08]">
+        <aside className="lg:col-span-3 rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-3 max-h-[260px] lg:max-h-[640px] overflow-y-auto order-2 lg:order-1 no-print pitch-deck-nav">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] px-2 pb-2 border-b border-[#E4DFD6] dark:border-[#232B4A]">
             Slide Index (18 Slides)
           </div>
           <div className="mt-2 space-y-1">
@@ -371,13 +371,13 @@ export function PitchDeckView() {
                   onClick={() => navigateToSlide(idx)}
                   className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-start gap-2.5 ${
                     active
-                      ? 'bg-zinc-950 text-white dark:bg-emerald-500/15 dark:text-emerald-200 dark:border dark:border-emerald-500/40 font-semibold'
-                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.05]'
+                      ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8]/18 dark:text-[#E7EBF5] dark:border dark:border-[#8FA6E8]/45 font-semibold'
+                      : 'text-[#4A5568] dark:text-[#A4ADC6] hover:bg-[#FAF8F4] dark:hover:bg-[#0F1529]'
                   }`}
                 >
                   <span
                     className={`font-mono text-[10px] shrink-0 mt-0.5 tabular-nums ${
-                      active ? 'text-emerald-400' : 'text-zinc-400 dark:text-zinc-500'
+                      active ? 'text-[#6FCB9F]' : 'text-[#5F6576] dark:text-[#8E96B0]'
                     }`}
                   >
                     {String(s.num).padStart(2, '0')}
@@ -385,7 +385,7 @@ export function PitchDeckView() {
                   <span className="min-w-0">
                     <span
                       className={`block text-[10px] font-mono uppercase ${
-                        active ? 'text-emerald-300' : 'text-emerald-700 dark:text-emerald-400'
+                        active ? 'text-[#A7E6C7]' : 'text-[#1C6E46] dark:text-[#6FCB9F]'
                       }`}
                     >
                       {s.section}
@@ -403,8 +403,8 @@ export function PitchDeckView() {
           <div
             className={`relative rounded-2xl border overflow-hidden transition-colors duration-200 motion-reduce:transition-none ${
               isDarkSlide
-                ? 'bg-[#09090B] bg-obsidian-grid text-white border-emerald-500/35'
-                : 'bg-white text-zinc-950 border-zinc-200 dark:border-white/[0.12]'
+                ? 'bg-[#0B1020] bg-obsidian-grid text-[#E7EBF5] border-[#6FCB9F]/35'
+                : 'bg-white text-[#16213A] border-[#E4DFD6] dark:border-[#232B4A]'
             }`}
           >
             <div
@@ -426,8 +426,8 @@ export function PitchDeckView() {
                 <span
                   className={`font-mono text-[10px] sm:text-[11px] uppercase tracking-wider px-2 py-0.5 rounded border truncate ${
                     isDarkSlide
-                      ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
-                      : 'text-emerald-800 border-emerald-200 bg-emerald-50'
+                      ? 'text-[#6FCB9F] border-[#6FCB9F]/30 bg-[#6FCB9F]/10'
+                      : 'text-[#1C6E46] border-[#1C6E46]/30 bg-[#1C6E46]/10'
                   }`}
                 >
                   {slide.section}
@@ -435,7 +435,7 @@ export function PitchDeckView() {
               </div>
               <span
                 className={`font-mono text-xs font-bold tabular-nums shrink-0 ${
-                  isDarkSlide ? 'text-zinc-400' : 'text-zinc-500'
+                  isDarkSlide ? 'text-[#8E96B0]' : 'text-[#5F6576]'
                 }`}
               >
                 {String(slide.num).padStart(2, '0')} / {total}
@@ -449,7 +449,7 @@ export function PitchDeckView() {
                 </h2>
                 <p
                   className={`text-xs sm:text-base mt-2 max-w-3xl ${
-                    isDarkSlide ? 'text-zinc-300' : 'text-zinc-600'
+                    isDarkSlide ? 'text-[#A4ADC6]' : 'text-[#4A5568]'
                   }`}
                 >
                   {slide.subtitle}
@@ -471,13 +471,13 @@ export function PitchDeckView() {
                       key={kpi.label}
                       className={`rounded-xl p-3 sm:p-3.5 border ${
                         isDarkSlide
-                          ? 'bg-[#111315] border-white/[0.08]'
-                          : 'bg-zinc-50 border-zinc-200'
+                          ? 'bg-[#141A32] border-[#232B4A]'
+                          : 'bg-[#FAF8F4] border-[#E4DFD6]'
                       }`}
                     >
                       <div
                         className={`text-[10px] font-mono uppercase tracking-wider ${
-                          isDarkSlide ? 'text-zinc-400' : 'text-zinc-500'
+                          isDarkSlide ? 'text-[#8E96B0]' : 'text-[#5F6576]'
                         }`}
                       >
                         {kpi.label}
@@ -497,8 +497,12 @@ export function PitchDeckView() {
               <ul className="space-y-2 text-xs sm:text-sm">
                 {slide.bullets.map((bullet) => (
                   <li key={bullet} className="flex items-start gap-2.5 leading-relaxed">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 sm:mt-2 shrink-0" />
-                    <span className={isDarkSlide ? 'text-zinc-200' : 'text-zinc-700'}>{bullet}</span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full mt-1.5 sm:mt-2 shrink-0 ${
+                        isDarkSlide ? 'bg-[#6FCB9F]' : 'bg-[#1C6E46]'
+                      }`}
+                    />
+                    <span className={isDarkSlide ? 'text-[#E7EBF5]' : 'text-[#4A5568]'}>{bullet}</span>
                   </li>
                 ))}
               </ul>
@@ -507,11 +511,15 @@ export function PitchDeckView() {
                 <div
                   className={`rounded-xl px-4 py-3 border text-xs ${
                     isDarkSlide
-                      ? 'bg-emerald-500/10 border-emerald-500/35 text-emerald-100'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-900'
+                      ? 'bg-[#6FCB9F]/10 border-[#6FCB9F]/35 text-[#E7EBF5]'
+                      : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#16213A]'
                   }`}
                 >
-                  <span className="font-mono font-bold uppercase text-emerald-500 mr-2">
+                  <span
+                    className={`font-mono font-bold uppercase mr-2 ${
+                      isDarkSlide ? 'text-[#6FCB9F]' : 'text-[#1C6E46]'
+                    }`}
+                  >
                     {slide.callout.label}:
                   </span>
                   <span>{slide.callout.text}</span>
@@ -522,8 +530,8 @@ export function PitchDeckView() {
             <div
               className={`pt-3 border-t flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] font-mono ${
                 isDarkSlide
-                  ? 'border-white/[0.08] text-zinc-400'
-                  : 'border-zinc-200 text-zinc-500'
+                  ? 'border-[#232B4A] text-[#8E96B0]'
+                  : 'border-[#E4DFD6] text-[#5F6576]'
               }`}
             >
               <span>spenta.tech · Sovereign OS</span>
@@ -533,21 +541,25 @@ export function PitchDeckView() {
           </div>
 
           {/* Navigation Controls + Progress Bar */}
-          <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] px-4 py-3 flex items-center justify-between gap-4 no-print pitch-deck-nav">
+          <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] px-4 py-3 flex items-center justify-between gap-3 no-print pitch-deck-nav">
             <button
               type="button"
               disabled={slideIdx === 0}
               onClick={goPrev}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-100 dark:bg-[#18181B] hover:bg-zinc-950 hover:text-white dark:hover:bg-emerald-500 dark:hover:text-zinc-950 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] hover:bg-[#1F3863] hover:text-white dark:hover:bg-[#8FA6E8] dark:hover:text-[#0B1020] disabled:opacity-40 disabled:cursor-not-allowed text-[#16213A] dark:text-[#E7EBF5] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Previous</span>
             </button>
 
+            <span className="sm:hidden font-mono text-xs font-bold tabular-nums text-[#4A5568] dark:text-[#A4ADC6]">
+              {String(slideIdx + 1).padStart(2, '0')} / {total}
+            </span>
+
             <div className="flex-1 max-w-md hidden sm:block">
-              <div className="h-1.5 bg-zinc-100 dark:bg-[#18181B] rounded-full overflow-hidden">
+              <div className="h-1.5 bg-[#F2EFE9] dark:bg-[#0F1529] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-500 transition-all duration-200"
+                  className="h-full bg-[#1C6E46] dark:bg-[#6FCB9F] transition-all duration-200"
                   style={{ width: `${((slideIdx + 1) / total) * 100}%` }}
                 />
               </div>
@@ -557,7 +569,7 @@ export function PitchDeckView() {
               type="button"
               disabled={slideIdx === total - 1}
               onClick={goNext}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-950 dark:bg-emerald-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white dark:text-zinc-950 text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 rounded-lg bg-[#1F3863] dark:bg-[#8FA6E8] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white dark:text-[#0B1020] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span>Next</span>
               <ChevronRight className="w-4 h-4" />
@@ -566,16 +578,16 @@ export function PitchDeckView() {
 
           {/* Speaker Notes Drawer */}
           {showNotes && (
-            <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#111315] p-4">
+            <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#141A32] p-4">
               <div
                 className={`transition-opacity duration-200 motion-reduce:transition-none ${
                   transitionStage === 'visible' ? 'opacity-100' : 'opacity-0'
                 }`}
               >
-                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#1C6E46] dark:text-[#6FCB9F] mb-1">
                   Presenter Speaker Notes — Slide {String(slide.num).padStart(2, '0')}
                 </div>
-                <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                <p className="text-xs sm:text-sm text-[#4A5568] dark:text-[#A4ADC6] leading-relaxed">
                   {slide.speakerNotes}
                 </p>
               </div>
@@ -675,19 +687,19 @@ export function PitchDeckView() {
       {/* High-Quality PDF Export Configuration Modal */}
       {exportModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 no-print pitch-deck-nav"
+          className="fixed inset-0 z-50 bg-[#0B1020]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 no-print pitch-deck-nav"
           onClick={() => setExportModalOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="Export Pitch Deck as High-Quality PDF"
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.12] shadow-2xl overflow-hidden"
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 bg-zinc-950 dark:bg-[#09090B] text-white border-b border-white/[0.08] flex items-center justify-between gap-3">
+            <div className="px-5 py-4 bg-[#1F3863] dark:bg-[#0F1529] text-white border-b border-white/10 dark:border-[#232B4A] flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-emerald-400">
+                <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#6FCB9F]">
                   WIDESCREEN 16:9 VECTOR PDF EXPORT
                 </div>
                 <h3 className="font-bold text-base mt-0.5">
@@ -697,7 +709,7 @@ export function PitchDeckView() {
               <button
                 type="button"
                 onClick={() => setExportModalOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="p-2 rounded-lg text-[#CBD5E1] hover:text-white hover:bg-white/10 cursor-pointer"
                 aria-label="Close PDF options"
               >
                 <X className="w-4 h-4" strokeWidth={1.5} />
@@ -707,7 +719,7 @@ export function PitchDeckView() {
             <div className="p-5 space-y-4 text-xs">
               {/* Scope Selector */}
               <div>
-                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mb-2">
                   Slide Selection
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -722,10 +734,10 @@ export function PitchDeckView() {
                       key={opt.id}
                       type="button"
                       onClick={() => setExportScope(opt.id)}
-                      className={`px-3 py-2 rounded-lg font-semibold border transition-colors cursor-pointer ${
+                      className={`min-h-[38px] px-3 py-2 rounded-lg font-semibold border transition-colors cursor-pointer ${
                         exportScope === opt.id
-                          ? 'bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300'
-                          : 'bg-zinc-50 dark:bg-[#09090B] border-zinc-200 dark:border-white/[0.08] text-zinc-700 dark:text-zinc-300'
+                          ? 'bg-[#1C6E46]/12 dark:bg-[#6FCB9F]/15 border-[#1C6E46] dark:border-[#6FCB9F] text-[#1C6E46] dark:text-[#6FCB9F]'
+                          : 'bg-[#FAF8F4] dark:bg-[#0F1529] border-[#E4DFD6] dark:border-[#232B4A] text-[#4A5568] dark:text-[#A4ADC6]'
                       }`}
                     >
                       {opt.label}
@@ -734,9 +746,9 @@ export function PitchDeckView() {
                 </div>
 
                 {exportScope === 'range' && (
-                  <div className="mt-2.5 grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-3">
+                  <div className="mt-2.5 grid grid-cols-2 gap-3 rounded-lg bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
                     <label className="block">
-                      <span className="text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
+                      <span className="text-[10px] font-mono uppercase text-[#5F6576] dark:text-[#8E96B0]">
                         From Slide
                       </span>
                       <input
@@ -745,11 +757,11 @@ export function PitchDeckView() {
                         max={total}
                         value={rangeStart}
                         onChange={(e) => setRangeStart(Number(e.target.value))}
-                        className="mt-1 w-full px-2.5 py-1.5 rounded bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                        className="mt-1 w-full px-2.5 py-1.5 rounded bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] font-mono text-xs text-[#16213A] dark:text-[#E7EBF5]"
                       />
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-mono uppercase text-zinc-500 dark:text-zinc-400">
+                      <span className="text-[10px] font-mono uppercase text-[#5F6576] dark:text-[#8E96B0]">
                         To Slide
                       </span>
                       <input
@@ -758,7 +770,7 @@ export function PitchDeckView() {
                         max={total}
                         value={rangeEnd}
                         onChange={(e) => setRangeEnd(Number(e.target.value))}
-                        className="mt-1 w-full px-2.5 py-1.5 rounded bg-white dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.1] font-mono text-xs text-zinc-900 dark:text-zinc-100"
+                        className="mt-1 w-full px-2.5 py-1.5 rounded bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] font-mono text-xs text-[#16213A] dark:text-[#E7EBF5]"
                       />
                     </label>
                   </div>
@@ -767,14 +779,14 @@ export function PitchDeckView() {
 
               {/* PDF Color Theme */}
               <div>
-                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mb-2">
                   Document Color Theme
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {(
                     [
                       { id: 'auto', label: 'Deck Native' },
-                      { id: 'dark', label: 'All Obsidian Dark' },
+                      { id: 'dark', label: 'Nocturnal Dark' },
                       { id: 'light', label: 'Print-Friendly Light' },
                     ] as const
                   ).map((opt) => (
@@ -782,10 +794,10 @@ export function PitchDeckView() {
                       key={opt.id}
                       type="button"
                       onClick={() => setPdfTheme(opt.id)}
-                      className={`px-3 py-2 rounded-lg font-semibold border transition-colors cursor-pointer ${
+                      className={`min-h-[38px] px-3 py-2 rounded-lg font-semibold border transition-colors cursor-pointer ${
                         pdfTheme === opt.id
-                          ? 'bg-emerald-500/15 border-emerald-500 text-emerald-800 dark:text-emerald-300'
-                          : 'bg-zinc-50 dark:bg-[#09090B] border-zinc-200 dark:border-white/[0.08] text-zinc-700 dark:text-zinc-300'
+                          ? 'bg-[#1C6E46]/12 dark:bg-[#6FCB9F]/15 border-[#1C6E46] dark:border-[#6FCB9F] text-[#1C6E46] dark:text-[#6FCB9F]'
+                          : 'bg-[#FAF8F4] dark:bg-[#0F1529] border-[#E4DFD6] dark:border-[#232B4A] text-[#4A5568] dark:text-[#A4ADC6]'
                       }`}
                     >
                       {opt.label}
@@ -796,37 +808,37 @@ export function PitchDeckView() {
 
               {/* Content Toggles */}
               <div className="space-y-2 pt-1">
-                <label className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] cursor-pointer">
+                <label className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={includeNotesInPdf}
                     onChange={(e) => setIncludeNotesInPdf(e.target.checked)}
-                    className="mt-0.5 accent-emerald-500 cursor-pointer"
+                    className="mt-0.5 accent-[#1C6E46] dark:accent-[#6FCB9F] cursor-pointer"
                   />
                   <div>
-                    <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    <div className="font-semibold text-[#16213A] dark:text-[#E7EBF5]">
                       Include Presenter Speaker Notes
                     </div>
-                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0]">
                       Renders a structured notes band at the bottom of each exported slide.
                     </div>
                   </div>
                 </label>
 
                 {exportScope !== 'current' && (
-                  <label className="flex items-start gap-2.5 p-3 rounded-lg bg-zinc-50 dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] cursor-pointer">
+                  <label className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeStackAppendix && selectedApps.length > 0}
                       disabled={selectedApps.length === 0}
                       onChange={(e) => setIncludeStackAppendix(e.target.checked)}
-                      className="mt-0.5 accent-emerald-500 cursor-pointer"
+                      className="mt-0.5 accent-[#1C6E46] dark:accent-[#6FCB9F] cursor-pointer"
                     />
                     <div>
-                      <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                      <div className="font-semibold text-[#16213A] dark:text-[#E7EBF5]">
                         Append Live Composed Stack Appendix ({selectedApps.length} modules)
                       </div>
-                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0]">
                         Adds a final 16:9 sheet detailing your selected modules, build scope, GM%, and recommended on-prem server tier.
                       </div>
                     </div>
@@ -835,11 +847,11 @@ export function PitchDeckView() {
               </div>
             </div>
 
-            <div className="px-5 py-3.5 bg-zinc-50 dark:bg-[#0C0E10] border-t border-zinc-200 dark:border-white/[0.08] flex items-center justify-end gap-2">
+            <div className="px-5 py-3.5 bg-[#FAF8F4] dark:bg-[#0F1529] border-t border-[#E4DFD6] dark:border-[#232B4A] flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setExportModalOpen(false)}
-                className="px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-white dark:bg-[#18181B] text-zinc-700 dark:text-zinc-300 text-xs font-semibold cursor-pointer"
+                className="min-h-[38px] px-3.5 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[#4A5568] dark:text-[#A4ADC6] text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
@@ -847,7 +859,7 @@ export function PitchDeckView() {
                 type="button"
                 disabled={pdfState === 'exporting'}
                 onClick={() => handleExportPdf()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-60 text-white text-xs font-bold cursor-pointer"
+                className="inline-flex items-center gap-2 min-h-[38px] px-4 py-2 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-60 text-white text-xs font-bold cursor-pointer"
               >
                 {pdfState === 'exporting' ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -865,31 +877,32 @@ export function PitchDeckView() {
 
       {/* Floating Print Pitch Deck & Serialized Blob PDF Action Bar (positioned bottom-left to stay clear of AI Advisor) */}
       <div
-        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/95 dark:bg-[#111315]/95 backdrop-blur-md border border-zinc-200 dark:border-white/[0.12] shadow-lg no-print pitch-deck-nav"
+        className="fixed bottom-3.5 left-3 sm:bottom-4 sm:left-4 z-40 inline-flex items-center gap-1.5 p-1 rounded-xl bg-white/95 dark:bg-[#141A32]/95 backdrop-blur-md border border-[#E4DFD6] dark:border-[#232B4A] shadow-lg no-print pitch-deck-nav"
         role="region"
         aria-label="Pitch Deck Print and PDF Download Controls"
       >
         <button
           type="button"
           onClick={handlePrintPitchDeck}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-zinc-950 hover:bg-zinc-800 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          className="inline-flex items-center gap-2 min-h-[38px] px-3 sm:px-3.5 py-2 rounded-lg bg-[#1F3863] hover:bg-[#16213A] dark:bg-[#8FA6E8] dark:hover:bg-[#A6B9F0] text-white dark:text-[#0B1020] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           title="Open browser print dialog targeting .pitch-deck-print-deck"
         >
           <Printer className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
-          <span>Print Pitch Deck</span>
+          <span className="sm:hidden">Print</span>
+          <span className="hidden sm:inline">Print Pitch Deck</span>
         </button>
 
         <button
           type="button"
           disabled={blobPdfState === 'exporting'}
           onClick={handleDownloadSerializedPrintDeck}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/50 text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60"
           title="Serialize .pitch-deck-print-deck content and download as PDF Blob"
         >
           {blobPdfState === 'exporting' ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
           ) : blobPdfState === 'done' ? (
-            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0" />
           ) : (
             <Download className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
           )}

@@ -12,6 +12,7 @@ import {
   FileCode2,
   GitBranch,
   LayoutGrid,
+  Link2,
   Monitor,
   Moon,
   Palette,
@@ -53,6 +54,7 @@ import {
 import { SERVER_TIERS } from '../data/spentaManifest';
 import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 import { DesignComparisonTable } from './DesignComparisonTable';
 import { InteractiveArchitecturePathway } from './InteractiveArchitecturePathway';
 import { ReferoPatternExplorer } from './ReferoPatternExplorer';
@@ -95,6 +97,7 @@ export function PromptThemeStudio() {
     selectedApps,
     exportStackJson,
     setActiveTab,
+    buildShareUrl,
   } = useStack();
 
   // P0/P1/P2 prompt deck state
@@ -248,14 +251,12 @@ export function PromptThemeStudio() {
   }, [priorityFilter, promptQuery]);
 
   const handleCopy = async (key: string, text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyTextWithFallback(text);
+    if (ok) {
       setCopiedKey(key);
       window.setTimeout(() => {
         setCopiedKey((prev) => (prev === key ? null : prev));
       }, 2000);
-    } catch {
-      setCopiedKey(null);
     }
   };
 
@@ -367,11 +368,11 @@ export function PromptThemeStudio() {
   return (
     <div className="space-y-10">
       {/* Downloadable Universal Markdown Prompt Pack Bar */}
-      <section className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-5 sm:p-6">
+      <section className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5 sm:p-6">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <span className="font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#5F6576] dark:text-[#8E96B0]">
+              <span className="font-mono text-[#1C6E46] dark:text-[#6FCB9F] font-semibold">
                 Universal Markdown Kit
               </span>
               <span aria-hidden="true">·</span>
@@ -381,10 +382,10 @@ export function PromptThemeStudio() {
               <span aria-hidden="true">·</span>
               <span>Refero State Taxonomy &amp; Spenta Dhaka Master Remix</span>
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-zinc-950 dark:text-zinc-50 tracking-tight text-balance">
+            <h2 className="text-lg sm:text-xl font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight text-balance">
               Coding-Agent Prompt Pack, v0 Theme Workbench &amp; Spenta Dhaka Remix Studio
             </h2>
-            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 max-w-3xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#4A5568] dark:text-[#A4ADC6] max-w-3xl leading-relaxed">
               Download any individual P0/P1/P2 section or phase bundle as Markdown, test all four themes live across Desktop/Tablet/Mobile frames with live CSS token tweaking, and audit UI pattern completeness.
             </p>
           </div>
@@ -395,16 +396,16 @@ export function PromptThemeStudio() {
               role="group"
               aria-label="Global Stone and Nocturnal theme switcher"
               title="Persists Stone (Light) / Nocturnal (Dark) across all views via localStorage"
-              className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.1]"
+              className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
             >
               <button
                 type="button"
                 onClick={() => handleToggleGlobalPalette('stone')}
                 aria-pressed={paletteMode === 'stone'}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   paletteMode === 'stone'
                     ? 'bg-[#1F3863] text-white shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Sun className="w-3.5 h-3.5" strokeWidth={1.7} />
@@ -414,10 +415,10 @@ export function PromptThemeStudio() {
                 type="button"
                 onClick={() => handleToggleGlobalPalette('nocturnal')}
                 aria-pressed={paletteMode === 'nocturnal'}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   paletteMode === 'nocturnal'
                     ? 'bg-[#8FA6E8] text-[#0B1020] shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Moon className="w-3.5 h-3.5" strokeWidth={1.7} />
@@ -434,10 +435,10 @@ export function PromptThemeStudio() {
                   buildSequencePromptsMd(),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/50 text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {downloadedKey === 'bundle-p0p1p2' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
               ) : (
                 <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
@@ -453,10 +454,10 @@ export function PromptThemeStudio() {
                   buildOitsDhakaMasterRemixMd(),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/50 text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {downloadedKey === 'bundle-master-remix' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
               ) : (
                 <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
@@ -472,10 +473,10 @@ export function PromptThemeStudio() {
                   buildThemeTemplatesPackMd(),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.12] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/50 text-zinc-900 dark:text-zinc-100 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-[#16213A] dark:text-[#E7EBF5] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {downloadedKey === 'bundle-themes' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
               ) : (
                 <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
@@ -491,7 +492,7 @@ export function PromptThemeStudio() {
                   buildFullPromptPackMd(),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-4 py-2 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {downloadedKey === 'bundle-full' ? (
                 <Check className="w-3.5 h-3.5" />
@@ -507,19 +508,19 @@ export function PromptThemeStudio() {
       {/* Deployment Configuration Switcher & Live Project Architecture Metadata */}
       <section
         aria-label="Deployment configuration switcher and project architecture metadata"
-        className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-hidden"
+        className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] overflow-hidden"
       >
-        <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-[#E4DFD6] dark:border-[#232B4A] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <span className="inline-flex items-center gap-1.5 font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[#5F6576] dark:text-[#8E96B0]">
+              <span className="inline-flex items-center gap-1.5 font-mono text-[#1C6E46] dark:text-[#6FCB9F] font-semibold">
                 <Server className="w-3.5 h-3.5" strokeWidth={1.65} />
                 <span>Deployment Configuration</span>
               </span>
               <span aria-hidden="true">·</span>
               <span>Updates L1–L6 Core isolation, Pathway topology, virtual previews &amp; JSON manifests</span>
             </div>
-            <h3 className="text-base font-bold text-zinc-950 dark:text-zinc-50 tracking-tight">
+            <h3 className="text-base font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight">
               {deploymentProfile.title}
             </h3>
           </div>
@@ -528,7 +529,7 @@ export function PromptThemeStudio() {
             <div
               role="group"
               aria-label="Infrastructure target environment"
-              className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+              className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
             >
               {DEPLOYMENT_TARGET_ORDER.map((targetId) => {
                 const prof = DEPLOYMENT_PROFILES[targetId];
@@ -539,10 +540,10 @@ export function PromptThemeStudio() {
                     type="button"
                     onClick={() => setDeploymentTarget(targetId, 'Studio Workspace')}
                     aria-pressed={active}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`min-h-[34px] px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       active
-                        ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                        ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                        : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                     }`}
                   >
                     {prof.switcherLabel}
@@ -553,8 +554,22 @@ export function PromptThemeStudio() {
 
             <button
               type="button"
+              onClick={() => handleCopy('studio-share-url', buildShareUrl({ tab: 'Resources' }))}
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              title="Copy shareable URL encoding your current stack, deployment target, and theme"
+            >
+              {copiedKey === 'studio-share-url' ? (
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
+              ) : (
+                <Link2 className="w-3.5 h-3.5" strokeWidth={1.6} />
+              )}
+              <span>{copiedKey === 'studio-share-url' ? 'Share Link Copied' : 'Copy Share Link'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => exportStackJson({ exportedFrom: 'Studio Deployment Switcher' })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" strokeWidth={1.6} />
               <span>Export Manifest (.json)</span>
@@ -563,7 +578,7 @@ export function PromptThemeStudio() {
             <button
               type="button"
               onClick={() => setActiveTab('Spenta Core')}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1 min-h-[36px] px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#1C6E46] dark:text-[#6FCB9F] hover:underline whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span>Inspect L1–L6 Core</span>
               <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -572,63 +587,63 @@ export function PromptThemeStudio() {
         </div>
 
         {/* Live Updated Project Architecture Metadata Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 dark:divide-white/[0.07]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E4DFD6] dark:divide-[#232B4A]">
           <div className="p-4 space-y-1">
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            <div className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
               Transport &amp; Latency Budget
             </div>
-            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50 tabular-nums">
+            <div className="text-xs font-bold text-[#16213A] dark:text-[#E7EBF5] tabular-nums">
               {deploymentProfile.latencyBudget}
             </div>
-            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+            <div className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6] leading-snug">
               {deploymentProfile.transport}
             </div>
           </div>
 
           <div className="p-4 space-y-1">
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            <div className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
               Enclave &amp; Egress Boundary
             </div>
-            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50">
+            <div className="text-xs font-bold text-[#16213A] dark:text-[#E7EBF5]">
               {deploymentProfile.egressPolicy}
             </div>
-            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+            <div className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6] leading-snug">
               {deploymentProfile.enclaveBoundary}
             </div>
           </div>
 
           <div className="p-4 space-y-1">
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            <div className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
               Active L1–L6 Core Metadata
             </div>
-            <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 font-mono tabular-nums">
+            <div className="text-xs font-bold text-[#1C6E46] dark:text-[#6FCB9F] font-mono tabular-nums">
               {coreMetadataSummary.teeCount}/6 TEE · {coreMetadataSummary.strictOpaCount}/6 Strict OPA
             </div>
-            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono tabular-nums">
+            <div className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6] font-mono tabular-nums">
               {coreMetadataSummary.airGappedCount} Air-Gapped · {coreMetadataSummary.vpcCount} VPC ·{' '}
               {activeServerTier.code} ({selectedApps.length} Apps)
             </div>
           </div>
 
           <div className="p-4 space-y-1">
-            <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-              <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={1.6} />
+            <div className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0] flex items-center gap-1">
+              <Shield className="w-3 h-3 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.6} />
               <span>Compliance &amp; Cost Posture</span>
             </div>
-            <div className="text-xs font-bold text-zinc-950 dark:text-zinc-50">
+            <div className="text-xs font-bold text-[#16213A] dark:text-[#E7EBF5]">
               {deploymentProfile.compliancePosture}
             </div>
-            <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+            <div className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6] leading-snug">
               {deploymentProfile.costPosture}
             </div>
           </div>
         </div>
 
         {/* Interactive Live Architectural Metadata Inspector & L1-L6 Isolation Matrix */}
-        <div className="border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-[#0C0E11]">
+        <div className="border-t border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529]">
           <div className="px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-[#4A5568] dark:text-[#A4ADC6]">
+              <span className="font-semibold text-[#16213A] dark:text-[#E7EBF5]">
                 architecture.meta.json
               </span>
               <span aria-hidden="true">·</span>
@@ -638,10 +653,10 @@ export function PromptThemeStudio() {
               <button
                 type="button"
                 onClick={handleDownloadArchitectureMetaJson}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#16213A] dark:text-[#E7EBF5] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 cursor-pointer whitespace-nowrap shrink-0"
               >
                 {downloadedKey === 'studio-arch-meta-json' ? (
-                  <Check className="w-3 h-3 text-emerald-500" />
+                  <Check className="w-3 h-3 text-[#1C6E46] dark:text-[#6FCB9F]" />
                 ) : (
                   <Download className="w-3 h-3" strokeWidth={1.6} />
                 )}
@@ -654,10 +669,10 @@ export function PromptThemeStudio() {
               <button
                 type="button"
                 onClick={() => handleCopy('studio-arch-meta', liveArchitectureMetadataJson)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#16213A] dark:text-[#E7EBF5] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 cursor-pointer whitespace-nowrap shrink-0"
               >
                 {copiedKey === 'studio-arch-meta' ? (
-                  <Check className="w-3 h-3 text-emerald-500" />
+                  <Check className="w-3 h-3 text-[#1C6E46] dark:text-[#6FCB9F]" />
                 ) : (
                   <Copy className="w-3 h-3" strokeWidth={1.6} />
                 )}
@@ -667,7 +682,7 @@ export function PromptThemeStudio() {
                 type="button"
                 onClick={() => setShowArchMetadata((v) => !v)}
                 aria-expanded={showArchMetadata}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#4A5568] dark:text-[#A4ADC6] cursor-pointer whitespace-nowrap shrink-0"
               >
                 {showArchMetadata ? (
                   <>
@@ -687,37 +702,37 @@ export function PromptThemeStudio() {
           {showArchMetadata && (
             <div className="px-4 sm:px-5 pb-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
               {/* Left 7 cols: Live L6-L1 Layer Isolation & TEE Table */}
-              <div className="lg:col-span-7 rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-x-auto">
+              <div className="lg:col-span-7 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] overflow-x-auto">
                 <table className="w-full text-left border-collapse text-[11px]">
                   <thead>
-                    <tr className="border-b border-zinc-200 dark:border-white/[0.08] text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                    <tr className="border-b border-[#E4DFD6] dark:border-[#232B4A] text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                       <th className="py-2 px-3 font-semibold">Layer</th>
                       <th className="py-2 px-3 font-semibold">Isolation Boundary</th>
                       <th className="py-2 px-3 font-semibold">Hardware TEE</th>
                       <th className="py-2 px-3 font-semibold">OPA Policy</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.05] font-mono tabular-nums">
+                  <tbody className="divide-y divide-[#E4DFD6]/80 dark:divide-[#232B4A] font-mono tabular-nums">
                     {(['L6', 'L5', 'L4', 'L3', 'L2', 'L1'] as const).map((layerKey) => {
                       const cfg = coreLayerConfigs[layerKey];
                       return (
-                        <tr key={layerKey} className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
-                          <td className="py-2 px-3 font-bold text-zinc-950 dark:text-zinc-100">
+                        <tr key={layerKey} className="hover:bg-[#FAF8F4] dark:hover:bg-[#0F1529]/60">
+                          <td className="py-2 px-3 font-bold text-[#16213A] dark:text-[#E7EBF5]">
                             {layerKey}
                           </td>
-                          <td className="py-2 px-3 text-zinc-700 dark:text-zinc-300">
+                          <td className="py-2 px-3 text-[#4A5568] dark:text-[#A4ADC6]">
                             {cfg.isolationMode}
                           </td>
                           <td
                             className={`py-2 px-3 font-semibold ${
                               cfg.teeEnabled
-                                ? 'text-emerald-700 dark:text-emerald-400'
-                                : 'text-zinc-500 dark:text-zinc-500'
+                                ? 'text-[#1C6E46] dark:text-[#6FCB9F]'
+                                : 'text-[#5F6576] dark:text-[#8E96B0]'
                             }`}
                           >
                             {cfg.teeEnabled ? 'Enforced' : 'Standard'}
                           </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 truncate max-w-[180px]">
+                          <td className="py-2 px-3 text-[#4A5568] dark:text-[#A4ADC6] truncate max-w-[180px]">
                             {cfg.policyMode}
                           </td>
                         </tr>
@@ -728,12 +743,12 @@ export function PromptThemeStudio() {
               </div>
 
               {/* Right 5 cols: Live Project Architectural Metadata JSON */}
-              <div className="lg:col-span-5 rounded-lg border border-zinc-800 bg-zinc-950 overflow-hidden flex flex-col">
-                <div className="px-3 py-1.5 border-b border-zinc-800 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+              <div className="lg:col-span-5 rounded-lg border border-[#232B4A] bg-[#0B1020] overflow-hidden flex flex-col">
+                <div className="px-3 py-1.5 border-b border-[#232B4A] flex items-center justify-between text-[10px] font-mono text-[#8E96B0]">
                   <span>target: {deploymentProfile.id}</span>
-                  <span className="text-emerald-400">{deploymentProfile.switcherLabel} Active</span>
+                  <span className="text-[#6FCB9F]">{deploymentProfile.switcherLabel} Active</span>
                 </div>
-                <pre className="p-3 text-[10.5px] leading-relaxed font-mono text-emerald-200 overflow-auto max-h-[215px] whitespace-pre">
+                <pre className="p-3 text-[10.5px] leading-relaxed font-mono text-[#A7E6C7] overflow-auto max-h-[215px] whitespace-pre">
                   {liveArchitectureMetadataJson}
                 </pre>
               </div>
@@ -746,15 +761,15 @@ export function PromptThemeStudio() {
       <section className="space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
               <span>01. Build Sequence</span>
               <span className="mx-1.5" aria-hidden="true">
                 ·
               </span>
               <span>Ordered by dependency graph · Per-phase &amp; per-section .md export</span>
             </div>
-            <h3 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
-              <FileCode2 className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
+            <h3 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-0.5 flex items-center gap-2">
+              <FileCode2 className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0" strokeWidth={1.5} />
               <span>Section Design &amp; Develop Prompts (P0 → P1 → P2)</span>
             </h3>
           </div>
@@ -774,10 +789,10 @@ export function PromptThemeStudio() {
                       buildPriorityPhaseMd(phase),
                     )
                   }
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {isDone ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
                   ) : (
                     <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
                   )}
@@ -789,10 +804,10 @@ export function PromptThemeStudio() {
             <button
               type="button"
               onClick={() => handleCopy('global-preamble', GLOBAL_AGENT_PREAMBLE)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#111315] hover:border-emerald-500/40 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-medium text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {copiedKey === 'global-preamble' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
               ) : (
                 <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
@@ -802,7 +817,7 @@ export function PromptThemeStudio() {
             <button
               type="button"
               onClick={toggleExpandAll}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#111315] hover:border-emerald-500/40 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-medium text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <span>{allVisibleExpanded ? 'Collapse All' : 'Expand All'}</span>
             </button>
@@ -811,7 +826,7 @@ export function PromptThemeStudio() {
 
         {/* Filter & Search Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]">
+          <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]">
             {PRIORITY_FILTERS.map((f) => {
               const active = priorityFilter === f.id;
               return (
@@ -819,10 +834,10 @@ export function PromptThemeStudio() {
                   key={f.id}
                   type="button"
                   onClick={() => setPriorityFilter(f.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`min-h-[34px] px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     active
-                      ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                      ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                      : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                   }`}
                 >
                   {f.label}
@@ -833,7 +848,7 @@ export function PromptThemeStudio() {
 
           <div className="relative w-full md:w-72">
             <Search
-              className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="w-3.5 h-3.5 text-[#5F6576] dark:text-[#8E96B0] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               strokeWidth={1.5}
             />
             <input
@@ -842,14 +857,14 @@ export function PromptThemeStudio() {
               onChange={(e) => setPromptQuery(e.target.value)}
               placeholder="Filter prompts (e.g. PDF, HITL, Audit)..."
               aria-label="Filter coding agent prompts"
-              className="w-full pl-8 pr-8 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#111315] text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+              className="w-full min-h-[38px] pl-8 pr-8 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-xs text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#5F6576] dark:placeholder:text-[#8E96B0] focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8]"
             />
             {promptQuery && (
               <button
                 type="button"
                 onClick={() => setPromptQuery('')}
                 aria-label="Clear prompt search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5F6576] hover:text-[#16213A] dark:text-[#8E96B0] dark:hover:text-[#E7EBF5] cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -859,11 +874,11 @@ export function PromptThemeStudio() {
 
         {/* Prompt Accordion List */}
         {filteredPrompts.length === 0 ? (
-          <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-8 text-center space-y-3">
-            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-8 text-center space-y-3">
+            <p className="text-sm font-semibold text-[#16213A] dark:text-[#E7EBF5]">
               No coding-agent prompts match "{promptQuery}"
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
               Reset the priority filter or search term to inspect all 11 P0–P2 build prompts.
             </p>
             <button
@@ -872,13 +887,13 @@ export function PromptThemeStudio() {
                 setPriorityFilter('All');
                 setPromptQuery('');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-xs font-semibold cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] text-xs font-semibold cursor-pointer"
             >
               Reset Filters
             </button>
           </div>
         ) : (
-          <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] divide-y divide-zinc-200 dark:divide-white/[0.07] overflow-hidden">
+          <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] divide-y divide-[#E4DFD6] dark:divide-[#232B4A] overflow-hidden">
             {filteredPrompts.map((section) => {
               const isOpen = expandedIds.includes(section.id);
               const isCopied = copiedKey === section.id;
@@ -887,8 +902,8 @@ export function PromptThemeStudio() {
                 section.priority === 'P0'
                   ? 'text-rose-600 dark:text-rose-400'
                   : section.priority === 'P1'
-                    ? 'text-emerald-700 dark:text-emerald-400'
-                    : 'text-teal-700 dark:text-teal-400';
+                    ? 'text-[#1C6E46] dark:text-[#6FCB9F]'
+                    : 'text-[#1F3863] dark:text-[#8FA6E8]';
 
               return (
                 <div key={section.id} className="transition-colors">
@@ -899,7 +914,7 @@ export function PromptThemeStudio() {
                       aria-expanded={isOpen}
                       className="text-left min-w-0 flex-1 space-y-1 cursor-pointer focus:outline-none"
                     >
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#5F6576] dark:text-[#8E96B0]">
                         <span className={`font-mono font-bold tabular-nums ${priorityColor}`}>
                           {section.code}
                         </span>
@@ -916,10 +931,10 @@ export function PromptThemeStudio() {
                           </>
                         )}
                       </div>
-                      <div className="text-sm sm:text-base font-bold text-zinc-950 dark:text-zinc-50 tracking-tight">
+                      <div className="text-sm sm:text-base font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight">
                         {section.title}
                       </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-3xl">
+                      <p className="text-xs text-[#4A5568] dark:text-[#A4ADC6] leading-relaxed max-w-3xl">
                         {section.summary}
                       </p>
                     </button>
@@ -928,10 +943,10 @@ export function PromptThemeStudio() {
                       <button
                         type="button"
                         onClick={() => handleCopy(section.id, section.promptMarkdown)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 text-xs font-semibold text-zinc-900 dark:text-zinc-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                       >
                         {isCopied ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
                         )}
@@ -947,11 +962,11 @@ export function PromptThemeStudio() {
                             buildSinglePromptSectionMd(section),
                           )
                         }
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/35 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg border border-[#1C6E46]/35 dark:border-[#6FCB9F]/35 bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/12 hover:bg-[#1C6E46]/18 dark:hover:bg-[#6FCB9F]/20 text-xs font-semibold text-[#1C6E46] dark:text-[#6FCB9F] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         title={`Download ${section.code} agent prompt as Markdown`}
                       >
                         {isDownloaded ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
                         ) : (
                           <Download className="w-3.5 h-3.5" strokeWidth={1.65} />
                         )}
@@ -962,7 +977,7 @@ export function PromptThemeStudio() {
                         type="button"
                         onClick={() => toggleExpandPrompt(section.id)}
                         aria-label={isOpen ? `Collapse ${section.code}` : `Expand ${section.code}`}
-                        className="p-1.5 rounded-lg text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.06] cursor-pointer"
+                        className="p-2 rounded-lg text-[#5F6576] dark:text-[#8E96B0] hover:bg-[#FAF8F4] dark:hover:bg-[#0F1529] cursor-pointer"
                       >
                         {isOpen ? (
                           <ChevronUp className="w-4 h-4" strokeWidth={1.5} />
@@ -975,7 +990,7 @@ export function PromptThemeStudio() {
 
                   {isOpen && (
                     <div className="px-4 sm:px-5 pb-5">
-                      <pre className="p-4 rounded-lg bg-zinc-950 text-zinc-100 text-xs leading-relaxed font-mono overflow-x-auto whitespace-pre-wrap border border-zinc-800">
+                      <pre className="p-4 rounded-lg bg-[#0B1020] text-[#E7EBF5] text-xs leading-relaxed font-mono overflow-x-auto whitespace-pre-wrap border border-[#232B4A]">
                         {section.promptMarkdown}
                       </pre>
                     </div>
@@ -991,15 +1006,15 @@ export function PromptThemeStudio() {
       <section className="space-y-4">
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-3">
           <div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
               <span>02. Live Virtual Iframe Sandbox &amp; v0 Workbench</span>
               <span className="mx-1.5" aria-hidden="true">
                 ·
               </span>
               <span>Responsive 100%/768px/375px frames · Preview / Split / Code · Visual Token Tweaker</span>
             </div>
-            <h3 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
-              <Palette className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
+            <h3 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-0.5 flex items-center gap-2">
+              <Palette className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0" strokeWidth={1.5} />
               <span>4-Theme Virtual Iframes &amp; Interactive Design Mode Workbench</span>
             </h3>
           </div>
@@ -1009,16 +1024,16 @@ export function PromptThemeStudio() {
             <div
               role="group"
               aria-label="Live preview viewport layout"
-              className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]"
+              className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
             >
               <button
                 type="button"
                 onClick={() => setPreviewLayout('iframes')}
                 aria-pressed={previewLayout === 'iframes'}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   previewLayout === 'iframes'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.65} />
@@ -1028,10 +1043,10 @@ export function PromptThemeStudio() {
                 type="button"
                 onClick={() => setPreviewLayout('single')}
                 aria-pressed={previewLayout === 'single'}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   previewLayout === 'single'
-                    ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                    ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                    : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                 }`}
               >
                 <Monitor className="w-3.5 h-3.5" strokeWidth={1.65} />
@@ -1040,18 +1055,18 @@ export function PromptThemeStudio() {
             </div>
 
             {previewLayout === 'iframes' ? (
-              <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]">
+              <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]">
                 <button
                   type="button"
                   onClick={() => syncAllIframePolarities('native')}
-                  className="px-2.5 py-1.5 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-[#18181B] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold text-[#4A5568] dark:text-[#A4ADC6] hover:bg-white dark:hover:bg-[#141A32] hover:text-[#16213A] dark:hover:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   Native Defaults
                 </button>
                 <button
                   type="button"
                   onClick={() => syncAllIframePolarities('light')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-[#18181B] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold text-[#4A5568] dark:text-[#A4ADC6] hover:bg-white dark:hover:bg-[#141A32] hover:text-[#16213A] dark:hover:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Sun className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>All Light</span>
@@ -1059,7 +1074,7 @@ export function PromptThemeStudio() {
                 <button
                   type="button"
                   onClick={() => syncAllIframePolarities('dark')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-[#18181B] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold text-[#4A5568] dark:text-[#A4ADC6] hover:bg-white dark:hover:bg-[#141A32] hover:text-[#16213A] dark:hover:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>All Dark</span>
@@ -1067,7 +1082,7 @@ export function PromptThemeStudio() {
               </div>
             ) : (
               <>
-                <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]">
+                <div className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]">
                   {THEME_REFERENCE_SPECS.map((t) => {
                     const active = t.id === activeThemeId;
                     return (
@@ -1075,10 +1090,10 @@ export function PromptThemeStudio() {
                         key={t.id}
                         type="button"
                         onClick={() => handleSelectTheme(t.id)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`min-h-[34px] px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                           active
-                            ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                            ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                            : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                         }`}
                       >
                         {t.shortLabel}
@@ -1087,14 +1102,14 @@ export function PromptThemeStudio() {
                   })}
                 </div>
 
-                <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#111315] border border-zinc-200 dark:border-white/[0.08]">
+                <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]">
                   <button
                     type="button"
                     onClick={() => setPreviewPolarity('light')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       previewPolarity === 'light'
-                        ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-zinc-50 shadow-xs'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        ? 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#E7EBF5] shadow-xs'
+                        : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                     }`}
                   >
                     <Sun className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -1103,10 +1118,10 @@ export function PromptThemeStudio() {
                   <button
                     type="button"
                     onClick={() => setPreviewPolarity('dark')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    className={`inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                       previewPolarity === 'dark'
-                        ? 'bg-white dark:bg-[#18181B] text-zinc-950 dark:text-zinc-50 shadow-xs'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        ? 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#E7EBF5] shadow-xs'
+                        : 'text-[#5F6576] dark:text-[#8E96B0] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                     }`}
                   >
                     <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -1126,22 +1141,22 @@ export function PromptThemeStudio() {
               return (
                 <div
                   key={spec.id}
-                  className={`rounded-xl border overflow-hidden flex flex-col bg-white dark:bg-[#111315] ${
+                  className={`rounded-xl border overflow-hidden flex flex-col bg-white dark:bg-[#141A32] ${
                     isOitsDhaka
-                      ? 'border-emerald-500/45 dark:border-emerald-500/40'
-                      : 'border-zinc-200 dark:border-white/[0.08]'
+                      ? 'border-[#1C6E46]/55 dark:border-[#6FCB9F]/45'
+                      : 'border-[#E4DFD6] dark:border-[#232B4A]'
                   }`}
                 >
                   {/* Virtual Browser Chrome Toolbar */}
-                  <div className="px-3.5 py-2.5 border-b border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0D1014] flex flex-wrap items-center justify-between gap-2">
+                  <div className="px-3.5 py-2.5 border-b border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xs font-bold text-zinc-950 dark:text-zinc-50">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#16213A] dark:text-[#E7EBF5]">
                         <span className="truncate">{spec.name}</span>
-                        <span className="font-mono text-[10px] font-normal text-zinc-500 dark:text-zinc-400 shrink-0">
+                        <span className="font-mono text-[10px] font-normal text-[#5F6576] dark:text-[#8E96B0] shrink-0">
                           ({polarity})
                         </span>
                       </div>
-                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                      <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0] truncate">
                         {spec.archetype}
                       </div>
                     </div>
@@ -1151,7 +1166,7 @@ export function PromptThemeStudio() {
                         type="button"
                         onClick={() => toggleSingleIframePolarity(spec.id)}
                         title={`Flip ${spec.shortLabel} iframe to ${polarity === 'dark' ? 'light' : 'dark'} mode`}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-200 hover:border-emerald-500/40 transition-colors cursor-pointer whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#16213A] dark:text-[#E7EBF5] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 transition-colors cursor-pointer whitespace-nowrap"
                       >
                         {polarity === 'dark' ? (
                           <Sun className="w-3 h-3" strokeWidth={1.6} />
@@ -1164,7 +1179,7 @@ export function PromptThemeStudio() {
                       <button
                         type="button"
                         onClick={() => handleSelectTheme(spec.id, true, true)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
                       >
                         <SlidersHorizontal className="w-3 h-3" strokeWidth={1.75} />
                         <span>Design / Code</span>
@@ -1175,7 +1190,7 @@ export function PromptThemeStudio() {
                         target="_blank"
                         rel="noreferrer"
                         aria-label={`Open ${spec.name} live site`}
-                        className="p-1 rounded-md text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
+                        className="p-1 rounded-md text-[#5F6576] hover:text-[#1C6E46] dark:text-[#8E96B0] dark:hover:text-[#6FCB9F]"
                       >
                         <ExternalLink className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </a>
@@ -1191,7 +1206,7 @@ export function PromptThemeStudio() {
                   />
 
                   {/* Compact Verified Hex Swatch Bar */}
-                  <div className="px-3.5 py-2 border-t border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0D1014] flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                  <div className="px-3.5 py-2 border-t border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] flex items-center justify-between gap-2 text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                     <div className="flex items-center gap-1.5 overflow-x-auto">
                       {spec.keySwatches.slice(0, 5).map((sw) => (
                         <button
@@ -1199,7 +1214,7 @@ export function PromptThemeStudio() {
                           type="button"
                           onClick={() => handleCopy(`grid-sw-${spec.id}-${sw.hex}`, sw.hex)}
                           title={`${sw.label}: ${sw.hex} (click to copy)`}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] hover:border-emerald-500/40 cursor-pointer shrink-0"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 cursor-pointer shrink-0"
                         >
                           <span
                             className="w-2.5 h-2.5 rounded-xs border border-black/15 dark:border-white/15"
@@ -1223,17 +1238,17 @@ export function PromptThemeStudio() {
           /* Single Focus v0 Workbench: Responsive Viewport + Preview/Split/Code + Visual Design Mode */
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
             {/* Left 8 cols: v0 Responsive Preview / Split / Code Workbench */}
-            <div className="xl:col-span-8 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-4">
+            <div className="xl:col-span-8 rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 flex flex-col justify-between gap-4">
               {/* Top v0 Workbench Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-[#E4DFD6] dark:border-[#232B4A]">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50">
+                  <div className="text-sm font-bold text-[#16213A] dark:text-[#E7EBF5]">
                     {activeTheme.name} — {activeTheme.archetype}
                   </div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 flex flex-wrap items-center gap-2">
+                  <div className="text-xs text-[#5F6576] dark:text-[#8E96B0] mt-0.5 flex flex-wrap items-center gap-2">
                     <span>
                       Polarity:{' '}
-                      <strong className="font-mono text-emerald-700 dark:text-emerald-400">
+                      <strong className="font-mono text-[#1C6E46] dark:text-[#6FCB9F]">
                         {previewPolarity}
                       </strong>
                     </span>
@@ -1257,7 +1272,7 @@ export function PromptThemeStudio() {
                   <div
                     role="group"
                     aria-label="Virtual preview viewport width"
-                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
                   >
                     {(
                       [
@@ -1276,8 +1291,8 @@ export function PromptThemeStudio() {
                           aria-pressed={active}
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-semibold transition-colors whitespace-nowrap cursor-pointer ${
                             active
-                              ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                              ? 'bg-white dark:bg-[#141A32] text-[#16213A] dark:text-[#6FCB9F] shadow-xs'
+                              : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                           }`}
                         >
                           <Icon className="w-3 h-3" strokeWidth={1.65} />
@@ -1291,7 +1306,7 @@ export function PromptThemeStudio() {
                   <div
                     role="group"
                     aria-label="Workbench view mode"
-                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]"
+                    className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A]"
                   >
                     {(
                       [
@@ -1310,8 +1325,8 @@ export function PromptThemeStudio() {
                           aria-pressed={active}
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer ${
                             active
-                              ? 'bg-zinc-950 text-white dark:bg-emerald-500 dark:text-zinc-950'
-                              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                              ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                              : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                           }`}
                         >
                           <Icon className="w-3 h-3" strokeWidth={1.65} />
@@ -1326,10 +1341,10 @@ export function PromptThemeStudio() {
                     type="button"
                     onClick={() => setDesignModeOpen((v) => !v)}
                     aria-pressed={designModeOpen}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 min-h-[34px] px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
                       designModeOpen
-                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                        : 'border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] text-zinc-700 dark:text-zinc-300'
+                        ? 'border-[#1C6E46]/50 dark:border-[#6FCB9F]/50 bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/12 text-[#1C6E46] dark:text-[#6FCB9F]'
+                        : 'border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] text-[#4A5568] dark:text-[#A4ADC6]'
                     }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.6} />
@@ -1340,19 +1355,19 @@ export function PromptThemeStudio() {
 
               {/* Collapsible Visual Design Mode Token Tweaker */}
               {designModeOpen && (
-                <div className="rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#0D1014] p-3.5 space-y-3">
+                <div className="rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] p-3.5 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-[11px] font-mono font-semibold text-zinc-700 dark:text-zinc-300">
+                    <div className="text-[11px] font-mono font-semibold text-[#16213A] dark:text-[#E7EBF5]">
                       Visual Design Mode · Live CSS Custom Property Tweaker
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleCopy('css-tokens-live', liveTokenCssCode)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 cursor-pointer whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#16213A] dark:text-[#E7EBF5] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 cursor-pointer whitespace-nowrap"
                       >
                         {copiedKey === 'css-tokens-live' ? (
-                          <Check className="w-3 h-3 text-emerald-500" />
+                          <Check className="w-3 h-3 text-[#1C6E46] dark:text-[#6FCB9F]" />
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
@@ -1362,7 +1377,7 @@ export function PromptThemeStudio() {
                         <button
                           type="button"
                           onClick={resetActiveOverrides}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#18181B] text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:border-rose-500/40 cursor-pointer whitespace-nowrap"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] text-[11px] font-semibold text-[#4A5568] dark:text-[#A4ADC6] hover:border-rose-500/40 cursor-pointer whitespace-nowrap"
                         >
                           <RotateCcw className="w-3 h-3" />
                           <span>Reset Tokens</span>
@@ -1374,7 +1389,7 @@ export function PromptThemeStudio() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
                     {/* Brand Accent Swatches + Native Picker */}
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                      <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                         Brand Accent ({effectiveBrandHex})
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -1389,14 +1404,14 @@ export function PromptThemeStudio() {
                             aria-label={`Set brand accent to ${sw.label}`}
                             className={`w-5 h-5 rounded-md border cursor-pointer transition-transform hover:scale-110 ${
                               effectiveBrandHex.toLowerCase() === sw.hex.toLowerCase()
-                                ? 'ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-[#0D1014]'
+                                ? 'ring-2 ring-[#1C6E46] dark:ring-[#6FCB9F] ring-offset-1 dark:ring-offset-[#0F1529]'
                                 : 'border-black/15 dark:border-white/20'
                             }`}
                             style={{ backgroundColor: sw.hex }}
                           />
                         ))}
                         <label
-                          className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-[#4A5568] dark:text-[#A4ADC6] cursor-pointer"
                           title="Pick custom hex color"
                         >
                           <input
@@ -1417,9 +1432,9 @@ export function PromptThemeStudio() {
 
                     {/* Card Radius Slider (4px - 22px) */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400 tabular-nums">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0] tabular-nums">
                         <span>Card Radius</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                        <span className="font-bold text-[#16213A] dark:text-[#E7EBF5]">
                           {effectiveRadiusPx}px
                         </span>
                       </div>
@@ -1439,10 +1454,10 @@ export function PromptThemeStudio() {
 
                     {/* Layout Density Segmented Toggle */}
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                      <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                         Layout Density
                       </div>
-                      <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-zinc-200/70 dark:bg-[#18181B] border border-zinc-200 dark:border-white/[0.08]">
+                      <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-[#F2EFE9] dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A]">
                         {(['compact', 'balanced', 'editorial'] as const).map((d) => (
                           <button
                             key={d}
@@ -1450,8 +1465,8 @@ export function PromptThemeStudio() {
                             onClick={() => updateActiveOverride({ density: d })}
                             className={`px-2 py-1 rounded text-[10px] font-mono font-semibold capitalize transition-colors cursor-pointer whitespace-nowrap ${
                               effectiveDensity === d
-                                ? 'bg-white dark:bg-[#111315] text-zinc-950 dark:text-emerald-400 shadow-xs'
-                                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
+                                ? 'bg-[#1F3863] text-white dark:bg-[#8FA6E8] dark:text-[#0B1020]'
+                                : 'text-[#4A5568] dark:text-[#A4ADC6] hover:text-[#16213A] dark:hover:text-[#E7EBF5]'
                             }`}
                           >
                             {d}
@@ -1475,10 +1490,10 @@ export function PromptThemeStudio() {
                   <div
                     className={`${
                       workbenchMode === 'split' ? 'lg:col-span-7' : 'w-full'
-                    } rounded-xl border border-zinc-200 dark:border-white/[0.1] bg-zinc-100/70 dark:bg-[#09090B] p-2.5 overflow-x-auto`}
+                    } rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-[#F2EFE9] dark:bg-[#0B1020] p-2.5 overflow-x-auto`}
                   >
                     <div
-                      className={`${viewportWidthClass} transition-all duration-200 rounded-lg overflow-hidden border border-zinc-300/70 dark:border-white/[0.12] bg-white dark:bg-zinc-950 shadow-sm`}
+                      className={`${viewportWidthClass} transition-all duration-200 rounded-lg overflow-hidden border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#0B1020] shadow-sm`}
                     >
                       <iframe
                         title={`${activeTheme.name} focused virtual preview (${previewPolarity}, ${viewportSize})`}
@@ -1494,24 +1509,24 @@ export function PromptThemeStudio() {
                   <div
                     className={`${
                       workbenchMode === 'split' ? 'lg:col-span-5' : 'w-full'
-                    } rounded-xl border border-zinc-800 bg-zinc-950 flex flex-col overflow-hidden`}
+                    } rounded-xl border border-[#232B4A] bg-[#0B1020] flex flex-col overflow-hidden`}
                   >
-                    <div className="px-3.5 py-2 border-b border-zinc-800 flex items-center justify-between gap-2 text-[11px] font-mono text-zinc-400">
+                    <div className="px-3.5 py-2 border-b border-[#232B4A] flex items-center justify-between gap-2 text-[11px] font-mono text-[#8E96B0]">
                       <span>tokens.{activeTheme.id}.css</span>
                       <button
                         type="button"
                         onClick={() => handleCopy('css-code-pane', liveTokenCssCode)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-100 cursor-pointer whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#141A32] hover:bg-[#1E2646] text-[#E7EBF5] border border-[#232B4A] cursor-pointer whitespace-nowrap"
                       >
                         {copiedKey === 'css-code-pane' ? (
-                          <Check className="w-3 h-3 text-emerald-400" />
+                          <Check className="w-3 h-3 text-[#6FCB9F]" />
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
                         <span>{copiedKey === 'css-code-pane' ? 'Copied' : 'Copy CSS'}</span>
                       </button>
                     </div>
-                    <pre className="p-3.5 text-[11px] leading-relaxed font-mono text-emerald-200 overflow-auto max-h-[370px] whitespace-pre">
+                    <pre className="p-3.5 text-[11px] leading-relaxed font-mono text-[#A7E6C7] overflow-auto max-h-[370px] whitespace-pre">
                       {liveTokenCssCode}
                     </pre>
                   </div>
@@ -1521,14 +1536,14 @@ export function PromptThemeStudio() {
               {/* Verified Hex Swatches (1-click copy) */}
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                  <span className="text-[11px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                     Verified Extracted Palette Tokens (click any swatch to copy hex)
                   </span>
                   <a
                     href={activeTheme.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline whitespace-nowrap shrink-0"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1C6E46] dark:text-[#6FCB9F] hover:underline whitespace-nowrap shrink-0"
                   >
                     <span>Inspect Live Site</span>
                     <ExternalLink className="w-3 h-3" strokeWidth={1.5} />
@@ -1543,16 +1558,16 @@ export function PromptThemeStudio() {
                         key={swatch.label}
                         type="button"
                         onClick={() => handleCopy(swatchKey, swatch.hex)}
-                        className="text-left p-2 rounded-lg border border-zinc-200 dark:border-white/[0.08] bg-zinc-50 dark:bg-[#09090B] hover:border-emerald-500/40 transition-colors cursor-pointer"
+                        className="text-left p-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 transition-colors cursor-pointer"
                       >
                         <div
                           className="w-full h-6 rounded border border-black/10 dark:border-white/10 mb-1.5"
                           style={{ backgroundColor: swatch.hex }}
                         />
-                        <div className="text-[10px] font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                        <div className="text-[10px] font-semibold text-[#16213A] dark:text-[#E7EBF5] truncate">
                           {swatch.label}
                         </div>
-                        <div className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                        <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
                           {copied ? 'Copied!' : swatch.hex}
                         </div>
                       </button>
@@ -1563,13 +1578,13 @@ export function PromptThemeStudio() {
             </div>
 
             {/* Right 4 cols: Copyable Theme Templating Prompt */}
-            <div className="xl:col-span-4 rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 flex flex-col justify-between gap-3">
-              <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-white/[0.08]">
+            <div className="xl:col-span-4 rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 flex flex-col justify-between gap-3">
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#E4DFD6] dark:border-[#232B4A]">
                 <div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
                     Theme Templating Prompt
                   </div>
-                  <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+                  <div className="text-sm font-bold text-[#16213A] dark:text-[#E7EBF5] mt-0.5">
                     Apply "{activeTheme.archetype}"
                   </div>
                 </div>
@@ -1579,7 +1594,7 @@ export function PromptThemeStudio() {
                     onClick={() =>
                       handleCopy(`theme-prompt-${activeTheme.id}`, activeTheme.templatePromptMarkdown)
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     {copiedKey === `theme-prompt-${activeTheme.id}` ? (
                       <Check className="w-3.5 h-3.5" />
@@ -1599,11 +1614,11 @@ export function PromptThemeStudio() {
                         `${activeTheme.templatePromptMarkdown}\n`,
                       )
                     }
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] hover:border-emerald-500/40 text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer whitespace-nowrap"
+                    className="inline-flex items-center gap-1 min-h-[34px] px-2.5 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] cursor-pointer whitespace-nowrap"
                     title={`Download ${activeTheme.shortLabel} theme prompt as Markdown`}
                   >
                     {downloadedKey === `dl-theme-${activeTheme.id}` ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
                     ) : (
                       <Download className="w-3.5 h-3.5" strokeWidth={1.5} />
                     )}
@@ -1612,13 +1627,13 @@ export function PromptThemeStudio() {
                 </div>
               </div>
 
-              <pre className="flex-1 p-3.5 rounded-lg bg-zinc-950 text-zinc-100 text-[11.5px] leading-relaxed font-mono overflow-auto max-h-[460px] whitespace-pre-wrap border border-zinc-800">
+              <pre className="flex-1 p-3.5 rounded-lg bg-[#0B1020] text-[#E7EBF5] text-[11.5px] leading-relaxed font-mono overflow-auto max-h-[460px] whitespace-pre-wrap border border-[#232B4A]">
                 {activeTheme.templatePromptMarkdown}
               </pre>
 
-              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 pt-1">
+              <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0] pt-1">
                 Paste this theme block (or your tweaked CSS tokens) above any P0–P2 prompt to restyle a branch using{' '}
-                <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                <span className="font-mono text-[#16213A] dark:text-[#E7EBF5]">
                   {activeTheme.shortLabel}
                 </span>
                 .
@@ -1628,19 +1643,19 @@ export function PromptThemeStudio() {
         )}
       </section>
 
-      {/* SECTION 03: Deep OITS Dhaka Analysis, Live Interactive Pathway & Master Remix Prompt */}
+      {/* SECTION 03: Deep Spenta Dhaka Analysis, Live Interactive Pathway & Master Remix Prompt */}
       <section className="space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
               <span>03. Primary Branch Remix Blueprint</span>
               <span className="mx-1.5" aria-hidden="true">
                 ·
               </span>
               <span>spenta-dhaka Visual System × roadmap.sh UX × Spenta/Odoo Content</span>
             </div>
-            <h3 className="text-base sm:text-lg font-bold text-zinc-950 dark:text-zinc-50 tracking-tight mt-0.5 flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={1.5} />
+            <h3 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight mt-0.5 flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-[#1C6E46] dark:text-[#6FCB9F] shrink-0" strokeWidth={1.5} />
               <span>Deep Spenta Dhaka Analysis &amp; Master GitHub Branch Remix Prompt</span>
             </h3>
           </div>
@@ -1649,10 +1664,10 @@ export function PromptThemeStudio() {
             <button
               type="button"
               onClick={() => handleCopy('oits-master-prompt', OITS_DHAKA_ROADMAP_MASTER_PROMPT)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-white dark:bg-[#111315] hover:border-emerald-500/40 text-xs font-semibold text-zinc-900 dark:text-zinc-100 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] hover:border-[#1F3863]/50 dark:hover:border-[#8FA6E8]/50 text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {copiedKey === 'oits-master-prompt' ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" />
               ) : (
                 <Copy className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
@@ -1670,7 +1685,7 @@ export function PromptThemeStudio() {
                   buildOitsDhakaMasterRemixMd(),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-950 dark:bg-emerald-500 text-white dark:text-zinc-950 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 rounded-lg bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {downloadedKey === 'oits-master-md' ? (
                 <Check className="w-3.5 h-3.5" />
@@ -1691,36 +1706,36 @@ export function PromptThemeStudio() {
           {OITS_DHAKA_DEEP_ANALYSIS_PILLARS.map((pillar) => (
             <article
               key={pillar.id}
-              className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] p-4 sm:p-5 space-y-3"
+              className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 space-y-3"
             >
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                <span className="font-mono text-xs font-bold text-[#1C6E46] dark:text-[#6FCB9F]">
                   {pillar.index}.
                 </span>
-                <h4 className="text-sm font-bold text-zinc-950 dark:text-zinc-50 tracking-tight">
+                <h4 className="text-sm font-bold text-[#16213A] dark:text-[#E7EBF5] tracking-tight">
                   {pillar.title}
                 </h4>
               </div>
               <div className="space-y-2 text-xs leading-relaxed">
                 <div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
                     Spenta Dhaka Pattern:{' '}
                   </span>
-                  <span className="text-zinc-700 dark:text-zinc-300">{pillar.oitsDhakaPattern}</span>
+                  <span className="text-[#4A5568] dark:text-[#A4ADC6]">{pillar.oitsDhakaPattern}</span>
                 </div>
                 <div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#1C6E46] dark:text-[#6FCB9F]">
                     roadmap.sh UX Fusion:{' '}
                   </span>
-                  <span className="text-zinc-700 dark:text-zinc-300">
+                  <span className="text-[#4A5568] dark:text-[#A4ADC6]">
                     {pillar.roadmapShAdaptation}
                   </span>
                 </div>
                 <div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#1F3863] dark:text-[#8FA6E8]">
                     Spenta / Odoo Content:{' '}
                   </span>
-                  <span className="text-zinc-700 dark:text-zinc-300">
+                  <span className="text-[#4A5568] dark:text-[#A4ADC6]">
                     {pillar.odooContentMapping}
                   </span>
                 </div>
@@ -1729,24 +1744,24 @@ export function PromptThemeStudio() {
           ))}
         </div>
 
-        {/* Live Interactive OITS Dhaka × roadmap.sh Pathway Blueprint Prototype */}
+        {/* Live Interactive Spenta Dhaka × roadmap.sh Pathway Blueprint Prototype */}
         <InteractiveArchitecturePathway compact defaultExpandedTrunks={['trunk-core', 'trunk-ops']} />
 
         {/* Collapsible Full Master Remix Prompt Markdown Box */}
-        <div className="rounded-xl border border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#111315] overflow-hidden">
-          <div className="px-4 sm:px-5 py-3.5 border-b border-zinc-200 dark:border-white/[0.08] flex flex-wrap items-center justify-between gap-2">
+        <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] overflow-hidden">
+          <div className="px-4 sm:px-5 py-3.5 border-b border-[#E4DFD6] dark:border-[#232B4A] flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+              <div className="text-xs font-mono text-[#1C6E46] dark:text-[#6FCB9F] font-semibold">
                 git checkout -b remix/spenta-dhaka-roadmap-edition
               </div>
-              <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50 mt-0.5">
+              <div className="text-sm font-bold text-[#16213A] dark:text-[#E7EBF5] mt-0.5">
                 Executable Master Prompt — Spenta Dhaka Theme + Code-Drawn roadmap.sh Infographics + Tactile 3D PBR + 4-Resource Spec
               </div>
             </div>
             <button
               type="button"
               onClick={() => setMasterPromptExpanded((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/[0.1] bg-zinc-50 dark:bg-[#18181B] text-xs font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-[#FAF8F4] dark:bg-[#0F1529] text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] cursor-pointer whitespace-nowrap"
             >
               {masterPromptExpanded ? (
                 <>
@@ -1763,7 +1778,7 @@ export function PromptThemeStudio() {
           </div>
           {masterPromptExpanded && (
             <div className="p-4 sm:p-5">
-              <pre className="p-4 rounded-lg bg-zinc-950 text-zinc-100 text-xs leading-relaxed font-mono overflow-auto max-h-[460px] whitespace-pre-wrap border border-zinc-800">
+              <pre className="p-4 rounded-lg bg-[#0B1020] text-[#E7EBF5] text-xs leading-relaxed font-mono overflow-auto max-h-[460px] whitespace-pre-wrap border border-[#232B4A]">
                 {OITS_DHAKA_ROADMAP_MASTER_PROMPT}
               </pre>
             </div>

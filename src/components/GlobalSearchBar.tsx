@@ -137,9 +137,9 @@ export function GlobalSearchBar() {
     items.push({
       id: 'action-theme',
       kind: 'Action',
-      title: theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Obsidian Mode',
-      subtitle: 'Toggle institutional Swiss color theme across all views',
-      keywords: 'theme dark light mode obsidian appearance toggle',
+      title: theme === 'dark' ? 'Switch to Stone Light Mode' : 'Switch to Nocturnal Navy Mode',
+      subtitle: 'Toggle Spenta Stone Light and Nocturnal Navy color tokens across all views',
+      keywords: 'theme dark light mode stone nocturnal navy appearance toggle',
       onRun: () => toggleTheme(),
     });
 
@@ -407,7 +407,7 @@ export function GlobalSearchBar() {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-start justify-center pt-[10vh] px-3 sm:px-6 no-print"
+      className="fixed inset-0 z-50 bg-[#0B1020]/70 backdrop-blur-xs flex items-start justify-center pt-[8vh] sm:pt-[10vh] px-3 sm:px-6 no-print"
       onClick={() => setCommandPaletteOpen(false)}
       role="dialog"
       aria-modal="true"
@@ -415,11 +415,11 @@ export function GlobalSearchBar() {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white dark:bg-[#111315] text-zinc-900 dark:text-zinc-100 rounded-xl border border-zinc-200 dark:border-white/[0.12] shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl bg-[#FAF8F4] dark:bg-[#141A32] text-[#16213A] dark:text-[#E7EBF5] rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] shadow-2xl overflow-hidden"
       >
         {/* Search Input Row */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-zinc-200 dark:border-white/[0.08]">
-          <Search className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={1.5} />
+        <div className="flex items-center gap-3 px-4 py-3.5 bg-white dark:bg-[#0F1529] border-b border-[#E4DFD6] dark:border-[#232B4A]">
+          <Search className="w-4 h-4 text-[#5F6576] dark:text-[#8E96B0] shrink-0" strokeWidth={1.5} />
           <input
             ref={inputRef}
             type="text"
@@ -428,7 +428,7 @@ export function GlobalSearchBar() {
             onKeyDown={handleKeyDown}
             placeholder="Jump to tabs, search 13 modules, apply stack recipes, inspect L1–L6..."
             aria-label="Command Palette Search"
-            className="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none"
+            className="flex-1 bg-transparent text-sm text-[#16213A] dark:text-[#E7EBF5] placeholder:text-[#7B8294] dark:placeholder:text-[#8E96B0] focus:outline-none"
           />
           {query && (
             <button
@@ -437,13 +437,13 @@ export function GlobalSearchBar() {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+              className="p-1 text-[#5F6576] hover:text-[#16213A] dark:hover:text-white cursor-pointer"
               aria-label="Clear query"
             >
               <X className="w-4 h-4" strokeWidth={1.5} />
             </button>
           )}
-          <kbd className="hidden sm:inline-block font-mono text-[10px] text-zinc-400 bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-white/10 px-1.5 py-0.5 rounded">
+          <kbd className="hidden sm:inline-block font-mono text-[10px] text-[#5F6576] dark:text-[#8E96B0] bg-[#F2EFE9] dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] px-1.5 py-0.5 rounded">
             ESC
           </kbd>
         </div>
@@ -451,9 +451,9 @@ export function GlobalSearchBar() {
         {/* Results List */}
         {results.length === 0 ? (
           <div className="p-8 text-center space-y-3">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-[#5F6576] dark:text-[#8E96B0]">
               No direct portal matches for{' '}
-              <strong className="text-zinc-900 dark:text-zinc-100">&ldquo;{query}&rdquo;</strong>.
+              <strong className="text-[#16213A] dark:text-[#E7EBF5]">&ldquo;{query}&rdquo;</strong>.
             </p>
             <button
               type="button"
@@ -461,14 +461,17 @@ export function GlobalSearchBar() {
                 setCommandPaletteOpen(false);
                 setAiAssistantOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-[#1C6E46] hover:bg-[#165838] dark:bg-[#6FCB9F] dark:text-[#0B1020] text-white text-xs font-semibold cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>Ask Spenta AI Advisor</span>
             </button>
           </div>
         ) : (
-          <div role="listbox" className="max-h-[58vh] overflow-y-auto divide-y divide-zinc-100 dark:divide-white/[0.05]">
+          <div
+            role="listbox"
+            className="max-h-[58vh] overflow-y-auto divide-y divide-[#E4DFD6] dark:divide-[#232B4A]"
+          >
             {results.map((entry, idx) => {
               const isActive = idx === activeIndex;
               const inStack = entry.appId ? selectedIds.includes(entry.appId) : false;
@@ -482,17 +485,17 @@ export function GlobalSearchBar() {
                   onClick={() => handleSelect(entry)}
                   className={`px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
                     isActive
-                      ? 'bg-zinc-100 dark:bg-[#18181B]'
-                      : 'bg-transparent hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
+                      ? 'bg-[#F2EFE9] dark:bg-[#1C2545]'
+                      : 'bg-transparent hover:bg-[#F2EFE9]/70 dark:hover:bg-[#1C2545]/60'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {renderKindIcon(entry.kind)}
                     <div className="min-w-0">
-                      <div className="text-xs sm:text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                      <div className="text-xs sm:text-[13px] font-medium text-[#16213A] dark:text-[#E7EBF5] truncate">
                         {entry.title}
                       </div>
-                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-mono">
+                      <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0] truncate mt-0.5 font-mono">
                         {entry.subtitle}
                       </div>
                     </div>
@@ -508,8 +511,8 @@ export function GlobalSearchBar() {
                         }}
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded font-mono text-[10px] font-semibold border transition-colors cursor-pointer ${
                           inStack
-                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
-                            : 'bg-zinc-100 dark:bg-[#18181B] text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-white/10 hover:border-emerald-500/40'
+                            ? 'bg-[#1C6E46]/12 dark:bg-[#6FCB9F]/15 text-[#1C6E46] dark:text-[#6FCB9F] border-[#1C6E46]/40 dark:border-[#6FCB9F]/40'
+                            : 'bg-white dark:bg-[#0F1529] text-[#4A5163] dark:text-[#C8D0E4] border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863] dark:hover:border-[#8FA6E8]'
                         }`}
                       >
                         {inStack ? (
@@ -520,7 +523,7 @@ export function GlobalSearchBar() {
                         <span>{inStack ? 'In Stack' : 'Add'}</span>
                       </button>
                     )}
-                    <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                    <span className="font-mono text-[10px] text-[#7B8294] dark:text-[#8E96B0] uppercase tracking-wider">
                       {entry.kind}
                     </span>
                   </div>
@@ -531,7 +534,7 @@ export function GlobalSearchBar() {
         )}
 
         {/* Palette Footer */}
-        <div className="px-4 py-2 bg-zinc-50 dark:bg-[#0C0E10] border-t border-zinc-200 dark:border-white/[0.08] flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+        <div className="px-4 py-2 bg-[#F2EFE9] dark:bg-[#0B1020] border-t border-[#E4DFD6] dark:border-[#232B4A] flex items-center justify-between text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0]">
           <span>
             {query.trim() ? `${results.length} matches` : 'Quick Navigation · Recipes · 13 Modules'}
           </span>

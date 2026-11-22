@@ -256,17 +256,17 @@ export function SpentaAiAssistant() {
         <button
           type="button"
           onClick={() => setAiAssistantOpen(true)}
-          className={`fixed bottom-4 right-4 z-40 inline-flex items-center gap-2 border px-3.5 py-2.5 rounded-xl shadow-lg text-xs font-semibold transition-colors cursor-pointer no-print ${
+          className={`fixed bottom-4 right-4 z-40 min-h-[44px] inline-flex items-center gap-2 border px-3.5 py-2.5 rounded-xl shadow-lg text-xs font-semibold transition-colors cursor-pointer no-print ${
             isStone
               ? 'bg-[#16213A] hover:bg-[#1F3863] text-white border-[#1F3863]'
-              : 'bg-[#111315] hover:bg-[#181B1E] text-white border-emerald-500/45'
+              : 'bg-[#141A32] hover:bg-[#1C2545] text-[#E7EBF5] border-[#6FCB9F]/45'
           }`}
           aria-label="Open Spenta AI Advisor"
         >
-          <Sparkles className="w-4 h-4 text-emerald-400" strokeWidth={1.5} />
+          <Sparkles className="w-4 h-4 text-[#6FCB9F]" strokeWidth={1.5} />
           <span className="hidden sm:inline">Spenta AI Advisor</span>
           <span className="sm:hidden">AI Advisor</span>
-          <span className="hidden md:inline font-mono text-[10px] text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded">
+          <span className="hidden md:inline font-mono text-[10px] text-[#6FCB9F] bg-[#6FCB9F]/15 px-1.5 py-0.5 rounded">
             Live Benchmarks
           </span>
         </button>
@@ -281,7 +281,7 @@ export function SpentaAiAssistant() {
           aria-label="Spenta Gemini AI Advisor"
         >
           <div
-            className="fixed inset-0 bg-zinc-950/70 backdrop-blur-xs"
+            className="fixed inset-0 bg-[#0B1020]/70 backdrop-blur-xs"
             onClick={() => setAiAssistantOpen(false)}
           />
 
@@ -289,24 +289,24 @@ export function SpentaAiAssistant() {
             className={`relative z-10 w-full sm:max-w-[460px] h-full shadow-2xl border-l flex flex-col ${
               isStone
                 ? 'bg-[#FAF8F4] border-[#E4DFD6] text-[#16213A]'
-                : 'bg-[#0C0E10] border-white/[0.1] text-zinc-100'
+                : 'bg-[#0F1529] border-[#232B4A] text-[#E7EBF5]'
             }`}
           >
             {/* Header */}
             <div
-              className={`px-4 py-3.5 text-white border-b flex items-center justify-between gap-2 shrink-0 ${
+              className={`px-4 py-3.5 text-[#E7EBF5] border-b flex items-center justify-between gap-2 shrink-0 ${
                 isStone
                   ? 'bg-[#16213A] border-[#263557]'
-                  : 'bg-[#09090B] border-white/[0.08]'
+                  : 'bg-[#0B1020] border-[#232B4A]'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center shrink-0">
-                  <MessageSquare className="w-4 h-4 text-emerald-400" strokeWidth={1.5} />
+                <div className="w-8 h-8 rounded-lg bg-[#6FCB9F]/15 border border-[#6FCB9F]/35 flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-4 h-4 text-[#6FCB9F]" strokeWidth={1.5} />
                 </div>
                 <div className="min-w-0">
                   <div className="font-bold text-sm truncate">Spenta AI Advisor</div>
-                  <div className="text-[10px] font-mono text-emerald-400 truncate">
+                  <div className="text-[10px] font-mono text-[#6FCB9F] truncate">
                     {groundingActive
                       ? 'Google Search Grounded · AI, ERP & Fintech Benchmarks'
                       : `${model} · Stack-Aware Chat`}
@@ -317,7 +317,7 @@ export function SpentaAiAssistant() {
                 <button
                   type="button"
                   onClick={clearHistory}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                  className="p-2 rounded-lg text-[#A8B4D4] hover:text-white hover:bg-white/10 cursor-pointer"
                   title="Clear conversation history"
                   aria-label="Clear conversation history"
                 >
@@ -326,7 +326,7 @@ export function SpentaAiAssistant() {
                 <button
                   type="button"
                   onClick={() => setAiAssistantOpen(false)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                  className="p-2 rounded-lg text-[#A8B4D4] hover:text-white hover:bg-white/10 cursor-pointer"
                   aria-label="Close AI Advisor"
                 >
                   <X className="w-5 h-5" strokeWidth={1.5} />
@@ -339,7 +339,7 @@ export function SpentaAiAssistant() {
               className={`px-4 py-2.5 border-b space-y-2 shrink-0 ${
                 isStone
                   ? 'bg-[#F2EFE9] border-[#E4DFD6]'
-                  : 'bg-[#111315] border-white/[0.08]'
+                  : 'bg-[#141A32] border-[#232B4A]'
               }`}
             >
               <div className="grid grid-cols-3 gap-1">
@@ -354,14 +354,14 @@ export function SpentaAiAssistant() {
                         setModel('gemini-4-hydrogen');
                       }
                     }}
-                    className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer truncate ${
+                    className={`min-h-[34px] px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer truncate ${
                       persona === p.id
                         ? isStone
                           ? 'bg-[#1F3863] text-white'
-                          : 'bg-emerald-500 text-zinc-950'
+                          : 'bg-[#8FA6E8] text-[#0B1020]'
                         : isStone
                           ? 'bg-white text-[#4A5163] border border-[#E4DFD6] hover:border-[#1F3863]'
-                          : 'bg-[#09090B] text-zinc-300 border border-white/[0.08] hover:border-emerald-500/40'
+                          : 'bg-[#0B1020] text-[#C8D0E4] border border-[#232B4A] hover:border-[#8FA6E8]'
                     }`}
                     title={p.desc}
                   >
@@ -386,10 +386,10 @@ export function SpentaAiAssistant() {
                   aria-pressed={groundingActive}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
                     groundingActive
-                      ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/40'
+                      ? 'bg-[#1C6E46]/15 dark:bg-[#6FCB9F]/15 text-[#1C6E46] dark:text-[#6FCB9F] border-[#1C6E46]/40 dark:border-[#6FCB9F]/40'
                       : isStone
                         ? 'bg-white text-[#5F6576] border-[#CFC8BC]'
-                        : 'bg-[#09090B] text-zinc-400 border-white/[0.08]'
+                        : 'bg-[#0B1020] text-[#8E96B0] border-[#232B4A]'
                   }`}
                 >
                   <Globe className="w-3.5 h-3.5" strokeWidth={1.6} />
@@ -397,14 +397,14 @@ export function SpentaAiAssistant() {
                 </button>
 
                 {!groundingActive ? (
-                  <div className="inline-flex rounded-md bg-white dark:bg-[#09090B] border border-zinc-200 dark:border-white/[0.08] p-0.5 font-mono text-[10px]">
+                  <div className="inline-flex rounded-md bg-white dark:bg-[#0B1020] border border-[#E4DFD6] dark:border-[#232B4A] p-0.5 font-mono text-[10px]">
                     <button
                       type="button"
                       onClick={() => setModel('gemini-4-hydrogen')}
                       className={`px-2 py-0.5 rounded cursor-pointer ${
                         model === 'gemini-4-hydrogen'
-                          ? 'bg-emerald-500 text-zinc-950 font-bold'
-                          : 'text-zinc-600 dark:text-zinc-400'
+                          ? 'bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] font-bold'
+                          : 'text-[#5F6576] dark:text-[#8E96B0]'
                       }`}
                     >
                       Hydrogen
@@ -414,8 +414,8 @@ export function SpentaAiAssistant() {
                       onClick={() => setModel('gemini-3.1-flash-lite')}
                       className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded cursor-pointer ${
                         model === 'gemini-3.1-flash-lite'
-                          ? 'bg-emerald-500 text-zinc-950 font-bold'
-                          : 'text-zinc-600 dark:text-zinc-400'
+                          ? 'bg-[#1F3863] dark:bg-[#8FA6E8] text-white dark:text-[#0B1020] font-bold'
+                          : 'text-[#5F6576] dark:text-[#8E96B0]'
                       }`}
                     >
                       <Zap className="w-2.5 h-2.5" /> Fast Lite
@@ -424,7 +424,7 @@ export function SpentaAiAssistant() {
                 ) : (
                   <span
                     className={`font-mono text-[10px] ${
-                      isStone ? 'text-[#5F6576]' : 'text-zinc-400'
+                      isStone ? 'text-[#5F6576]' : 'text-[#8E96B0]'
                     }`}
                   >
                     Target: {deploymentProfile.switcherLabel} · Live Web Citations
@@ -436,7 +436,7 @@ export function SpentaAiAssistant() {
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
                 <span
                   className={`inline-flex items-center gap-1 font-mono text-[10px] font-semibold shrink-0 ${
-                    isStone ? 'text-[#5F6576]' : 'text-zinc-400'
+                    isStone ? 'text-[#5F6576]' : 'text-[#8E96B0]'
                   }`}
                 >
                   <BarChart3 className="w-3 h-3" strokeWidth={1.7} />
@@ -453,10 +453,10 @@ export function SpentaAiAssistant() {
                         personaOverride: 'market',
                       })
                     }
-                    className={`px-2 py-0.5 rounded border text-[10.5px] font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50 ${
+                    className={`px-2 py-1 rounded border text-[10.5px] font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50 ${
                       isStone
                         ? 'bg-white border-[#CFC8BC] text-[#1F3863] hover:border-[#1F3863]'
-                        : 'bg-[#09090B] border-white/[0.1] text-emerald-300 hover:border-emerald-500/50'
+                        : 'bg-[#0B1020] border-[#232B4A] text-[#6FCB9F] hover:border-[#6FCB9F]'
                     }`}
                   >
                     {action.label}
@@ -468,7 +468,7 @@ export function SpentaAiAssistant() {
             {/* Scrollable Conversation Thread */}
             <div
               className={`flex-1 overflow-y-auto px-4 py-4 space-y-3 ${
-                isStone ? 'bg-[#FAF8F4]' : 'bg-[#0C0E10]'
+                isStone ? 'bg-[#FAF8F4]' : 'bg-[#0F1529]'
               }`}
             >
               {messages.map((msg) => {
@@ -483,10 +483,10 @@ export function SpentaAiAssistant() {
                         isUser
                           ? isStone
                             ? 'bg-[#1F3863] text-white font-medium'
-                            : 'bg-emerald-500 text-zinc-950 font-medium'
+                            : 'bg-[#8FA6E8] text-[#0B1020] font-medium'
                           : isStone
                             ? 'bg-white text-[#16213A] border border-[#E4DFD6]'
-                            : 'bg-[#111315] text-zinc-200 border border-white/[0.08]'
+                            : 'bg-[#141A32] text-[#E7EBF5] border border-[#232B4A]'
                       }`}
                     >
                       {msg.text}
@@ -494,12 +494,12 @@ export function SpentaAiAssistant() {
                       {msg.searchQueries && msg.searchQueries.length > 0 && (
                         <div
                           className={`mt-2.5 pt-2 border-t space-y-1 ${
-                            isStone ? 'border-[#E4DFD6]' : 'border-white/[0.08]'
+                            isStone ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
                           }`}
                         >
                           <div
                             className={`text-[10px] font-mono font-semibold flex items-center gap-1 ${
-                              isStone ? 'text-[#5F6576]' : 'text-zinc-400'
+                              isStone ? 'text-[#5F6576]' : 'text-[#8E96B0]'
                             }`}
                           >
                             <Search className="w-2.5 h-2.5" />
@@ -512,7 +512,7 @@ export function SpentaAiAssistant() {
                                 className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                                   isStone
                                     ? 'bg-[#F2EFE9] text-[#4A5163]'
-                                    : 'bg-white/[0.05] text-zinc-300'
+                                    : 'bg-[#0B1020] text-[#C8D0E4]'
                                 }`}
                               >
                                 “{q}”
@@ -525,10 +525,10 @@ export function SpentaAiAssistant() {
                       {msg.sources && msg.sources.length > 0 && (
                         <div
                           className={`mt-2.5 pt-2 border-t space-y-1.5 ${
-                            isStone ? 'border-[#E4DFD6]' : 'border-white/[0.08]'
+                            isStone ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
                           }`}
                         >
-                          <div className="text-[10px] font-mono font-bold uppercase text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <div className="text-[10px] font-mono font-bold uppercase text-[#1C6E46] dark:text-[#6FCB9F] flex items-center gap-1">
                             <Globe className="w-3 h-3" /> Grounded Web Sources ({msg.sources.length})
                           </div>
                           <div className="flex flex-wrap gap-1.5">
@@ -542,7 +542,7 @@ export function SpentaAiAssistant() {
                                 className={`inline-flex items-center gap-1 text-[10px] font-mono border px-2 py-0.5 rounded max-w-full transition-colors ${
                                   isStone
                                     ? 'bg-[#FAF8F4] border-[#CFC8BC] text-[#1C6E46] hover:border-[#1C6E46]'
-                                    : 'bg-[#09090B] border-white/[0.1] text-emerald-400 hover:border-emerald-500'
+                                    : 'bg-[#0B1020] border-[#232B4A] text-[#6FCB9F] hover:border-[#6FCB9F]'
                                 }`}
                               >
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0" />
@@ -556,7 +556,7 @@ export function SpentaAiAssistant() {
                     {!isUser && msg.modelUsed && (
                       <span
                         className={`text-[10px] font-mono mt-1 px-1 ${
-                          isStone ? 'text-[#5F6576]' : 'text-zinc-500'
+                          isStone ? 'text-[#5F6576]' : 'text-[#8E96B0]'
                         }`}
                       >
                         {msg.modelUsed}
@@ -568,7 +568,7 @@ export function SpentaAiAssistant() {
               })}
 
               {loading && (
-                <div className="flex items-center gap-2 text-xs font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 w-fit">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#1C6E46] dark:text-[#6FCB9F] bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/15 border border-[#1C6E46]/30 dark:border-[#6FCB9F]/30 rounded-xl px-3 py-2 w-fit">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>
                     {groundingActive
@@ -592,7 +592,7 @@ export function SpentaAiAssistant() {
                 <div className="pt-2 space-y-1.5">
                   <div
                     className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
-                      isStone ? 'text-[#5F6576]' : 'text-zinc-500'
+                      isStone ? 'text-[#5F6576]' : 'text-[#8E96B0]'
                     }`}
                   >
                     Suggested {PERSONAS.find((p) => p.id === persona)?.label} Prompts
@@ -602,10 +602,10 @@ export function SpentaAiAssistant() {
                       key={prompt}
                       type="button"
                       onClick={() => sendMessage(prompt)}
-                      className={`w-full text-left text-xs border rounded-lg px-3 py-2 transition-colors cursor-pointer ${
+                      className={`w-full text-left text-xs border rounded-lg px-3 py-2.5 transition-colors cursor-pointer ${
                         isStone
                           ? 'bg-white border-[#E4DFD6] text-[#16213A] hover:border-[#1F3863]'
-                          : 'bg-[#111315] border-white/[0.08] text-zinc-200 hover:border-emerald-500/40'
+                          : 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5] hover:border-[#8FA6E8]'
                       }`}
                     >
                       {prompt}
@@ -626,7 +626,7 @@ export function SpentaAiAssistant() {
               className={`p-3 border-t flex items-center gap-2 shrink-0 ${
                 isStone
                   ? 'bg-[#F2EFE9] border-[#E4DFD6]'
-                  : 'bg-[#111315] border-white/[0.08]'
+                  : 'bg-[#0B1020] border-[#232B4A]'
               }`}
             >
               <input
@@ -634,16 +634,16 @@ export function SpentaAiAssistant() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask for AI, ERP, or Fintech benchmarks or stack analysis..."
-                className={`flex-1 px-3 py-2 text-xs border rounded-lg focus:outline-none focus:border-emerald-500 ${
+                className={`flex-1 min-h-[40px] px-3 py-2 text-xs border rounded-lg focus:outline-none focus:border-[#1F3863] dark:focus:border-[#8FA6E8] ${
                   isStone
                     ? 'bg-white border-[#CFC8BC] text-[#16213A] placeholder:text-[#7B8294]'
-                    : 'bg-[#09090B] border-white/[0.1] text-zinc-100 placeholder:text-zinc-500'
+                    : 'bg-[#141A32] border-[#232B4A] text-[#E7EBF5] placeholder:text-[#8E96B0]'
                 }`}
               />
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="inline-flex items-center justify-center p-2.5 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white transition-colors cursor-pointer"
+                className="min-h-[40px] min-w-[40px] inline-flex items-center justify-center p-2.5 rounded-lg bg-[#E11D48] hover:bg-[#BE123C] disabled:bg-[#CFC8BC] dark:disabled:bg-[#232B4A] text-white transition-colors cursor-pointer"
                 aria-label="Send message"
               >
                 <Send className="w-4 h-4" strokeWidth={1.75} />
