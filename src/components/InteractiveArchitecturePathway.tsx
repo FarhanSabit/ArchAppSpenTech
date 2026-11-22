@@ -35,6 +35,16 @@ import {
   PlaybackSpeed,
   RequestWalkthroughTrace,
 } from './PathwayHopPlayback';
+import {
+  ArchitectureNodeTooltip,
+  ArchitectureTooltipData,
+  getElementAnchorPoint,
+  TooltipAccent,
+} from './ArchitectureNodeTooltip';
+import {
+  PathwayMiniMapPillar,
+  PathwayPanZoomStage,
+} from './PathwayPanZoomStage';
 
 export type { DeploymentProviderId };
 
@@ -343,13 +353,7 @@ export interface PathwayTrunkNode {
   branches: PathwayBranchNode[];
 }
 
-interface HoveredTipState {
-  title: string;
-  code: string;
-  summary: string;
-  metric: string;
-  hint: string;
-}
+type HoveredTipPayload = Omit<ArchitectureTooltipData, 'x' | 'y'>;
 
 interface InteractiveArchitecturePathwayProps {
   compact?: boolean;
@@ -737,8 +741,31 @@ export function InteractiveArchitecturePathway({
   const [inspectedBranchId, setInspectedBranchId] = useState<string | null>(
     'branch-app-healthcare_erp',
   );
-  const [hoveredTip, setHoveredTip] = useState<HoveredTipState | null>(null);
+  const [hoveredTip, setHoveredTip] = useState<ArchitectureTooltipData | null>(null);
   const [exportedFlag, setExportedFlag] = useState(false);
+
+  const showHoverTip = useCallback(
+    (payload: HoveredTipPayload, e: React.MouseEvent) => {
+      setHoveredTip({ ...payload, x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
+  const moveHoverTip = useCallback((e: React.MouseEvent) => {
+    setHoveredTip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : prev));
+  }, []);
+
+  const showFocusTip = useCallback(
+    (payload: HoveredTipPayload, e: React.FocusEvent) => {
+      const pt = getElementAnchorPoint(e.currentTarget);
+      setHoveredTip({ ...payload, x: pt.x, y: pt.y });
+    },
+    [],
+  );
+
+  const clearHoverTip = useCallback(() => {
+    setHoveredTip(null);
+  }, []);
 
   // Sync tree expansion, inspector, and chronological activation history whenever active hop changes
   useEffect(() => {
@@ -997,6 +1024,36 @@ export function InteractiveArchitecturePathway({
   const activeGreen = isDark ? '#6FCB9F' : '#1C6E46';
   const hopAmber = isDark ? '#E0B063' : '#8A5C10';
 
+  const miniMapPillars = useMemo<PathwayMiniMapPillar[]>(() => {
+    return tree.map((trunk) => {
+      const isActiveHop = currentHop?.trunkId === trunk.id;
+      const isPassedHop =
+        !isActiveHop &&
+        activeHopIdx >= 0 &&
+        activeTrace.hops.slice(0, activeHopIdx).some((h) => h.trunkId === trunk.id);
+      const activeAppCount = trunk.branches.filter(
+        (b) => b.appId && selectedIds.includes(b.appId),
+      ).length;
+      return {
+        id: trunk.id,
+        index: trunk.index,
+        label: trunk.title,
+        isExpanded: expandedTrunks.includes(trunk.id),
+        isActiveHop,
+        isPassedHop,
+        activeAppCount,
+      };
+    });
+  }, [tree, currentHop, activeHopIdx, activeTrace.hops, selectedIds, expandedTrunks]);
+
+  const handleFocusPillarFromMiniMap = useCallback((pillarId: string) => {
+    setExpandedTrunks((prev) => (prev.includes(pillarId) ? prev : [...prev, pillarId]));
+    const targetTrunk = tree.find((t) => t.id === pillarId);
+    if (targetTrunk && targetTrunk.branches.length > 0) {
+      setInspectedBranchId(targetTrunk.branches[0].id);
+    }
+  }, [tree]);
+
   return (
     <section
       className={`rounded-[10px] border transition-colors duration-200 overflow-hidden ${canvasClass}`}
@@ -1237,11 +1294,19 @@ export function InteractiveArchitecturePathway({
 
       {/* Main Split: Left Orthogonal Branching Tree | Right roadmap.sh Slide-In Inspector */}
       <div className={`grid grid-cols-1 ${compact ? 'xl:grid-cols-12' : 'lg:grid-cols-12'}`}>
-        {/* Left Interactive SVG-Connected Architecture Tree */}
-        <div
+        {/* Left Interactive SVG-Connected Architecture Tree with Framer Motion Pan & Zoom */}
+        <PathwayPanZoomStage
+          isDark={isDark}
+          pillars={miniMapPillars}
+          activeHopLabel={
+            currentHop
+              ? `HOP ${currentHop.stepNumber}/${activeTrace.hops.length} · ${currentHop.nodeCode}`
+              : null
+          }
+          onFocusPillar={handleFocusPillarFromMiniMap}
           className={`${
             compact ? 'xl:col-span-8' : 'lg:col-span-8'
-          } p-4 sm:p-6 space-y-5 border-b lg:border-b-0 lg:border-r ${
+          } border-b lg:border-b-0 lg:border-r ${
             isDark ? 'border-[#232B4A]' : 'border-[#E4DFD6]'
           }`}
         >
@@ -1456,20 +1521,38 @@ export function InteractiveArchitecturePathway({
                   (b) => b.appId && selectedIds.includes(b.appId),
                 ).length;
 
+                const spineAccent: TooltipAccent = isHopTrunk
+                  ? 'amber'
+                  : isPassedTrunk || activeCount > 0
+                    ? 'emerald'
+                    : 'navy';
+                const spineStatus = isHopTrunk
+                  ? `ACTIVE · HOP ${currentHop.stepNumber}`
+                  : isPassedTrunk
+                    ? `PASSED · HOP ${passedHopSteps[passedHopSteps.length - 1]}`
+                    : isQueuedTrunk
+                      ? `QUEUED · HOP ${upcomingHopSteps[0]}`
+                      : isExpanded
+                        ? 'EXPANDED'
+                        : 'COLLAPSED';
+                const spinePayload: HoveredTipPayload = {
+                  id: `spine-${trunk.id}`,
+                  code: `PILLAR ${trunk.index}`,
+                  title: trunk.title,
+                  summary: trunk.summary,
+                  metric: activeCount > 0 ? `${activeCount} in stack · ${trunk.metric}` : trunk.metric,
+                  status: spineStatus,
+                  hint: isExpanded ? 'Click to collapse' : 'Click to expand',
+                  accent: spineAccent,
+                };
+
                 return (
                   <g
                     key={trunk.id}
                     onClick={() => toggleTrunk(trunk.id)}
-                    onMouseEnter={() =>
-                      setHoveredTip({
-                        code: `PILLAR ${trunk.index}`,
-                        title: trunk.title,
-                        summary: trunk.summary,
-                        metric: trunk.metric,
-                        hint: isExpanded ? 'Click to collapse' : 'Click to expand branches',
-                      })
-                    }
-                    onMouseLeave={() => setHoveredTip(null)}
+                    onMouseEnter={(e) => showHoverTip(spinePayload, e)}
+                    onMouseMove={moveHoverTip}
+                    onMouseLeave={clearHoverTip}
                     className="cursor-pointer"
                   >
                     {idx > 0 && (isExpanded || isHopTrunk || isPassedTrunk) && (
@@ -1591,22 +1674,35 @@ export function InteractiveArchitecturePathway({
                 (b) => b.appId && selectedIds.includes(b.appId),
               ).length;
 
+              const trunkPayload: HoveredTipPayload = {
+                id: `trunk-${trunk.id}`,
+                code: `PILLAR ${trunk.index}`,
+                title: trunk.title,
+                summary: trunk.summary,
+                metric:
+                  activeAppsInTrunk > 0
+                    ? `${activeAppsInTrunk} active · ${trunk.metric}`
+                    : trunk.metric,
+                status: isHopTrunk
+                  ? `ACTIVE · HOP ${currentHop.stepNumber}`
+                  : isTrunkOpen
+                    ? `${trunk.branches.length} BRANCHES OPEN`
+                    : `${trunk.branches.length} BRANCHES`,
+                hint: isTrunkOpen ? 'Click to collapse' : 'Click to expand',
+                accent: isHopTrunk ? 'amber' : activeAppsInTrunk > 0 ? 'emerald' : 'navy',
+              };
+
               return (
                 <div key={trunk.id} className="space-y-2.5">
                   {/* Trunk Row */}
                   <button
                     type="button"
                     onClick={() => toggleTrunk(trunk.id)}
-                    onMouseEnter={() =>
-                      setHoveredTip({
-                        code: `PILLAR ${trunk.index}`,
-                        title: trunk.title,
-                        summary: trunk.summary,
-                        metric: trunk.metric,
-                        hint: isTrunkOpen ? 'Click to collapse' : 'Click to expand',
-                      })
-                    }
-                    onMouseLeave={() => setHoveredTip(null)}
+                    onMouseEnter={(e) => showHoverTip(trunkPayload, e)}
+                    onMouseMove={moveHoverTip}
+                    onMouseLeave={clearHoverTip}
+                    onFocus={(e) => showFocusTip(trunkPayload, e)}
+                    onBlur={clearHoverTip}
                     aria-expanded={isTrunkOpen}
                     className={`w-full text-left rounded-[10px] border px-4 py-3.5 transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer ${
                       isHopTrunk
@@ -1756,16 +1852,62 @@ export function InteractiveArchitecturePathway({
                                   <button
                                     type="button"
                                     onClick={() => toggleBranch(branch)}
-                                    onMouseEnter={() =>
-                                      setHoveredTip({
-                                        code: branch.code,
-                                        title: branch.title,
-                                        summary: branch.summary,
-                                        metric: branch.metric,
-                                        hint: `${branch.compositions.length} compositions · Click to expand`,
-                                      })
+                                    onMouseEnter={(e) =>
+                                      showHoverTip(
+                                        {
+                                          id: `branch-${branch.id}`,
+                                          code: branch.code,
+                                          title: branch.title,
+                                          summary:
+                                            (isHopBranch || isPassedBranch) && branchHop
+                                              ? `${branchHop.metadataState.stage} · ${branchHop.metadataState.policyDecision} — ${branch.summary}`
+                                              : branch.summary,
+                                          metric: branch.metric,
+                                          status: isHopBranch
+                                            ? `ACTIVE · HOP ${currentHop.stepNumber}`
+                                            : isPassedBranch && branchHop
+                                              ? `PASSED · HOP ${branchHop.stepNumber}`
+                                              : isQueuedBranch && branchHop
+                                                ? `QUEUED · HOP ${branchHop.stepNumber}`
+                                                : isInStack
+                                                  ? 'IN STACK'
+                                                  : branch.role,
+                                          hint: `${branch.compositions.length} nodes · Click`,
+                                          accent: isHopBranch
+                                            ? 'amber'
+                                            : isPassedBranch || isInStack
+                                              ? 'emerald'
+                                              : 'navy',
+                                        },
+                                        e,
+                                      )
                                     }
-                                    onMouseLeave={() => setHoveredTip(null)}
+                                    onMouseMove={moveHoverTip}
+                                    onMouseLeave={clearHoverTip}
+                                    onFocus={(e) =>
+                                      showFocusTip(
+                                        {
+                                          id: `branch-${branch.id}`,
+                                          code: branch.code,
+                                          title: branch.title,
+                                          summary: branch.summary,
+                                          metric: branch.metric,
+                                          status: isHopBranch
+                                            ? `ACTIVE · HOP ${currentHop.stepNumber}`
+                                            : isInStack
+                                              ? 'IN STACK'
+                                              : branch.role,
+                                          hint: `${branch.compositions.length} nodes · Click`,
+                                          accent: isHopBranch
+                                            ? 'amber'
+                                            : isPassedBranch || isInStack
+                                              ? 'emerald'
+                                              : 'navy',
+                                        },
+                                        e,
+                                      )
+                                    }
+                                    onBlur={clearHoverTip}
                                     aria-expanded={isBranchOpen}
                                     className="text-left min-w-0 flex-1 cursor-pointer focus:outline-none"
                                   >
@@ -1902,29 +2044,40 @@ export function InteractiveArchitecturePathway({
                                       const isHighlightedLeaf =
                                         isHopBranch &&
                                         currentHop?.highlightCompKind === comp.kind;
-                                      return (
-                                        <button
-                                          key={comp.id}
-                                          type="button"
-                                          onClick={() => {
-                                            if (comp.linkedAppId) {
-                                              focusLinkedAppBranch(comp.linkedAppId);
-                                            } else {
-                                              setInspectedBranchId(branch.id);
-                                            }
-                                          }}
-                                          onMouseEnter={() =>
-                                            setHoveredTip({
-                                              code: comp.code,
-                                              title: comp.label,
-                                              summary: comp.detail,
-                                              metric: comp.metric,
-                                              hint: comp.linkedAppId
-                                                ? 'Click to jump to linked module'
-                                                : 'Click to inspect in drawer',
-                                            })
-                                          }
-                                          onMouseLeave={() => setHoveredTip(null)}
+                                        const leafPayload: HoveredTipPayload = {
+                                          id: `leaf-${comp.id}`,
+                                          code: comp.code,
+                                          title: comp.label,
+                                          summary: comp.detail,
+                                          metric: comp.metric,
+                                          status: isHighlightedLeaf
+                                            ? 'ACTIVE HOP SPEC'
+                                            : comp.kind.toUpperCase(),
+                                          hint: comp.linkedAppId
+                                            ? 'Click to jump'
+                                            : 'Click to inspect',
+                                          accent: isHighlightedLeaf
+                                            ? 'amber'
+                                            : comp.kind === 'synergy' || comp.kind === 'proof'
+                                              ? 'emerald'
+                                              : 'navy',
+                                        };
+                                        return (
+                                          <button
+                                            key={comp.id}
+                                            type="button"
+                                            onClick={() => {
+                                              if (comp.linkedAppId) {
+                                                focusLinkedAppBranch(comp.linkedAppId);
+                                              } else {
+                                                setInspectedBranchId(branch.id);
+                                              }
+                                            }}
+                                            onMouseEnter={(e) => showHoverTip(leafPayload, e)}
+                                            onMouseMove={moveHoverTip}
+                                            onMouseLeave={clearHoverTip}
+                                            onFocus={(e) => showFocusTip(leafPayload, e)}
+                                            onBlur={clearHoverTip}
                                           className={`w-full text-left px-2.5 py-1.5 rounded-md border text-[11px] flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                                             isHighlightedLeaf
                                               ? isDark
@@ -1974,7 +2127,7 @@ export function InteractiveArchitecturePathway({
               );
             })}
           </div>
-        </div>
+        </PathwayPanZoomStage>
 
         {/* Right roadmap.sh-Style Deep-Dive Inspector Drawer */}
         <aside
@@ -2228,6 +2381,9 @@ export function InteractiveArchitecturePathway({
           </div>
         </aside>
       </div>
+
+      {/* Animated Frosted-Glass Hover Tooltip for Interactive Architecture Nodes */}
+      <ArchitectureNodeTooltip data={hoveredTip} isDark={isDark} />
     </section>
   );
 }

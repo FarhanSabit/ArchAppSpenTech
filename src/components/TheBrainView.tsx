@@ -29,6 +29,51 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
 import { SovereignBrain3D } from './three/SovereignBrain3D';
+import brainStoneSculptImg from '../assets/images/brain_stone_sculpt_1795257685678.jpg';
+import brainNocturnalCoreImg from '../assets/images/brain_nocturnal_core_1795257688515.jpg';
+import brainDualSynapseImg from '../assets/images/brain_dual_synapse_1795257687722.jpg';
+
+type BrainBackdropVariantId = 'auto' | 'stone-sculpt' | 'nocturnal-core' | 'dual-synapse' | 'none';
+
+interface Brain3DAssetVariant {
+  id: Exclude<BrainBackdropVariantId, 'auto' | 'none'>;
+  title: string;
+  themeBadge: string;
+  caption: string;
+  src: string;
+  alt: string;
+  recommendedPolarity: 'light' | 'dark' | 'dual';
+}
+
+const BRAIN_3D_ASSET_VARIANTS: Brain3DAssetVariant[] = [
+  {
+    id: 'stone-sculpt',
+    title: 'Stone Alabaster Rings',
+    themeBadge: 'Stone Light',
+    caption: 'Concentric honed limestone & opal glass neural orbits with heritage navy filaments.',
+    src: brainStoneSculptImg,
+    alt: 'Abstract 3D warm stone alabaster neural concentric rings with navy steel filaments and emerald glass nodes',
+    recommendedPolarity: 'light',
+  },
+  {
+    id: 'nocturnal-core',
+    title: 'Nocturnal Sapphire Core',
+    themeBadge: 'Nocturnal Navy',
+    caption: 'Smoked sapphire glass neural folds interlocked inside brushed dark titanium rings.',
+    src: brainNocturnalCoreImg,
+    alt: 'Abstract 3D nocturnal midnight navy smoked glass neural sculpture inside brushed titanium orbital rings',
+    recommendedPolarity: 'dark',
+  },
+  {
+    id: 'dual-synapse',
+    title: 'Dual-Theme Synapse Bridge',
+    themeBadge: 'Stone × Navy',
+    caption: 'Travertine architectural plinth bridged via brushed titanium arcs into sapphire glass.',
+    src: brainDualSynapseImg,
+    alt: 'Abstract 3D architectural bridge connecting warm travertine limestone and dark nocturnal sapphire glass with titanium arcs',
+    recommendedPolarity: 'dual',
+  },
+];
 
 interface GroundedBriefState {
   text: string;
@@ -103,6 +148,7 @@ export function TheBrainView() {
   } = useStack();
 
   const [visualMode, setVisualMode] = useState<'radar' | '3d'>('radar');
+  const [backdropVariant, setBackdropVariant] = useState<BrainBackdropVariantId>('auto');
   const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
   const [selectedHubId, setSelectedHubId] = useState<string | null>('fintech');
   const [focusedAppId, setFocusedAppId] = useState<string>('icr_ops');
@@ -252,11 +298,38 @@ export function TheBrainView() {
     ? polarCoords(focusedNodeSpec.angleDeg, focusedNodeSpec.radius)
     : null;
 
+  const activeBackdropAsset = useMemo<Brain3DAssetVariant | null>(() => {
+    if (backdropVariant === 'none') return null;
+    if (backdropVariant === 'auto') {
+      return isDark ? BRAIN_3D_ASSET_VARIANTS[1] : BRAIN_3D_ASSET_VARIANTS[0];
+    }
+    return BRAIN_3D_ASSET_VARIANTS.find((v) => v.id === backdropVariant) ?? BRAIN_3D_ASSET_VARIANTS[0];
+  }, [backdropVariant, isDark]);
+
   return (
     <div className="space-y-6">
-      {/* OITS Dhaka Editorial Header */}
-      <section className={`rounded-[10px] border p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors ${bandSurface}`}>
-        <div>
+      {/* OITS Dhaka Editorial Header with Theme-Matched 3D Abstract Backdrop Texture */}
+      <section className={`relative overflow-hidden rounded-[10px] border p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors ${bandSurface}`}>
+        {activeBackdropAsset && (
+          <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+            <img
+              src={activeBackdropAsset.src}
+              alt=""
+              referrerPolicy="no-referrer"
+              className={`w-full h-full object-cover object-center transition-opacity duration-300 ${
+                isDark ? 'opacity-30' : 'opacity-25'
+              }`}
+            />
+            <div
+              className={`absolute inset-0 ${
+                isDark
+                  ? 'bg-gradient-to-r from-[#0F1529]/95 via-[#0F1529]/82 to-[#0F1529]/45'
+                  : 'bg-gradient-to-r from-[#FAF8F4]/96 via-[#FAF8F4]/86 to-[#FAF8F4]/50'
+              }`}
+            />
+          </div>
+        )}
+        <div className="relative z-10">
           <div className={`text-[11px] font-mono font-semibold ${brandInk}`}>
             OITS Dhaka Edition · Sovereign Operational Tech Radar &amp; Dual-Studio 3D Neural Core
           </div>
@@ -268,7 +341,7 @@ export function TheBrainView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
+        <div className="relative z-10 flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
           {/* Radar vs 3D Segmented Toggle */}
           <div
             role="group"
@@ -396,10 +469,30 @@ export function TheBrainView() {
                 })}
               </div>
 
-              <div className="w-full max-w-[520px] mx-auto aspect-square my-2 flex items-center justify-center">
+              <div className="relative w-full max-w-[520px] mx-auto aspect-square my-2 flex items-center justify-center rounded-xl overflow-hidden">
+                {activeBackdropAsset && (
+                  <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+                    <img
+                      src={activeBackdropAsset.src}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className={`w-full h-full object-cover object-center scale-105 transition-opacity duration-300 ${
+                        isDark ? 'opacity-[0.22]' : 'opacity-[0.14]'
+                      }`}
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: isDark
+                          ? 'radial-gradient(circle at center, rgba(20,26,50,0.38) 0%, rgba(20,26,50,0.88) 76%, #141A32 100%)'
+                          : 'radial-gradient(circle at center, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.88) 76%, #FFFFFF 100%)',
+                      }}
+                    />
+                  </div>
+                )}
                 <svg
                   viewBox="0 0 520 520"
-                  className="w-full h-full select-none"
+                  className="relative z-10 w-full h-full select-none"
                   role="img"
                   aria-label="Spenta Operational Tech Radar in OITS Dhaka Editorial Palette"
                 >
@@ -536,6 +629,7 @@ export function TheBrainView() {
                     const isDimmed =
                       quadrantFilter !== 'All' && node.quadrant !== quadrantFilter;
 
+                    const hasEmissivePulse = !isDimmed && (isFocused || isSelected);
                     return (
                       <g
                         key={node.appId}
@@ -543,7 +637,27 @@ export function TheBrainView() {
                         onMouseEnter={() => setHoveredRadarId(node.appId)}
                         onMouseLeave={() => setHoveredRadarId(null)}
                         opacity={isDimmed ? 0.25 : 1}
-                        className="cursor-pointer"
+                        style={
+                          hasEmissivePulse
+                            ? ({
+                                '--brain-emissive-dim': isSelected
+                                  ? isDark
+                                    ? 'rgba(111, 203, 159, 0.28)'
+                                    : 'rgba(28, 110, 70, 0.22)'
+                                  : isDark
+                                    ? 'rgba(143, 166, 232, 0.28)'
+                                    : 'rgba(31, 56, 99, 0.22)',
+                                '--brain-emissive-glow': isSelected
+                                  ? isDark
+                                    ? 'rgba(111, 203, 159, 0.82)'
+                                    : 'rgba(28, 110, 70, 0.68)'
+                                  : isDark
+                                    ? 'rgba(143, 166, 232, 0.82)'
+                                    : 'rgba(31, 56, 99, 0.68)',
+                              } as React.CSSProperties)
+                            : undefined
+                        }
+                        className={`cursor-pointer ${hasEmissivePulse ? 'brain-svg-emissive-pulse' : ''}`}
                       >
                         {isFocused && (
                           <circle
@@ -681,6 +795,8 @@ export function TheBrainView() {
                       type="button"
                       onClick={() => setFocusedAppId(sib.id)}
                       className={`px-2 py-0.5 rounded font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap ${
+                        isCurrent ? 'brain-node-emissive-pulse' : ''
+                      } ${
                         isCurrent
                           ? isDark
                             ? 'bg-[#161D3A] border-[#8FA6E8] text-[#8FA6E8]'
@@ -859,6 +975,118 @@ export function TheBrainView() {
           </div>
         </div>
       </div>
+
+      {/* Abstract 3D Architectural Backdrop & UI Embellishment Studio Strip */}
+      <section className={`rounded-[10px] border p-4 sm:p-5 space-y-3.5 ${surfaceCard}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <div className={`text-[10.5px] font-mono font-bold ${brandInk}`}>
+              3D Editorial Backdrop Textures · Stone &amp; Nocturnal Navy Material Variants
+            </div>
+            <h2 className="text-sm sm:text-base font-bold mt-0.5">
+              Abstract 3D Brain Embellishments &amp; Atmospheric Textures
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setBackdropVariant('auto')}
+              aria-pressed={backdropVariant === 'auto'}
+              className={`px-2.5 py-1 rounded-md font-mono text-[10.5px] font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                backdropVariant === 'auto'
+                  ? isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020] border-[#8FA6E8]'
+                    : 'bg-[#1F3863] text-white border-[#1F3863]'
+                  : isDark
+                    ? 'bg-[#0F1529] border-[#232B4A] text-[#C3CCE4] hover:border-[#8FA6E8]'
+                    : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#4A5163] hover:border-[#1F3863]'
+              }`}
+            >
+              Auto Sync ({isDark ? 'Nocturnal' : 'Stone'})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBackdropVariant('none')}
+              aria-pressed={backdropVariant === 'none'}
+              className={`px-2.5 py-1 rounded-md font-mono text-[10.5px] font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                backdropVariant === 'none'
+                  ? isDark
+                    ? 'bg-[#8FA6E8] text-[#0B1020] border-[#8FA6E8]'
+                    : 'bg-[#1F3863] text-white border-[#1F3863]'
+                  : isDark
+                    ? 'bg-[#0F1529] border-[#232B4A] text-[#C3CCE4] hover:border-[#8FA6E8]'
+                    : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#4A5163] hover:border-[#1F3863]'
+              }`}
+            >
+              Flat Editorial
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {BRAIN_3D_ASSET_VARIANTS.map((variant) => {
+            const isActiveVariant = activeBackdropAsset?.id === variant.id;
+            return (
+              <button
+                key={variant.id}
+                type="button"
+                onClick={() => setBackdropVariant(variant.id)}
+                aria-pressed={isActiveVariant}
+                className={`group text-left rounded-[10px] border overflow-hidden transition-all cursor-pointer ${
+                  isActiveVariant
+                    ? isDark
+                      ? 'bg-[#161D3A] border-[#8FA6E8] ring-1 ring-[#8FA6E8]/40'
+                      : 'bg-[#EEF3FB] border-[#1F3863] ring-1 ring-[#1F3863]/25'
+                    : isDark
+                      ? 'bg-[#0F1529] border-[#232B4A] hover:border-[#8FA6E8]/70'
+                      : 'bg-[#FAF8F4] border-[#E4DFD6] hover:border-[#1F3863]/70'
+                }`}
+              >
+                <div className="relative aspect-[16/9] w-full overflow-hidden">
+                  <img
+                    src={variant.src}
+                    alt={variant.alt}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    <span
+                      className={`px-2 py-0.5 rounded font-mono text-[9.5px] font-bold border ${
+                        variant.recommendedPolarity === 'dark'
+                          ? 'bg-[#0B1020]/90 border-[#34416E] text-[#8FA6E8]'
+                          : 'bg-[#FAF8F4]/92 border-[#CFC8BC] text-[#1F3863]'
+                      }`}
+                    >
+                      {variant.themeBadge}
+                    </span>
+                  </div>
+                  {isActiveVariant && (
+                    <span
+                      className={`absolute top-2 right-2 px-2 py-0.5 rounded font-mono text-[9.5px] font-bold ${
+                        isDark
+                          ? 'bg-[#6FCB9F] text-[#0B1020]'
+                          : 'bg-[#1C6E46] text-white'
+                      }`}
+                    >
+                      Active Texture
+                    </span>
+                  )}
+                </div>
+                <div className="p-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold tracking-tight">{variant.title}</span>
+                    <span className={`font-mono text-[9.5px] ${mutedInk}`}>16:9 3D</span>
+                  </div>
+                  <p className={`text-[11px] leading-snug line-clamp-2 ${bodyInk}`}>
+                    {variant.caption}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Live Google Search Grounded Intelligence Panel */}
       <section className={`rounded-[10px] border p-5 space-y-4 ${surfaceCard}`}>

@@ -63,9 +63,111 @@
   animation-play-state: paused;
 }
 
+/* Custom CSS 'Emissive Pulse' Animation for Active & Selected 3D Brain Nodes */
+@keyframes spenta-brain-emissive-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px var(--brain-emissive-border, rgba(31, 56, 99, 0.35)),
+      0 0 4px 0 var(--brain-emissive-dim, rgba(31, 56, 99, 0.16));
+    filter: brightness(0.96);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1.5px var(--brain-emissive-bright, rgba(31, 56, 99, 0.85)),
+      0 0 14px 2px var(--brain-emissive-glow, rgba(31, 56, 99, 0.42)),
+      inset 0 0 8px 0 var(--brain-emissive-inner, rgba(31, 56, 99, 0.22));
+    filter: brightness(1.07);
+  }
+}
+
+@keyframes spenta-brain-emissive-pulse-selected {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1.5px var(--brain-emissive-border, rgba(28, 110, 70, 0.55)),
+      0 0 6px 1px var(--brain-emissive-dim, rgba(28, 110, 70, 0.25));
+    filter: brightness(0.98);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--brain-emissive-bright, rgba(28, 110, 70, 0.95)),
+      0 0 20px 4px var(--brain-emissive-glow, rgba(28, 110, 70, 0.52)),
+      inset 0 0 10px 0 var(--brain-emissive-inner, rgba(28, 110, 70, 0.28));
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes spenta-brain-ring-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(0.9);
+    box-shadow: 0 0 5px 1px var(--brain-emissive-dim, rgba(111, 203, 159, 0.25));
+  }
+  50% {
+    opacity: 0.92;
+    transform: translate(-50%, -50%) scale(1.12);
+    box-shadow:
+      0 0 18px 4px var(--brain-emissive-glow, rgba(111, 203, 159, 0.62)),
+      inset 0 0 10px 1px var(--brain-emissive-inner, rgba(111, 203, 159, 0.35));
+  }
+}
+
+@keyframes spenta-brain-core-dot-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.88);
+    box-shadow: 0 0 2px 0 var(--brain-emissive-dim, rgba(111, 203, 159, 0.3));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+    box-shadow: 0 0 9px 2px var(--brain-emissive-glow, rgba(111, 203, 159, 0.85));
+  }
+}
+
+@keyframes spenta-svg-emissive-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px var(--brain-emissive-dim, rgba(28, 110, 70, 0.28)));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px var(--brain-emissive-glow, rgba(28, 110, 70, 0.78)));
+  }
+}
+
+.brain-node-emissive-pulse {
+  animation: spenta-brain-emissive-pulse 2.6s ease-in-out infinite;
+  will-change: box-shadow, filter;
+}
+
+.brain-node-emissive-pulse--selected {
+  animation: spenta-brain-emissive-pulse-selected 2.1s ease-in-out infinite;
+  will-change: box-shadow, filter;
+}
+
+.brain-node-ring-pulse {
+  animation: spenta-brain-ring-pulse 2.3s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}
+
+.brain-core-dot-pulse {
+  animation: spenta-brain-core-dot-pulse 2.2s ease-in-out infinite;
+  will-change: transform, opacity, box-shadow;
+}
+
+.brain-svg-emissive-pulse {
+  animation: spenta-svg-emissive-pulse 2.4s ease-in-out infinite;
+  will-change: filter;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-spenta-marquee {
     animation: none;
+  }
+  .brain-node-emissive-pulse,
+  .brain-node-emissive-pulse--selected,
+  .brain-node-ring-pulse,
+  .brain-core-dot-pulse,
+  .brain-svg-emissive-pulse {
+    animation: none !important;
   }
 }
 

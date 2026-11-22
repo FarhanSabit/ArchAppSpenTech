@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Check, Plus } from 'lucide-react';
 import {
   BRAIN_HUBS,
@@ -10,6 +10,36 @@ import {
   ServerTierId,
 } from '../data/spentaManifest';
 import { useStack } from '../store/StackContext';
+import {
+  ArchitectureNodeTooltip,
+  ArchitectureTooltipData,
+  getElementAnchorPoint,
+} from './ArchitectureNodeTooltip';
+
+type PlateTipPayload = Omit<ArchitectureTooltipData, 'x' | 'y'>;
+
+function usePlateTooltip() {
+  const [tip, setTip] = useState<ArchitectureTooltipData | null>(null);
+
+  const showTip = useCallback((payload: PlateTipPayload, e: React.MouseEvent) => {
+    setTip({ ...payload, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const moveTip = useCallback((e: React.MouseEvent) => {
+    setTip((prev) => (prev ? { ...prev, x: e.clientX, y: e.clientY } : prev));
+  }, []);
+
+  const focusTip = useCallback((payload: PlateTipPayload, e: React.FocusEvent) => {
+    const pt = getElementAnchorPoint(e.currentTarget);
+    setTip({ ...payload, x: pt.x, y: pt.y });
+  }, []);
+
+  const clearTip = useCallback(() => {
+    setTip(null);
+  }, []);
+
+  return { tip, showTip, moveTip, focusTip, clearTip };
+}
 
 export type OitsPlateId = 'ai-brain' | 'l1-l6-stack' | 'captive-ecosystem' | 'financial-edge';
 
@@ -140,6 +170,7 @@ function Plate01BrainTopology({
 }) {
   const { selectedIds, toggleApp, hitlConfidence } = useStack();
   const [focusedHubId, setFocusedHubId] = useState<string>('fintech');
+  const { tip, showTip, moveTip, focusTip, clearTip } = usePlateTooltip();
   const p = getOitsPalette(polarity);
 
   const leftHubs = useMemo(() => BRAIN_HUBS.filter((h) => h.side === 'left'), []);
@@ -272,35 +303,77 @@ function Plate01BrainTopology({
             stroke={passHitl ? p.navy : p.amber}
             strokeWidth="1.6"
           />
-          <rect x="364" y="108" width="152" height="44" rx="7" fill={p.navySoft} stroke={p.hairline} />
-          <text
-            x="440"
-            y="127"
-            textAnchor="middle"
-            fill={p.navy}
-            fontSize="11"
-            fontWeight="800"
-            fontFamily="Plus Jakarta Sans, sans-serif"
+          <g
+            onMouseEnter={(e) =>
+              showTip(
+                {
+                  id: 'p1-core',
+                  code: 'SPENTA CORE',
+                  title: 'Sovereign Fusion Kernel (L1–L6)',
+                  summary:
+                    'Air-gapped customer-enclave execution spine isolating every LLM weight, vector index, and PostgreSQL/Kafka ledger.',
+                  metric: '0% Cloud PII Egress',
+                  status: `${selectedIds.length}/13 ACTIVE`,
+                  hint: 'Inspect L1–L6 rungs below',
+                  accent: 'navy',
+                },
+                e,
+              )
+            }
+            onMouseMove={moveTip}
+            onMouseLeave={clearTip}
+            className="cursor-default"
           >
-            SPENTA CORE
-          </text>
-          <text
-            x="440"
-            y="142"
-            textAnchor="middle"
-            fill={p.muted}
-            fontSize="8.5"
-            fontFamily="JetBrains Mono, monospace"
-          >
-            0% Cloud PII Egress
-          </text>
+            <rect x="364" y="108" width="152" height="44" rx="7" fill={p.navySoft} stroke={p.hairline} />
+            <text
+              x="440"
+              y="127"
+              textAnchor="middle"
+              fill={p.navy}
+              fontSize="11"
+              fontWeight="800"
+              fontFamily="Plus Jakarta Sans, sans-serif"
+            >
+              SPENTA CORE
+            </text>
+            <text
+              x="440"
+              y="142"
+              textAnchor="middle"
+              fill={p.muted}
+              fontSize="8.5"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              0% Cloud PII Egress
+            </text>
+          </g>
 
           {/* L6 -> L1 Mini Rungs inside Kernel */}
           {[...SOVEREIGN_STACK_LAYERS].reverse().map((layer, idx) => {
             const ry = 162 + idx * 30;
             const isUsedByFocus = focusedHub.keyLayers.includes(layer.id);
             return (
-              <g key={`k-${layer.id}`}>
+              <g
+                key={`k-${layer.id}`}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p1-layer-${layer.id}`,
+                      code: `LAYER ${layer.id}`,
+                      title: layer.title,
+                      summary: layer.summary,
+                      metric: layer.slaMetric,
+                      status: isUsedByFocus ? `USED BY HUB ${focusedHub.num}` : 'KERNEL RUNG',
+                      hint: layer.protocols[0] ?? 'Sovereign protocol',
+                      accent: isUsedByFocus ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
+                className="cursor-default"
+              >
                 <rect
                   x="364"
                   y={ry}
@@ -336,36 +409,58 @@ function Plate01BrainTopology({
           })}
 
           {/* OPA Gate Footer inside Kernel */}
-          <rect
-            x="364"
-            y="348"
-            width="152"
-            height="40"
-            rx="7"
-            fill={passHitl ? p.greenSoft : p.amberSoft}
-            stroke={passHitl ? p.green : p.amber}
-          />
-          <text
-            x="440"
-            y="365"
-            textAnchor="middle"
-            fill={passHitl ? p.green : p.amber}
-            fontSize="9.5"
-            fontWeight="700"
-            fontFamily="JetBrains Mono, monospace"
+          <g
+            onMouseEnter={(e) =>
+              showTip(
+                {
+                  id: 'p1-opa-gate',
+                  code: `OPA ${hitlConfidence.toFixed(2)}`,
+                  title: passHitl ? 'Deterministic Auto-Commit Active' : 'Human-in-the-Loop Audit Hold',
+                  summary:
+                    'Open Policy Agent circuit breaker evaluates every inference score before allowing automated PostgreSQL/Kafka writes.',
+                  metric: passHitl ? '≥0.88 Auto-Ledger' : '<0.88 Verifier Queue',
+                  status: passHitl ? 'PASS' : 'HOLD',
+                  hint: 'Adjust slider in The Brain',
+                  accent: passHitl ? 'emerald' : 'amber',
+                },
+                e,
+              )
+            }
+            onMouseMove={moveTip}
+            onMouseLeave={clearTip}
+            className="cursor-default"
           >
-            OPA GATE: {hitlConfidence.toFixed(2)}
-          </text>
-          <text
-            x="440"
-            y="379"
-            textAnchor="middle"
-            fill={p.body}
-            fontSize="8"
-            fontFamily="JetBrains Mono, monospace"
-          >
-            {passHitl ? '≥0.88 AUTO-LEDGER' : '<0.88 HUMAN VERIFY'}
-          </text>
+            <rect
+              x="364"
+              y="348"
+              width="152"
+              height="40"
+              rx="7"
+              fill={passHitl ? p.greenSoft : p.amberSoft}
+              stroke={passHitl ? p.green : p.amber}
+            />
+            <text
+              x="440"
+              y="365"
+              textAnchor="middle"
+              fill={passHitl ? p.green : p.amber}
+              fontSize="9.5"
+              fontWeight="700"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              OPA GATE: {hitlConfidence.toFixed(2)}
+            </text>
+            <text
+              x="440"
+              y="379"
+              textAnchor="middle"
+              fill={p.body}
+              fontSize="8"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              {passHitl ? '≥0.88 AUTO-LEDGER' : '<0.88 HUMAN VERIFY'}
+            </text>
+          </g>
 
           {/* Left 4 Hub Cards */}
           {leftHubs.map((hub, i) => {
@@ -377,6 +472,23 @@ function Plate01BrainTopology({
               <g
                 key={hub.id}
                 onClick={() => setFocusedHubId(hub.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p1-hub-${hub.id}`,
+                      code: `HUB ${hub.num} · ${hub.keyLayers.join('/')}`,
+                      title: hub.label,
+                      summary: hub.summary,
+                      metric: `${activeCount}/${apps.length} modules active`,
+                      status: isFocus ? 'FOCUSED' : activeCount > 0 ? 'IN STACK' : 'OPERATIONS',
+                      hint: 'Click to inspect apps',
+                      accent: activeCount > 0 ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 className="cursor-pointer"
               >
                 <rect
@@ -443,6 +555,23 @@ function Plate01BrainTopology({
               <g
                 key={hub.id}
                 onClick={() => setFocusedHubId(hub.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p1-hub-${hub.id}`,
+                      code: `HUB ${hub.num} · ${hub.keyLayers.join('/')}`,
+                      title: hub.label,
+                      summary: hub.summary,
+                      metric: `${activeCount}/${apps.length} modules active`,
+                      status: isFocus ? 'FOCUSED' : activeCount > 0 ? 'IN STACK' : 'EXPERIENCE',
+                      hint: 'Click to inspect apps',
+                      accent: activeCount > 0 ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 className="cursor-pointer"
               >
                 <rect
@@ -545,6 +674,39 @@ function Plate01BrainTopology({
                 key={app.id}
                 type="button"
                 onClick={() => toggleApp(app.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p1-app-${app.id}`,
+                      code: app.layers.join('/'),
+                      title: app.name,
+                      summary: app.tagline,
+                      metric: `${app.setupLabel} · ${app.gmPct.toFixed(1)}% GM`,
+                      status: active ? 'IN STACK' : `TIER ${app.minServerTier} MIN`,
+                      hint: active ? 'Click to remove' : 'Click to add',
+                      accent: active ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
+                onFocus={(e) =>
+                  focusTip(
+                    {
+                      id: `p1-app-${app.id}`,
+                      code: app.layers.join('/'),
+                      title: app.name,
+                      summary: app.tagline,
+                      metric: `${app.setupLabel} · ${app.gmPct.toFixed(1)}% GM`,
+                      status: active ? 'IN STACK' : `TIER ${app.minServerTier} MIN`,
+                      hint: active ? 'Click to remove' : 'Click to add',
+                      accent: active ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onBlur={clearTip}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap"
                 style={{
                   backgroundColor: active ? p.green : p.card,
@@ -559,6 +721,8 @@ function Plate01BrainTopology({
           })}
         </div>
       </div>
+
+      <ArchitectureNodeTooltip data={tip} isDark={polarity === 'dark'} />
     </div>
   );
 }
@@ -576,6 +740,7 @@ function Plate02StackAndServers({
   const { stackMetrics } = useStack();
   const [selectedLayerId, setSelectedLayerId] = useState<string>('L5');
   const [selectedTierId, setSelectedTierId] = useState<ServerTierId>(stackMetrics.tier);
+  const { tip, showTip, moveTip, clearTip } = usePlateTooltip();
   const p = getOitsPalette(polarity);
 
   const layersDesc = useMemo(() => [...SOVEREIGN_STACK_LAYERS].reverse(), []);
@@ -662,6 +827,23 @@ function Plate02StackAndServers({
               <g
                 key={layer.id}
                 onClick={() => setSelectedLayerId(layer.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p2-layer-${layer.id}`,
+                      code: `LAYER ${layer.id}`,
+                      title: layer.title,
+                      summary: `${layer.summary} Controls: ${layer.securityControls.slice(0, 2).join(', ')}.`,
+                      metric: layer.slaMetric,
+                      status: isSelected ? 'SELECTED LAYER' : layer.subtitle,
+                      hint: 'Click to inspect controls',
+                      accent: isSelected ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 className="cursor-pointer"
               >
                 <rect
@@ -737,6 +919,23 @@ function Plate02StackAndServers({
               <g
                 key={tier.id}
                 onClick={() => setSelectedTierId(tier.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p2-tier-${tier.id}`,
+                      code: tier.code,
+                      title: tier.name,
+                      summary: `${tier.hardware} (${tier.vramRam}, ${tier.storage}). ${tier.idealFor}`,
+                      metric: `${tier.capex} · ${tier.speed}`,
+                      status: isRec ? 'RECOMMENDED' : isSelected ? 'SELECTED' : tier.modelScale,
+                      hint: 'Click to lock hardware spec',
+                      accent: isRec ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 className="cursor-pointer"
               >
                 <rect
@@ -845,6 +1044,8 @@ function Plate02StackAndServers({
           </div>
         </div>
       </div>
+
+      <ArchitectureNodeTooltip data={tip} isDark={polarity === 'dark'} />
     </div>
   );
 }
@@ -965,6 +1166,7 @@ function Plate03CaptiveSynergies({
   const { selectedIds, toggleApp, appMap } = useStack();
   const [trackFilter, setTrackFilter] = useState<'all' | 'best' | 'xltd'>('all');
   const [activeStageId, setActiveStageId] = useState<string>('best-exchange');
+  const { tip, showTip, moveTip, clearTip } = usePlateTooltip();
   const p = getOitsPalette(polarity);
 
   const activeStage =
@@ -1058,18 +1260,40 @@ function Plate03CaptiveSynergies({
           ))}
 
           {/* Shared Sovereign Core Bus in the Middle */}
-          <rect x="190" y="218" width="500" height="32" rx="7" fill={p.card} stroke={p.green} />
-          <text
-            x="440"
-            y="238"
-            textAnchor="middle"
-            fill={p.green}
-            fontSize="9.5"
-            fontWeight="800"
-            fontFamily="JetBrains Mono, monospace"
+          <g
+            onMouseEnter={(e) =>
+              showTip(
+                {
+                  id: 'p3-core-bus',
+                  code: 'SPENTA CORE BUS',
+                  title: 'Kafka / OPA 0.88 Unified Event Spine',
+                  summary:
+                    'Shared real-time sovereign event bus bridging BEST Electronics retail showrooms and X Ltd EV battery-swap telemetry.',
+                  metric: '0% Cloud PII · ≥0.88 OPA',
+                  status: 'LIVE PRODUCTION',
+                  hint: 'Hover stage nodes above/below',
+                  accent: 'emerald',
+                },
+                e,
+              )
+            }
+            onMouseMove={moveTip}
+            onMouseLeave={clearTip}
+            className="cursor-default"
           >
-            SHARED SPENTA SOVEREIGN CORE · KAFKA / OPA 0.88 / UNIFIED DATA BUS
-          </text>
+            <rect x="190" y="218" width="500" height="32" rx="7" fill={p.card} stroke={p.green} />
+            <text
+              x="440"
+              y="238"
+              textAnchor="middle"
+              fill={p.green}
+              fontSize="9.5"
+              fontWeight="800"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              SHARED SPENTA SOVEREIGN CORE · KAFKA / OPA 0.88 / UNIFIED DATA BUS
+            </text>
+          </g>
           <line x1="340" y1="208" x2="340" y2="218" stroke={p.green} strokeWidth="1.5" />
           <line x1="540" y1="250" x2="540" y2="260" stroke={p.green} strokeWidth="1.5" />
 
@@ -1146,6 +1370,23 @@ function Plate03CaptiveSynergies({
               <g
                 key={st.id}
                 onClick={() => setActiveStageId(st.id)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p3-stage-${st.id}`,
+                      code: `${st.step} · ${st.track === 'best' ? 'BEST RETAIL' : 'X LTD EV'}`,
+                      title: st.title,
+                      summary: st.detail,
+                      metric: st.metric,
+                      status: inStack ? 'IN STACK' : isSelected ? 'SELECTED' : 'CAPTIVE PROOF',
+                      hint: 'Click to inspect & bind app',
+                      accent: st.track === 'xltd' || inStack ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 opacity={isDimmed ? 0.28 : 1}
                 className="cursor-pointer"
               >
@@ -1237,6 +1478,8 @@ function Plate03CaptiveSynergies({
           </button>
         )}
       </div>
+
+      <ArchitectureNodeTooltip data={tip} isDark={polarity === 'dark'} />
     </div>
   );
 }
@@ -1253,6 +1496,7 @@ function Plate04FinancialEdge({
 }) {
   const [scenario, setScenario] = useState<'conservative' | 'upside'>('conservative');
   const [selectedYear, setSelectedYear] = useState<string>('FY2031');
+  const { tip, showTip, moveTip, clearTip } = usePlateTooltip();
   const p = getOitsPalette(polarity);
 
   const activeFy =
@@ -1402,10 +1646,31 @@ function Plate04FinancialEdge({
             const topY = yForVal(rev);
             const h = Math.max(8, chartBaseY - topY);
             const isSel = fy.year === selectedYear;
+            const fyEbitda =
+              scenario === 'conservative' ? fy.conservativeEbitdaK : fy.upsideEbitdaK;
+            const fyNet =
+              scenario === 'conservative' ? fy.conservativeNetProfitK : fy.upsideNetProfitK;
             return (
               <g
                 key={fy.year}
                 onClick={() => setSelectedYear(fy.year)}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p4-fy-${fy.year}`,
+                      code: `${fy.year} · ${scenario.toUpperCase()}`,
+                      title: `${fy.label} Trajectory`,
+                      summary: fy.milestone,
+                      metric: `Rev $${rev.toLocaleString()}K · EBITDA $${fyEbitda.toLocaleString()}K · Net $${fyNet.toLocaleString()}K`,
+                      status: isSel ? 'SELECTED YEAR' : 'CLICK TO PIN',
+                      hint: 'Switch scenario above',
+                      accent: isSel ? 'emerald' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
                 className="cursor-pointer"
               >
                 <rect
@@ -1511,7 +1776,27 @@ function Plate04FinancialEdge({
             const w = Math.max(24, Math.round((row.hourlyUsd / 155) * 288));
             const isDhaka = idx === 0;
             return (
-              <g key={row.role}>
+              <g
+                key={row.role}
+                onMouseEnter={(e) =>
+                  showTip(
+                    {
+                      id: `p4-shore-${idx}`,
+                      code: isDhaka ? 'DHAKA R&D POD' : 'BENCHMARK',
+                      title: row.role,
+                      summary: `${row.edgeLabel}. Dual-shore San Jose · Australia · Dhaka architecture preserves 40%–60% gross margin moat.`,
+                      metric: `$${row.hourlyUsd.toFixed(row.hourlyUsd % 1 === 0 ? 0 : 2)}/hr blended`,
+                      status: isDhaka ? 'SPENTA ADVANTAGE' : 'MARKET RATE',
+                      hint: 'Cost arbitrage benchmark',
+                      accent: isDhaka ? 'emerald' : idx === 3 ? 'crimson' : 'navy',
+                    },
+                    e,
+                  )
+                }
+                onMouseMove={moveTip}
+                onMouseLeave={clearTip}
+                className="cursor-default"
+              >
                 <text
                   x="542"
                   y={ry}
@@ -1557,26 +1842,48 @@ function Plate04FinancialEdge({
           })}
 
           {/* SAFE Terms Summary Box inside Right Card */}
-          <rect x="542" y="346" width="302" height="38" rx="7" fill={p.greenSoft} stroke={p.green} />
-          <text
-            x="554"
-            y="362"
-            fill={p.green}
-            fontSize="9"
-            fontWeight="800"
-            fontFamily="JetBrains Mono, monospace"
+          <g
+            onMouseEnter={(e) =>
+              showTip(
+                {
+                  id: 'p4-safe-box',
+                  code: 'SEED SAFE',
+                  title: '$500K SAFE · $4.5M Valuation Cap',
+                  summary:
+                    'Reconciled 5-year conservative projection delivers $3.189M cumulative net profit (6.38× return) backed by captive distribution.',
+                  metric: '20% Discount · 6.38× Net',
+                  status: 'CONSERVATIVE BASE',
+                  hint: 'See Capital Engine tab',
+                  accent: 'emerald',
+                },
+                e,
+              )
+            }
+            onMouseMove={moveTip}
+            onMouseLeave={clearTip}
+            className="cursor-default"
           >
-            $500K SAFE · $4.5M CAP · 20% DISCOUNT
-          </text>
-          <text
-            x="554"
-            y="376"
-            fill={p.body}
-            fontSize="8.3"
-            fontFamily="JetBrains Mono, monospace"
-          >
-            Cum. 5-Yr Net Profit: $3.189M (Conservative)
-          </text>
+            <rect x="542" y="346" width="302" height="38" rx="7" fill={p.greenSoft} stroke={p.green} />
+            <text
+              x="554"
+              y="362"
+              fill={p.green}
+              fontSize="9"
+              fontWeight="800"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              $500K SAFE · $4.5M CAP · 20% DISCOUNT
+            </text>
+            <text
+              x="554"
+              y="376"
+              fill={p.body}
+              fontSize="8.3"
+              fontFamily="JetBrains Mono, monospace"
+            >
+              Cum. 5-Yr Net Profit: $3.189M (Conservative)
+            </text>
+          </g>
 
           <text
             x="854"
@@ -1610,6 +1917,8 @@ function Plate04FinancialEdge({
           Click FY27–FY31 bars to inspect
         </span>
       </div>
+
+      <ArchitectureNodeTooltip data={tip} isDark={polarity === 'dark'} />
     </div>
   );
 }

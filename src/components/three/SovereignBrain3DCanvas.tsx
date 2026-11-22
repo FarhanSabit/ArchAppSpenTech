@@ -38,6 +38,43 @@ interface ProjectedCallout {
   visible: boolean;
 }
 
+interface ProjectedNodeAnchor {
+  hubId: string;
+  num: string;
+  x: number;
+  y: number;
+  isSelected: boolean;
+  isActive: boolean;
+  accent: string;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean;
+  const num = Number.parseInt(full, 16);
+  if (Number.isNaN(num)) return `rgba(111, 203, 159, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getEmissiveCssVars(accent: string, isLight: boolean): React.CSSProperties {
+  return {
+    '--brain-emissive-border': hexToRgba(accent, isLight ? 0.52 : 0.62),
+    '--brain-emissive-bright': hexToRgba(accent, isLight ? 0.92 : 0.98),
+    '--brain-emissive-dim': hexToRgba(accent, isLight ? 0.16 : 0.24),
+    '--brain-emissive-glow': hexToRgba(accent, isLight ? 0.42 : 0.62),
+    '--brain-emissive-inner': hexToRgba(accent, isLight ? 0.2 : 0.34),
+  } as React.CSSProperties;
+}
+
 // Pre-allocated scratch math objects (zero GC inside animation loop)
 const _packetPos = new THREE.Vector3();
 const _worldPos = new THREE.Vector3();
@@ -193,6 +230,7 @@ export default function SovereignBrain3DCanvas({
   const { selectedIds, hitlConfidence, toggleApp } = useStack();
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
   const [projectedCallout, setProjectedCallout] = useState<ProjectedCallout | null>(null);
+  const [projectedAnchors, setProjectedAnchors] = useState<ProjectedNodeAnchor[]>([]);
   const [contextLost, setContextLost] = useState(false);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [activePreset, setActivePreset] = useState<CameraPreset>('overview');
@@ -875,6 +913,10 @@ export default function SovereignBrain3DCanvas({
     let lastTime = performance.now();
     let elapsed = 0;
     let lastCalloutSync = 0;
+    let lastAnchorSync = 0;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -1051,23 +1093,29 @@ export default function SovereignBrain3DCanvas({
 
         node.collarMat.color.lerp(targetMetal, fAlpha);
 
-        const pulseWave = isFocus ? 0.24 * Math.sin(elapsed * 5.2 + idx) : 0;
-        const lightDamp = isStoneLight ? 0.55 : 1.0;
+        const pulseWave = prefersReducedMotion
+          ? 0
+          : isFocus
+            ? 0.32 * (0.5 + 0.5 * Math.sin(elapsed * 3.4 + idx))
+            : isActive
+              ? 0.2 * (0.5 + 0.5 * Math.sin(elapsed * 2.4 + idx * 0.9))
+              : 0;
+        const lightDamp = isStoneLight ? 0.58 : 1.0;
         node.glassShellMat.emissiveIntensity = THREE.MathUtils.damp(
           node.glassShellMat.emissiveIntensity,
-          ((isFocus ? 0.8 : isActive ? 0.45 : 0.14) + pulseWave) * lightDamp,
+          ((isFocus ? 0.65 : isActive ? 0.34 : 0.14) + pulseWave) * lightDamp,
           7,
           dt,
         );
         node.innerCoreMat.emissiveIntensity = THREE.MathUtils.damp(
           node.innerCoreMat.emissiveIntensity,
-          ((isFocus ? 2.0 : isActive ? 1.25 : 0.45) + pulseWave) * lightDamp,
+          ((isFocus ? 1.75 : isActive ? 1.05 : 0.45) + pulseWave * 1.45) * lightDamp,
           7,
           dt,
         );
         node.collarMat.emissiveIntensity = THREE.MathUtils.damp(
           node.collarMat.emissiveIntensity,
-          (isFocus ? 0.85 : isActive ? 0.42 : 0.1) * lightDamp,
+          ((isFocus ? 0.72 : isActive ? 0.34 : 0.1) + pulseWave * 0.65) * lightDamp,
           7,
           dt,
         );
@@ -1093,6 +1141,36 @@ export default function SovereignBrain3DCanvas({
 
       controls.update();
       renderer.render(scene, camera);
+
+      if (now - lastAnchorSync > 60) {
+        lastAnchorSync = now;
+        const w = container.clientWidth || 640;
+        const h = container.clientHeight || 460;
+        const nextAnchors: ProjectedNodeAnchor[] = [];
+        for (let i = 0; i < hubNodes.length; i++) {
+          const node = hubNodes[i];
+          const isNodeActive = activeHubs.has(node.hubId);
+          const isNodeSelected = selectedHubRef.current === node.hubId;
+          if (!isNodeActive && !isNodeSelected) continue;
+          node.group.getWorldPosition(_worldPos);
+          _projVec.copy(_worldPos).project(camera);
+          if (_projVec.z >= 1) continue;
+          const sx = ((_projVec.x + 1) / 2) * w;
+          const sy = ((-_projVec.y + 1) / 2) * h;
+          if (sx < 14 || sx > w - 14 || sy < 14 || sy > h - 14) continue;
+          const meta = BRAIN_HUBS[i];
+          nextAnchors.push({
+            hubId: node.hubId,
+            num: meta?.num ?? String(i + 1).padStart(2, '0'),
+            x: Math.round(sx),
+            y: Math.round(sy),
+            isSelected: isNodeSelected,
+            isActive: isNodeActive,
+            accent: meta?.accent ?? '#6FCB9F',
+          });
+        }
+        setProjectedAnchors(nextAnchors);
+      }
 
       if (hoveredNodeRef && !isDraggingOrbit && now - lastCalloutSync > 45) {
         lastCalloutSync = now;
@@ -1167,19 +1245,30 @@ export default function SovereignBrain3DCanvas({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 w-full max-w-2xl">
           {BRAIN_HUBS.map((hub) => {
             const active = activeHubIds.has(hub.id);
+            const selected = selectedHubId === hub.id;
+            const pulseClass = selected
+              ? 'brain-node-emissive-pulse--selected'
+              : active
+                ? 'brain-node-emissive-pulse'
+                : '';
             return (
               <button
                 key={hub.id}
                 type="button"
                 onClick={() => onSelectHub?.(hub.id)}
-                className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                style={active || selected ? getEmissiveCssVars(hub.accent, isLightHud) : undefined}
+                className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${pulseClass} ${
                   isLightHud
-                    ? active
-                      ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#16213A]'
-                      : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163]'
-                    : active
-                      ? 'bg-[#0F2A22] border-[#6FCB9F] text-[#E7EBF5]'
-                      : 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4]'
+                    ? selected
+                      ? 'bg-[#EEF3FB] border-[#1F3863] text-[#16213A]'
+                      : active
+                        ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#16213A]'
+                        : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163]'
+                    : selected
+                      ? 'bg-[#1B2547] border-[#8FA6E8] text-[#E7EBF5]'
+                      : active
+                        ? 'bg-[#0F2A22] border-[#6FCB9F] text-[#E7EBF5]'
+                        : 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4]'
                 }`}
               >
                 <div className="text-[10px] font-mono font-bold">HUB {hub.num}</div>
@@ -1213,6 +1302,27 @@ export default function SovereignBrain3DCanvas({
     >
       {/* Isolated Stable WebGL Canvas Container */}
       <div ref={mountRef} className="w-full h-full min-h-[450px]" />
+
+      {/* Projected CSS Emissive Pulse Halos on Active & Selected 3D Brain Nodes (Zero backdrop-filter) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10" aria-hidden="true">
+        {projectedAnchors.map((anchor) => {
+          const size = anchor.isSelected ? 46 : 34;
+          return (
+            <div
+              key={`pulse-${anchor.hubId}`}
+              className="brain-node-ring-pulse absolute rounded-full border"
+              style={{
+                left: `${anchor.x}px`,
+                top: `${anchor.y}px`,
+                width: `${size}px`,
+                height: `${size}px`,
+                borderColor: hexToRgba(anchor.accent, anchor.isSelected ? 0.88 : 0.58),
+                ...getEmissiveCssVars(anchor.accent, isLightHud),
+              }}
+            />
+          );
+        })}
+      </div>
 
       {/* Minimal Top-Left Spec Badge (Zero Side-Flank Occlusion, Solid Surface) */}
       <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap items-center gap-2">
@@ -1348,6 +1458,61 @@ export default function SovereignBrain3DCanvas({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Interactive 8-Hub 3D Node Selector Strip with Custom CSS Emissive Pulse on Active/Selected States */}
+            <div
+              className={`flex flex-wrap items-center gap-1.5 pt-1.5 border-t ${
+                isLightHud ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
+              }`}
+              role="group"
+              aria-label="3D Brain hub node quick selector"
+            >
+              {BRAIN_HUBS.map((hub) => {
+                const isActiveNode = activeHubIds.has(hub.id);
+                const isSelectedNode = selectedHubId === hub.id;
+                const pulseClass = isSelectedNode
+                  ? 'brain-node-emissive-pulse--selected'
+                  : isActiveNode
+                    ? 'brain-node-emissive-pulse'
+                    : '';
+                return (
+                  <button
+                    key={hub.id}
+                    type="button"
+                    onClick={() => {
+                      pendingPulseHubRef.current = hub.id;
+                      onSelectHub?.(hub.id);
+                    }}
+                    aria-pressed={isSelectedNode}
+                    style={
+                      isActiveNode || isSelectedNode
+                        ? getEmissiveCssVars(hub.accent, isLightHud)
+                        : undefined
+                    }
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${pulseClass} ${
+                      isSelectedNode
+                        ? isLightHud
+                          ? 'bg-[#EEF3FB] border-[#1F3863] text-[#16213A]'
+                          : 'bg-[#1B2547] border-[#8FA6E8] text-white'
+                        : isActiveNode
+                          ? isLightHud
+                            ? 'bg-[#EBF6F0] border-[#1C6E46]/70 text-[#16213A]'
+                            : 'bg-[#0F2A22] border-[#6FCB9F]/70 text-[#E7EBF5]'
+                          : hudInactiveBtn
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        isActiveNode || isSelectedNode ? 'brain-core-dot-pulse' : 'opacity-45'
+                      }`}
+                      style={{ backgroundColor: hub.accent }}
+                    />
+                    <span>H{hub.num}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <div
