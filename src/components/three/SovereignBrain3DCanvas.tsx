@@ -5,9 +5,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ChevronDown, ChevronUp, Pause, Play, RotateCcw } from 'lucide-react';
 import { BRAIN_HUBS, SPENTA_APPS } from '../../data/spentaManifest';
 import { useStack } from '../../store/StackContext';
+import {
+  CameraPreset,
+  GalaxyControlPanel,
+  GalaxyPhysicsPreset,
+  ObservatoryFinish,
+} from './GalaxyControlPanel';
 
 interface SovereignBrain3DCanvasProps {
   compact?: boolean;
@@ -16,9 +21,6 @@ interface SovereignBrain3DCanvasProps {
   selectedHubId?: string | null;
   hubFocusNonce?: number;
 }
-
-type CameraPreset = 'overview' | 'operations' | 'experience' | 'ecliptic';
-type ObservatoryFinish = 'cosmos' | 'nocturnal' | 'stone';
 
 interface SatelliteMeta {
   appId: string;
@@ -56,6 +58,7 @@ interface HubOrbitMeta {
   orbitSpeed: number;
   initialAngle: number;
   currentAngle: number;
+  decayFactor: number;
   inclinationX: number;
   inclinationZ: number;
   satellites: SatelliteMeta[];
@@ -221,7 +224,10 @@ function createPlanetaryBandTexture(accentHex: string): THREE.CanvasTexture {
 
 const GALAXY_VERTEX_SHADER = /* glsl */ `
   uniform float uTime;
-  uniform float uSpinSpeed;
+  uniform float uSpinPhase;
+  uniform float uDecayPhase;
+  uniform float uDecayRate;
+  uniform float uDensity;
   uniform float uPixelRatio;
   uniform float uSpread;
 
@@ -236,30 +242,41 @@ const GALAXY_VERTEX_SHADER = /* glsl */ `
   varying float vScale;
 
   void main() {
-    float r = aRadius * (0.72 + uSpread * 0.45);
-    // Differential Keplerian rotation: inner bulge spins faster than outer spiral arms
+    float spreadMult = 0.72 + uSpread * 0.45;
+    float diskMask = step(aRadius, 16.5);
+
+    // Continuous gravitational inspiral when orbital decay rate > 0
+    float inspiralCycle = fract(uDecayPhase * 0.16 + aPhase * 0.15915494);
+    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.58, clamp(uDecayRate, 0.0, 1.0) * diskMask);
+    float r = max(aRadius * spreadMult * decayPull, 0.42);
+
+    // Differential Keplerian rotation + relativistic inspiral spin-up
     float angVel = 0.24 / (pow(max(r, 0.35), 0.58) + 0.32);
-    float angle = uTime * uSpinSpeed * angVel;
+    float inspiralTwist = (1.0 - decayPull) * 3.1 * diskMask;
+    float angle = uSpinPhase * angVel + inspiralTwist;
     float c = cos(angle);
     float s = sin(angle);
 
     vec3 pos = position;
-    pos.xz *= (0.72 + uSpread * 0.45);
+    pos.xz *= spreadMult * decayPull;
     vec2 rotatedXZ = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
     pos.x = rotatedXZ.x;
     pos.z = rotatedXZ.y;
     // Gentle galactic disk harmonic ripple
-    pos.y += sin(r * 1.15 - uTime * 0.6 + aPhase) * 0.045;
+    pos.y = pos.y * mix(1.0, 0.65, (1.0 - decayPull) * diskMask) + sin(r * 1.15 - uTime * 0.6 + aPhase) * 0.045;
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
     float twinkle = 0.78 + 0.22 * sin(uTime * aTwinkle + aPhase);
     vTwinkle = twinkle;
-    vColor = aColor;
+    // Subtle thermal brightening as decaying matter approaches accretion horizon
+    float coreHeat = smoothstep(0.62, 0.38, decayPull) * uDecayRate * diskMask;
+    vColor = mix(aColor, vec3(1.0, 0.92, 0.74), coreHeat * 0.55);
     vScale = aScale;
 
-    float size = aScale * uPixelRatio * (118.0 / max(-mvPosition.z, 1.2));
+    float densityComp = mix(1.16, 1.0, clamp(uDensity, 0.2, 1.0));
+    float size = aScale * densityComp * uPixelRatio * (118.0 / max(-mvPosition.z, 1.2));
     gl_PointSize = clamp(size * twinkle, 1.25, 28.0);
   }
 `;
@@ -293,8 +310,9 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
 `;
 
 const NEBULA_VERTEX_SHADER = /* glsl */ `
-  uniform float uTime;
-  uniform float uSpinSpeed;
+  uniform float uSpinPhase;
+  uniform float uDecayPhase;
+  uniform float uDecayRate;
   uniform float uPixelRatio;
   uniform float uSpread;
 
@@ -307,14 +325,17 @@ const NEBULA_VERTEX_SHADER = /* glsl */ `
   varying float vPhase;
 
   void main() {
-    float r = aRadius * (0.72 + uSpread * 0.45);
+    float spreadMult = 0.72 + uSpread * 0.45;
+    float inspiralCycle = fract(uDecayPhase * 0.12 + aPhase * 0.15915494);
+    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.5, clamp(uDecayRate, 0.0, 1.0));
+    float r = max(aRadius * spreadMult * decayPull, 0.65);
     float angVel = 0.16 / (pow(max(r, 0.5), 0.6) + 0.45);
-    float angle = uTime * uSpinSpeed * angVel;
+    float angle = uSpinPhase * angVel + (1.0 - decayPull) * 2.4;
     float c = cos(angle);
     float s = sin(angle);
 
     vec3 pos = position;
-    pos.xz *= (0.72 + uSpread * 0.45);
+    pos.xz *= spreadMult * decayPull;
     pos.xz = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -543,6 +564,8 @@ export default function SovereignBrain3DCanvas({
     polarity === 'light' ? 'stone' : 'cosmos',
   );
   const [spinSpeed, setSpinSpeed] = useState<number>(0.85);
+  const [starDensity, setStarDensity] = useState<number>(1.0);
+  const [orbitalDecay, setOrbitalDecay] = useState<number>(0.0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [orbitalSpread, setOrbitalSpread] = useState<number>(0.65);
   const [dockOpen, setDockOpen] = useState<boolean>(false);
@@ -554,6 +577,8 @@ export default function SovereignBrain3DCanvas({
   const hitlRef = useRef<number>(hitlConfidence);
   const finishRef = useRef<ObservatoryFinish>(finish);
   const spinSpeedRef = useRef<number>(spinSpeed);
+  const starDensityRef = useRef<number>(starDensity);
+  const orbitalDecayRef = useRef<number>(orbitalDecay);
   const isPausedRef = useRef<boolean>(isPaused);
   const spreadRef = useRef<number>(orbitalSpread);
   const hoveredHubRef = useRef<string | null>(null);
@@ -583,6 +608,14 @@ export default function SovereignBrain3DCanvas({
   useEffect(() => {
     spinSpeedRef.current = spinSpeed;
   }, [spinSpeed]);
+
+  useEffect(() => {
+    starDensityRef.current = starDensity;
+  }, [starDensity]);
+
+  useEffect(() => {
+    orbitalDecayRef.current = orbitalDecay;
+  }, [orbitalDecay]);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -897,7 +930,10 @@ export default function SovereignBrain3DCanvas({
 
     const galaxyUniforms = {
       uTime: { value: 0 },
-      uSpinSpeed: { value: spinSpeedRef.current },
+      uSpinPhase: { value: 0 },
+      uDecayPhase: { value: 0 },
+      uDecayRate: { value: orbitalDecayRef.current },
+      uDensity: { value: starDensityRef.current },
       uPixelRatio: { value: dpr },
       uSpread: { value: spreadRef.current },
       uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
@@ -976,8 +1012,9 @@ export default function SovereignBrain3DCanvas({
     applyNebulaPalette(finishRef.current);
 
     const nebulaUniforms = {
-      uTime: { value: 0 },
-      uSpinSpeed: { value: spinSpeedRef.current },
+      uSpinPhase: { value: 0 },
+      uDecayPhase: { value: 0 },
+      uDecayRate: { value: orbitalDecayRef.current },
       uPixelRatio: { value: dpr },
       uSpread: { value: spreadRef.current },
       uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
@@ -1341,6 +1378,7 @@ export default function SovereignBrain3DCanvas({
         orbitSpeed,
         initialAngle,
         currentAngle: initialAngle,
+        decayFactor: 1.0,
         inclinationX,
         inclinationZ,
         satellites,
@@ -1480,8 +1518,11 @@ export default function SovereignBrain3DCanvas({
     let syncTimerId = 0;
     let activeSync: WebGLSync | null = null;
     let elapsed = 0;
+    let spinPhase = 0;
+    let decayPhase = 0;
     let lastTime = performance.now();
     let lastAppliedFinish: ObservatoryFinish = finishRef.current;
+    let lastAppliedDensity = -1;
     let lastHudSyncMs = 0;
 
     // WebGL2 fenceSync pacing helper for Software WebGL (yields via setTimeout)
@@ -1528,7 +1569,10 @@ export default function SovereignBrain3DCanvas({
       lastTime = now;
 
       const effectiveSpeed = reducedMotion || isPausedRef.current ? 0 : spinSpeedRef.current;
+      const effectiveDecay = reducedMotion || isPausedRef.current ? 0 : orbitalDecayRef.current;
       elapsed += rawDt * (effectiveSpeed === 0 ? 0.12 : 1.0);
+      spinPhase += rawDt * effectiveSpeed;
+      decayPhase += rawDt * effectiveDecay;
 
       // Handle Finish palette switches cleanly
       const curFinish = finishRef.current;
@@ -1558,6 +1602,14 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
+      // Dynamic Star & Nebula Density via GPU drawRange (zero buffer re-uploads)
+      const targetDensity = starDensityRef.current;
+      if (Math.abs(targetDensity - lastAppliedDensity) > 0.001) {
+        lastAppliedDensity = targetDensity;
+        galaxyGeo.setDrawRange(0, Math.max(1000, Math.round(starCount * targetDensity)));
+        nebulaGeo.setDrawRange(0, Math.max(120, Math.round(nebulaCount * targetDensity)));
+      }
+
       // Smoothly lerp scene background, exponential fog & lighting
       (scene.background as THREE.Color).lerp(BG_COLORS[curFinish], Math.min(1, rawDt * 6));
       if (scene.fog instanceof THREE.FogExp2) {
@@ -1566,9 +1618,17 @@ export default function SovereignBrain3DCanvas({
       hemiLight.intensity = isStone ? 1.35 : 0.9;
       solarPointLight.intensity = isStone ? 2.6 : 4.2;
 
-      // Update GLSL Galaxy & Nebula Uniforms
+      // Update GLSL Galaxy & Nebula Uniforms (smooth integrated spin & orbital decay)
       galaxyUniforms.uTime.value = elapsed;
-      galaxyUniforms.uSpinSpeed.value = effectiveSpeed;
+      galaxyUniforms.uSpinPhase.value = spinPhase;
+      galaxyUniforms.uDecayPhase.value = decayPhase;
+      galaxyUniforms.uDecayRate.value = THREE.MathUtils.damp(
+        galaxyUniforms.uDecayRate.value,
+        orbitalDecayRef.current,
+        4.5,
+        rawDt,
+      );
+      galaxyUniforms.uDensity.value = targetDensity;
       galaxyUniforms.uSpread.value = THREE.MathUtils.damp(
         galaxyUniforms.uSpread.value,
         spreadRef.current,
@@ -1577,8 +1637,9 @@ export default function SovereignBrain3DCanvas({
       );
       galaxyUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
-      nebulaUniforms.uTime.value = elapsed;
-      nebulaUniforms.uSpinSpeed.value = effectiveSpeed;
+      nebulaUniforms.uSpinPhase.value = spinPhase;
+      nebulaUniforms.uDecayPhase.value = decayPhase;
+      nebulaUniforms.uDecayRate.value = galaxyUniforms.uDecayRate.value;
       nebulaUniforms.uSpread.value = galaxyUniforms.uSpread.value;
       nebulaUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
@@ -1659,12 +1720,29 @@ export default function SovereignBrain3DCanvas({
         const isSelected = curSelectedHub === meta.hubId;
         const isHovered = curHovered === meta.hubId;
 
-        // Advance Keplerian orbital position & GPU trailing wake
-        meta.currentAngle += rawDt * meta.orbitSpeed * effectiveSpeed;
-        const curOrbitR = meta.baseRadius * spreadScale;
-        meta.orbitRingLine.scale.setScalar(spreadScale);
+        // Advance Keplerian orbital position with gravitational orbital decay & conservation of angular momentum
+        const targetDecayScale =
+          orbitalDecayRef.current > 0.001
+            ? 1.0 -
+              orbitalDecayRef.current * 0.34 -
+              0.045 *
+                orbitalDecayRef.current *
+                (0.5 + 0.5 * Math.sin(decayPhase * 0.85 + h * 0.7))
+            : 1.0;
+        meta.decayFactor = THREE.MathUtils.damp(
+          meta.decayFactor,
+          targetDecayScale,
+          orbitalDecayRef.current > 0.001 ? 1.6 + orbitalDecayRef.current * 1.4 : 2.8,
+          rawDt,
+        );
+        const keplerBoost = 1 / Math.pow(Math.max(meta.decayFactor, 0.55), 1.45);
+        meta.currentAngle += rawDt * meta.orbitSpeed * effectiveSpeed * keplerBoost;
+
+        const curOrbitR = Math.max(2.05, meta.baseRadius * spreadScale * meta.decayFactor);
+        meta.orbitRingLine.scale.setScalar(curOrbitR / meta.baseRadius);
         meta.trailMat.uniforms.uHeadAngle.value = meta.currentAngle;
         meta.trailMat.uniforms.uRadius.value = curOrbitR;
+        meta.trailMat.uniforms.uArcSpan.value = 1.18 + (1.0 - meta.decayFactor) * 2.9;
         meta.trailMat.uniforms.uOpacity.value = isSelected
           ? 0.92
           : isHovered
@@ -2059,178 +2137,49 @@ export default function SovereignBrain3DCanvas({
         </div>
       )}
 
-      {/* Single Collapsible Bottom Cinema Control Dock (Zero backdrop-filter over WebGL) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-24px)] max-w-[740px]">
-        <div
-          className={`rounded-xl border shadow-lg transition-colors ${
-            isLightMode
-              ? 'bg-[#FAF8F4]/95 border-[#D4CEC2] text-[#16213A]'
-              : 'bg-[#0B1124]/92 border-[#233157] text-[#E7EBF5]'
-          }`}
-        >
-          {/* Compact Dock Header / Toggle */}
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <button
-                type="button"
-                onClick={() => setDockOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-[0.14em] cursor-pointer whitespace-nowrap"
-              >
-                {dockOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                )}
-                <span>Observatory Controls</span>
-              </button>
-              <span className="hidden sm:inline text-[10px] font-mono opacity-55 truncate">
-                · 8 Hubs · 13 Satellites · {selectedIds.length} Active
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsPaused((p) => !p)}
-                aria-label={isPaused ? 'Resume orbital simulation' : 'Pause orbital simulation'}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
-                  isLightMode
-                    ? 'bg-white border-[#D4CEC2] text-[#16213A] hover:border-[#1F3863]'
-                    : 'bg-[#141D38] border-[#26355E] text-[#D9E3FA] hover:border-[#6FCB9F]'
-                }`}
-              >
-                {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-                <span>{isPaused ? 'Play' : 'Pause'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSpinSpeed(0.85);
-                  setOrbitalSpread(0.65);
-                  setIsPaused(false);
-                  applyCameraPreset('overview');
-                }}
-                aria-label="Reset observatory camera and orbital physics"
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
-                  isLightMode
-                    ? 'bg-white border-[#D4CEC2] text-[#16213A] hover:border-[#1F3863]'
-                    : 'bg-[#141D38] border-[#26355E] text-[#D9E3FA] hover:border-[#6FCB9F]'
-                }`}
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span className="hidden sm:inline">Reset</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Expandable Controls Body */}
-          {dockOpen && (
-            <div
-              className={`px-3 pb-2.5 pt-2 border-t grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[10px] font-mono ${
-                isLightMode ? 'border-[#E4DFD6]' : 'border-[#1E2B4F]'
-              }`}
-            >
-              {/* Camera Presets */}
-              <div className="space-y-1">
-                <div className="uppercase tracking-wider opacity-65">Camera Angle</div>
-                <div className="grid grid-cols-2 gap-1">
-                  {(['overview', 'operations', 'experience', 'ecliptic'] as CameraPreset[]).map(
-                    (preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => applyCameraPreset(preset)}
-                        className={`px-2 py-1 rounded text-[10px] font-semibold capitalize cursor-pointer transition-colors whitespace-nowrap ${
-                          cameraPreset === preset
-                            ? isLightMode
-                              ? 'bg-[#1F3863] text-white'
-                              : 'bg-[#6FCB9F] text-[#0B1020]'
-                            : isLightMode
-                              ? 'bg-[#EFECE4] text-[#4A5163] hover:text-[#16213A]'
-                              : 'bg-[#141D38] text-[#A8B4D4] hover:text-white'
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              {/* Observatory Finish */}
-              <div className="space-y-1">
-                <div className="uppercase tracking-wider opacity-65">Observatory</div>
-                <div className="grid grid-cols-3 gap-1">
-                  {(
-                    [
-                      { id: 'cosmos', label: 'Cosmos' },
-                      { id: 'nocturnal', label: 'Navy' },
-                      { id: 'stone', label: 'Stone' },
-                    ] as { id: ObservatoryFinish; label: string }[]
-                  ).map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setFinish(opt.id)}
-                      className={`px-1.5 py-1 rounded text-[10px] font-semibold cursor-pointer transition-colors whitespace-nowrap ${
-                        finish === opt.id
-                          ? isLightMode
-                            ? 'bg-[#1F3863] text-white'
-                            : 'bg-[#8FA6E8] text-[#0B1020]'
-                          : isLightMode
-                            ? 'bg-[#EFECE4] text-[#4A5163] hover:text-[#16213A]'
-                            : 'bg-[#141D38] text-[#A8B4D4] hover:text-white'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Spin Velocity */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between uppercase tracking-wider opacity-75">
-                  <span>Spin Velocity</span>
-                  <span className="tabular-nums font-bold">{spinSpeed.toFixed(2)}×</span>
-                </div>
-                <input
-                  type="range"
-                  min={0.1}
-                  max={2.4}
-                  step={0.05}
-                  value={spinSpeed}
-                  onChange={(e) => {
-                    setSpinSpeed(Number(e.target.value));
-                    if (isPaused) setIsPaused(false);
-                  }}
-                  aria-label="Galaxy spin velocity"
-                  className="w-full spenta-slider"
-                />
-              </div>
-
-              {/* Orbital Spread */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between uppercase tracking-wider opacity-75">
-                  <span>Orbital Spread</span>
-                  <span className="tabular-nums font-bold">{Math.round(orbitalSpread * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0.25}
-                  max={1.1}
-                  step={0.05}
-                  value={orbitalSpread}
-                  onChange={(e) => setOrbitalSpread(Number(e.target.value))}
-                  aria-label="Hub orbital spread"
-                  className="w-full spenta-slider"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Dedicated Collapsible Spiral Galaxy Control Panel Component */}
+      <GalaxyControlPanel
+        isLightMode={isLightMode}
+        dockOpen={dockOpen}
+        onToggleDock={() => setDockOpen((v) => !v)}
+        isPaused={isPaused}
+        onTogglePause={() => setIsPaused((p) => !p)}
+        cameraPreset={cameraPreset}
+        onSelectCameraPreset={applyCameraPreset}
+        finish={finish}
+        onSelectFinish={setFinish}
+        spinSpeed={spinSpeed}
+        onSpinSpeedChange={(val) => {
+          setSpinSpeed(val);
+          if (isPaused) setIsPaused(false);
+        }}
+        starDensity={starDensity}
+        onStarDensityChange={setStarDensity}
+        orbitalDecay={orbitalDecay}
+        onOrbitalDecayChange={(val) => {
+          setOrbitalDecay(val);
+          if (isPaused) setIsPaused(false);
+        }}
+        orbitalSpread={orbitalSpread}
+        onOrbitalSpreadChange={setOrbitalSpread}
+        totalStarCapacity={28000}
+        activeHubCount={BRAIN_HUBS.length}
+        onApplyPhysicsPreset={(preset: GalaxyPhysicsPreset) => {
+          setSpinSpeed(preset.spinSpeed);
+          setStarDensity(preset.starDensity);
+          setOrbitalDecay(preset.orbitalDecay);
+          setOrbitalSpread(preset.orbitalSpread);
+          if (isPaused) setIsPaused(false);
+        }}
+        onReset={() => {
+          setSpinSpeed(0.85);
+          setStarDensity(1.0);
+          setOrbitalDecay(0.0);
+          setOrbitalSpread(0.65);
+          setIsPaused(false);
+          applyCameraPreset('overview');
+        }}
+      />
     </div>
   );
 }

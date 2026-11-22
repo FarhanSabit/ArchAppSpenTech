@@ -34,6 +34,7 @@ const PROPOSALS_STORAGE_KEY = 'spenta_saved_proposals_v1';
 const CORE_CONFIG_STORAGE_KEY = 'spenta_core_layer_configs_v1';
 const CORE_AUDIT_STORAGE_KEY = 'spenta_core_audit_log_v1';
 const DEPLOYMENT_TARGET_STORAGE_KEY = 'spenta_deployment_target_v1';
+const MOBILE_GRID_STORAGE_KEY = 'spenta_mobile_grid_v1';
 const DEFAULT_SELECTED_IDS = ['icr_ops', 'genai_bi', 'mis_erp', 'cyber_sla'];
 
 export type { PaletteMode, ThemeMode };
@@ -221,6 +222,9 @@ interface StackContextValue {
   setTheme: (theme: ThemeMode) => void;
   setPaletteMode: (palette: PaletteMode) => void;
   toggleTheme: () => void;
+  mobileGridVisible: boolean;
+  setMobileGridVisible: (visible: boolean) => void;
+  toggleMobileGrid: () => void;
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
   activeTab: NavTab;
@@ -356,8 +360,30 @@ function loadStoredDeploymentTarget(): DeploymentTargetId {
   return 'on-prem';
 }
 
+function loadStoredMobileGridVisible(): boolean {
+  try {
+    return window.localStorage.getItem(MOBILE_GRID_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export function StackProvider({ children }: { children: React.ReactNode }) {
   const { theme, paletteMode, setTheme, setPaletteMode, toggleTheme } = useTheme();
+  const [mobileGridVisible, setMobileGridVisible] = useState<boolean>(loadStoredMobileGridVisible);
+
+  const toggleMobileGrid = useCallback(() => {
+    setMobileGridVisible((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('spenta-mobile-grid-on', mobileGridVisible);
+    try {
+      window.localStorage.setItem(MOBILE_GRID_STORAGE_KEY, String(mobileGridVisible));
+    } catch {
+      // ignore storage errors
+    }
+  }, [mobileGridVisible]);
   const [initialShareSnapshot] = useState<ParsedShareSnapshot | null>(() => parseShareUrlParams());
   const [sharedSnapshotSummary, setSharedSnapshotSummary] = useState<string | null>(
     () => initialShareSnapshot?.summary ?? null,
@@ -952,6 +978,9 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         setTheme,
         setPaletteMode,
         toggleTheme,
+        mobileGridVisible,
+        setMobileGridVisible,
+        toggleMobileGrid,
         commandPaletteOpen,
         setCommandPaletteOpen,
         activeTab,

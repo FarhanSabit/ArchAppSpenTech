@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Grid3x3,
   Keyboard,
   Loader2,
   Presentation,
@@ -25,7 +26,14 @@ import { SpentaLogo } from './SpentaLogo';
 type ExportScope = 'all' | 'current' | 'range';
 
 export function PitchDeckView() {
-  const { pendingNavFocus, clearPendingNavFocus, selectedApps, stackMetrics } = useStack();
+  const {
+    pendingNavFocus,
+    clearPendingNavFocus,
+    selectedApps,
+    stackMetrics,
+    mobileGridVisible,
+    toggleMobileGrid,
+  } = useStack();
   const [slideIdx, setSlideIdx] = useState(0);
   const [displayedIdx, setDisplayedIdx] = useState(0);
   const [transitionStage, setTransitionStage] = useState<'visible' | 'fading-out' | 'fading-in'>(
@@ -351,6 +359,25 @@ export function PitchDeckView() {
           >
             <FileText className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>{showNotes ? 'Hide Notes' : 'Show Notes'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleMobileGrid}
+            aria-pressed={mobileGridVisible}
+            className={`md:hidden inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              mobileGridVisible
+                ? 'border-[#1C6E46]/50 dark:border-[#6FCB9F]/50 bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/15 text-[#1C6E46] dark:text-[#6FCB9F]'
+                : 'bg-[#FAF8F4] dark:bg-[#0F1529] text-[#5F6576] dark:text-[#8E96B0] border-[#E4DFD6] dark:border-[#232B4A]'
+            }`}
+            title={
+              mobileGridVisible
+                ? 'Hide 24×24 architectural grid on mobile'
+                : 'Show 24×24 architectural grid on mobile'
+            }
+          >
+            <Grid3x3 className="w-3.5 h-3.5" strokeWidth={1.65} />
+            <span>{mobileGridVisible ? 'Grid On' : 'Grid Off'}</span>
           </button>
         </div>
       </section>

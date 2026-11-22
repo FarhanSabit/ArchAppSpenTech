@@ -157,19 +157,42 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Subtle 24x24 Swiss architectural grid harmonized to Stone & Nocturnal palettes */
+/* Subtle 24x24 Swiss architectural grid harmonized to Stone & Nocturnal palettes
+ * Hidden by default on mobile (<768px) to prevent excessive visual density;
+ * toggled on mobile via html.spenta-mobile-grid-on, always visible at >=768px. */
 .bg-obsidian-grid {
-  background-image:
-    linear-gradient(to right, rgba(31, 56, 99, 0.055) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(31, 56, 99, 0.055) 1px, transparent 1px);
+  background-image: none;
   background-size: 24px 24px;
 }
 
-.dark .bg-obsidian-grid {
+html.spenta-mobile-grid-on .bg-obsidian-grid {
   background-image:
-    linear-gradient(to right, rgba(143, 166, 232, 0.055) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(143, 166, 232, 0.055) 1px, transparent 1px);
+    linear-gradient(to right, rgba(31, 56, 99, 0.042) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(31, 56, 99, 0.042) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
+  background-image:
+    linear-gradient(to right, rgba(143, 166, 232, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(143, 166, 232, 0.045) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media (min-width: 768px) {
+  .bg-obsidian-grid {
+    background-image:
+      linear-gradient(to right, rgba(31, 56, 99, 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(31, 56, 99, 0.055) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .dark .bg-obsidian-grid {
+    background-image:
+      linear-gradient(to right, rgba(143, 166, 232, 0.055) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(143, 166, 232, 0.055) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 }
 
 /* Governance marquee ticker */

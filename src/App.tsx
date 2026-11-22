@@ -16,6 +16,7 @@ import { SpentaLogo } from './components/SpentaLogo';
 import { SpentaAiAssistant } from './components/SpentaAiAssistant';
 import { GlobalSearchBar } from './components/GlobalSearchBar';
 import { SpentaThemeView } from './components/SpentaThemeView';
+import { MobileGridToggle } from './components/MobileGridToggle';
 
 function PortalShell() {
   const {
@@ -116,6 +117,7 @@ function PortalShell() {
 
       <GlobalSearchBar />
       <StackComposerDrawer />
+      <MobileGridToggle />
       <SpentaAiAssistant />
     </div>
   );

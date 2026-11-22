@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   Grid2x2,
+  Grid3x3,
   Landmark,
   Layers,
   Mic,
@@ -111,6 +112,8 @@ export function SpentaBrainVault() {
     buildExecutiveBrief,
     pendingNavFocus,
     clearPendingNavFocus,
+    mobileGridVisible,
+    toggleMobileGrid,
   } = useStack();
 
   const [viewMode, setViewMode] = useState<VaultViewMode>('matrix');
@@ -426,12 +429,31 @@ export function SpentaBrainVault() {
                 </p>
               </div>
 
-              {/* Top-Right Quick-Action Toolbar: Share, Export, Copy */}
+              {/* Top-Right Quick-Action Toolbar: Mobile Grid Toggle, Share, Export, Copy */}
               <div
                 role="toolbar"
                 aria-label="Architecture Matrix Quick Actions"
                 className="flex flex-wrap items-center gap-1.5 self-start md:self-auto shrink-0"
               >
+                <button
+                  type="button"
+                  onClick={toggleMobileGrid}
+                  aria-pressed={mobileGridVisible}
+                  className={`md:hidden inline-flex items-center gap-1.5 min-h-[36px] px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    mobileGridVisible
+                      ? 'border-[#1C6E46]/50 dark:border-[#6FCB9F]/50 bg-[#1C6E46]/10 dark:bg-[#6FCB9F]/15 text-[#1C6E46] dark:text-[#6FCB9F]'
+                      : 'border-[#E4DFD6] dark:border-[#232B4A] bg-white/95 dark:bg-[#0F1529]/95 text-[#5F6576] dark:text-[#8E96B0]'
+                  }`}
+                  title={
+                    mobileGridVisible
+                      ? 'Hide 24×24 architectural grid on mobile'
+                      : 'Show 24×24 architectural grid on mobile'
+                  }
+                >
+                  <Grid3x3 className="w-3.5 h-3.5" strokeWidth={1.75} />
+                  <span>{mobileGridVisible ? 'Grid On' : 'Grid Off'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleMatrixShare}

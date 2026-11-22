@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Menu, Moon, Search, Sparkles, Sun, X } from 'lucide-react';
+import { Grid3x3, Layers, Menu, Moon, Search, Sparkles, Sun, X } from 'lucide-react';
 import { NAV_TABS, NavTab } from '../data/spentaManifest';
 import { useTheme } from '../context/ThemeContext';
 import { useStack } from '../store/StackContext';
@@ -15,6 +15,8 @@ export function Navbar() {
     setDrawerOpen,
     setCommandPaletteOpen,
     setAiAssistantOpen,
+    mobileGridVisible,
+    toggleMobileGrid,
   } = useStack();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -159,6 +161,51 @@ export function Navbar() {
                 </button>
               );
             })}
+          </div>
+
+          {/* Mobile-only Display Density Setting for .bg-obsidian-grid */}
+          <div className="md:hidden pt-2.5 border-t border-[#E4DFD6] dark:border-[#232B4A]">
+            <button
+              type="button"
+              onClick={toggleMobileGrid}
+              role="switch"
+              aria-checked={mobileGridVisible}
+              className="w-full min-h-[44px] flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] hover:border-[#1F3863] dark:hover:border-[#8FA6E8] transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2 text-left min-w-0">
+                <Grid3x3
+                  className={`w-4 h-4 shrink-0 ${
+                    mobileGridVisible
+                      ? 'text-[#1C6E46] dark:text-[#6FCB9F]'
+                      : 'text-[#5F6576] dark:text-[#8E96B0]'
+                  }`}
+                  strokeWidth={1.75}
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5]">
+                    Swiss Architectural Grid
+                  </span>
+                  <span className="block text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0] truncate">
+                    {mobileGridVisible
+                      ? 'Active on mobile (.bg-obsidian-grid)'
+                      : 'Hidden on mobile for clean density'}
+                  </span>
+                </span>
+              </span>
+              <span
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  mobileGridVisible
+                    ? 'bg-[#1C6E46] dark:bg-[#6FCB9F]'
+                    : 'bg-[#CFC8BC] dark:bg-[#2A355A]'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-white dark:bg-[#0B1020] transition-transform ${
+                    mobileGridVisible ? 'translate-x-4.5' : 'translate-x-1'
+                  }`}
+                />
+              </span>
+            </button>
           </div>
 
           <div className="pt-2.5 border-t border-[#E4DFD6] dark:border-[#232B4A] flex items-center justify-between gap-2">
