@@ -9,9 +9,14 @@ import { BRAIN_HUBS, SPENTA_APPS } from '../../data/spentaManifest';
 import { useStack } from '../../store/StackContext';
 import {
   CameraPreset,
+  GALAXY_TYPE_PRESETS,
   GalaxyControlPanel,
-  GalaxyPhysicsPreset,
+  GalaxyPresetId,
+  GalaxyTypePreset,
   ObservatoryFinish,
+  TIMELINE_MAX_MYR,
+  TIMELINE_MIN_MYR,
+  formatEpochMyr,
 } from './GalaxyControlPanel';
 
 interface SovereignBrain3DCanvasProps {
@@ -61,6 +66,8 @@ interface HubOrbitMeta {
   decayFactor: number;
   inclinationX: number;
   inclinationZ: number;
+  ellipticalInclinationX: number;
+  ellipticalInclinationZ: number;
   satellites: SatelliteMeta[];
   curve: THREE.QuadraticBezierCurve3;
 }
@@ -89,8 +96,21 @@ const _midCtrl = new THREE.Vector3();
 const _packetPos = new THREE.Vector3();
 const _camGoalPos = new THREE.Vector3();
 const _camGoalTarget = new THREE.Vector3();
+const _radialDir = new THREE.Vector3();
+const _morphWeights = new THREE.Vector3(1, 0, 0);
+const _morphTarget = new THREE.Vector3(1, 0, 0);
 const _dummyObj = new THREE.Object3D();
 const _tmpColor = new THREE.Color();
+const _tmpColor2 = new THREE.Color();
+const _tmpColor3 = new THREE.Color();
+const _coreHotCol = new THREE.Color();
+const _coreMidCol = new THREE.Color();
+const _coreEdgeCol = new THREE.Color();
+const _coronaCol = new THREE.Color();
+const _haloInCol = new THREE.Color();
+const _haloOutCol = new THREE.Color();
+const _accInCol = new THREE.Color();
+const _accOutCol = new THREE.Color();
 
 // Palette constants
 const BG_COLORS: Record<ObservatoryFinish, THREE.Color> = {
@@ -134,6 +154,78 @@ const CORE_HEX_BY_FINISH: Record<
     armAccent: '#1C6E46',
     hiiKnot: '#9F1239',
   },
+};
+
+const ELLIPTICAL_HEX_BY_FINISH: Record<
+  ObservatoryFinish,
+  {
+    nucleus: string;
+    innerGold: string;
+    outerAmber: string;
+    cluster: string;
+    halo: string;
+  }
+> = {
+  cosmos: {
+    nucleus: '#FFFBEB',
+    innerGold: '#FCD34D',
+    outerAmber: '#D97706',
+    cluster: '#FDE68A',
+    halo: '#B45309',
+  },
+  nocturnal: {
+    nucleus: '#FFF7ED',
+    innerGold: '#FBBF24',
+    outerAmber: '#EA580C',
+    cluster: '#FDE047',
+    halo: '#9A3412',
+  },
+  stone: {
+    nucleus: '#78350F',
+    innerGold: '#B45309',
+    outerAmber: '#92400E',
+    cluster: '#1F3863',
+    halo: '#57534E',
+  },
+};
+
+const STARBURST_HEX_BY_FINISH: Record<
+  ObservatoryFinish,
+  {
+    nucleus: string;
+    diskBlue: string;
+    knotEmerald: string;
+    plumeCrimson: string;
+    plumeViolet: string;
+  }
+> = {
+  cosmos: {
+    nucleus: '#F0F9FF',
+    diskBlue: '#38BDF8',
+    knotEmerald: '#34D399',
+    plumeCrimson: '#FB7185',
+    plumeViolet: '#E879F9',
+  },
+  nocturnal: {
+    nucleus: '#ECFEFF',
+    diskBlue: '#22D3EE',
+    knotEmerald: '#6FCB9F',
+    plumeCrimson: '#F43F5E',
+    plumeViolet: '#C084FC',
+  },
+  stone: {
+    nucleus: '#0F172A',
+    diskBlue: '#0369A1',
+    knotEmerald: '#0F766E',
+    plumeCrimson: '#BE123C',
+    plumeViolet: '#7E22CE',
+  },
+};
+
+const MORPH_TARGET_BY_PRESET: Record<GalaxyPresetId, [number, number, number]> = {
+  'andromeda-spiral': [1, 0, 0],
+  'elliptical-dense': [0, 1, 0],
+  'active-starburst': [0, 0, 1],
 };
 
 const CAMERA_PRESETS: Record<
@@ -223,60 +315,94 @@ function createPlanetaryBandTexture(accentHex: string): THREE.CanvasTexture {
 // ============================================================================
 
 const GALAXY_VERTEX_SHADER = /* glsl */ `
-  uniform float uTime;
-  uniform float uSpinPhase;
-  uniform float uDecayPhase;
+  uniform float uRealTime;
+  uniform float uSimEpoch;
   uniform float uDecayRate;
   uniform float uDensity;
   uniform float uPixelRatio;
   uniform float uSpread;
+  uniform vec3 uMorphWeights;
+  uniform float uTransitionSwirl;
 
+  attribute vec3 aPosElliptical;
+  attribute vec3 aPosStarburst;
+  attribute vec3 aColor;
+  attribute vec3 aColorElliptical;
+  attribute vec3 aColorStarburst;
+  attribute vec3 aRadiusMorph;
   attribute float aScale;
-  attribute float aRadius;
   attribute float aPhase;
   attribute float aTwinkle;
-  attribute vec3 aColor;
 
   varying vec3 vColor;
   varying float vTwinkle;
   varying float vScale;
 
   void main() {
-    float spreadMult = 0.72 + uSpread * 0.45;
-    float diskMask = step(aRadius, 16.5);
+    float wSpiral = uMorphWeights.x;
+    float wEllip = uMorphWeights.y;
+    float wBurst = uMorphWeights.z;
 
-    // Continuous gravitational inspiral when orbital decay rate > 0
-    float inspiralCycle = fract(uDecayPhase * 0.16 + aPhase * 0.15915494);
-    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.58, clamp(uDecayRate, 0.0, 1.0) * diskMask);
-    float r = max(aRadius * spreadMult * decayPull, 0.42);
+    vec3 basePos = position * wSpiral + aPosElliptical * wEllip + aPosStarburst * wBurst;
+    vec3 baseCol = aColor * wSpiral + aColorElliptical * wEllip + aColorStarburst * wBurst;
+    float morphR = dot(aRadiusMorph, uMorphWeights);
+    float diskMask = step(aRadiusMorph.x, 16.5);
 
-    // Differential Keplerian rotation + relativistic inspiral spin-up
-    float angVel = 0.24 / (pow(max(r, 0.35), 0.58) + 0.32);
-    float inspiralTwist = (1.0 - decayPull) * 3.1 * diskMask;
-    float angle = uSpinPhase * angVel + inspiralTwist;
+    // Normalized cosmic timeline (-1.0 at -500 Myr .. +1.0 at +500 Myr)
+    float epochNorm = clamp(uSimEpoch / 500.0, -1.0, 1.0);
+    float epochProgress = (uSimEpoch + 500.0) / 1000.0;
+
+    // Historical protogalactic expansion (-500 Myr) -> projected compaction (+500 Myr)
+    float epochRadialEvol = mix(1.0, 1.0 - epochNorm * 0.085, diskMask);
+    float epochVertEvol = mix(1.0, 1.0 - epochNorm * 0.24, diskMask * (1.0 - wEllip * 0.72));
+
+    float spreadMult = (0.72 + uSpread * 0.45) * epochRadialEvol;
+
+    // Deterministic orbital decay driven by both uDecayRate and timeline epoch
+    float inspiralCycle = fract(epochProgress * 1.85 + aPhase * 0.15915494);
+    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.56, clamp(uDecayRate, 0.0, 1.0) * diskMask);
+    float r = max(morphR * spreadMult * decayPull, 0.42);
+
+    // Morphology-aware differential rotation + morph transition swirl
+    float spinPhase = uSimEpoch * 0.16;
+    float kinRate = wSpiral * 1.0 + wEllip * 0.36 + wBurst * 1.32;
+    float angVel = (0.24 * kinRate) / (pow(max(r, 0.35), 0.58) + 0.32);
+    float inspiralTwist = (1.0 - decayPull) * 3.2 * diskMask;
+    float morphSwirl = uTransitionSwirl * (1.35 / (morphR * 0.16 + 0.65)) * diskMask;
+    float angle = spinPhase * angVel + inspiralTwist + morphSwirl;
     float c = cos(angle);
     float s = sin(angle);
 
-    vec3 pos = position;
+    vec3 pos = basePos;
     pos.xz *= spreadMult * decayPull;
     vec2 rotatedXZ = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
     pos.x = rotatedXZ.x;
     pos.z = rotatedXZ.y;
-    // Gentle galactic disk harmonic ripple
-    pos.y = pos.y * mix(1.0, 0.65, (1.0 - decayPull) * diskMask) + sin(r * 1.15 - uTime * 0.6 + aPhase) * 0.045;
+
+    // Active Starburst bipolar superwind streaming along +/-Y with timeline epoch
+    float isPlume = smoothstep(1.15, 2.25, abs(aPosStarburst.y)) * wBurst * diskMask;
+    float plumeFlow = 1.0 + epochNorm * 0.22 + sin(aPhase + uSimEpoch * 0.045) * 0.075;
+    pos.y = pos.y * mix(epochVertEvol, plumeFlow, isPlume);
+    pos.y *= mix(1.0, 0.65, (1.0 - decayPull) * diskMask * (1.0 - isPlume));
+
+    // Gentle galactic harmonic ripple / elliptical 3D velocity dispersion
+    float waveAmp = mix(0.045, 0.11, wEllip) * diskMask;
+    pos.y += sin(r * 1.15 - uSimEpoch * 0.09 + aPhase) * waveAmp;
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    float twinkle = 0.78 + 0.22 * sin(uTime * aTwinkle + aPhase);
+    float twinkle = 0.78 + 0.22 * sin(uRealTime * aTwinkle + aPhase);
     vTwinkle = twinkle;
-    // Subtle thermal brightening as decaying matter approaches accretion horizon
+
+    // Thermal core brightening under orbital decay & starburst scintillation
     float coreHeat = smoothstep(0.62, 0.38, decayPull) * uDecayRate * diskMask;
-    vColor = mix(aColor, vec3(1.0, 0.92, 0.74), coreHeat * 0.55);
-    vScale = aScale;
+    float burstBoost = wBurst * (0.14 + 0.12 * sin(uRealTime * 3.2 + aPhase)) * diskMask;
+    vColor = mix(baseCol, vec3(1.0, 0.92, 0.74), coreHeat * 0.55) * (1.0 + burstBoost);
+    vScale = aScale * (1.0 + wBurst * isPlume * 0.22);
 
     float densityComp = mix(1.16, 1.0, clamp(uDensity, 0.2, 1.0));
-    float size = aScale * densityComp * uPixelRatio * (118.0 / max(-mvPosition.z, 1.2));
+    float size = vScale * densityComp * uPixelRatio * (118.0 / max(-mvPosition.z, 1.2));
     gl_PointSize = clamp(size * twinkle, 1.25, 28.0);
   }
 `;
@@ -310,40 +436,62 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
 `;
 
 const NEBULA_VERTEX_SHADER = /* glsl */ `
-  uniform float uSpinPhase;
-  uniform float uDecayPhase;
+  uniform float uSimEpoch;
   uniform float uDecayRate;
   uniform float uPixelRatio;
   uniform float uSpread;
+  uniform vec3 uMorphWeights;
+  uniform float uTransitionSwirl;
 
-  attribute float aScale;
-  attribute float aRadius;
-  attribute float aPhase;
+  attribute vec3 aPosElliptical;
+  attribute vec3 aPosStarburst;
   attribute vec3 aColor;
+  attribute vec3 aColorElliptical;
+  attribute vec3 aColorStarburst;
+  attribute vec3 aRadiusMorph;
+  attribute float aScale;
+  attribute float aPhase;
 
   varying vec3 vColor;
   varying float vPhase;
+  varying float vOpacityBoost;
 
   void main() {
-    float spreadMult = 0.72 + uSpread * 0.45;
-    float inspiralCycle = fract(uDecayPhase * 0.12 + aPhase * 0.15915494);
-    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.5, clamp(uDecayRate, 0.0, 1.0));
-    float r = max(aRadius * spreadMult * decayPull, 0.65);
-    float angVel = 0.16 / (pow(max(r, 0.5), 0.6) + 0.45);
-    float angle = uSpinPhase * angVel + (1.0 - decayPull) * 2.4;
+    float wSpiral = uMorphWeights.x;
+    float wEllip = uMorphWeights.y;
+    float wBurst = uMorphWeights.z;
+
+    vec3 basePos = position * wSpiral + aPosElliptical * wEllip + aPosStarburst * wBurst;
+    vec3 baseCol = aColor * wSpiral + aColorElliptical * wEllip + aColorStarburst * wBurst;
+    float morphR = dot(aRadiusMorph, uMorphWeights);
+
+    float epochNorm = clamp(uSimEpoch / 500.0, -1.0, 1.0);
+    float epochProgress = (uSimEpoch + 500.0) / 1000.0;
+    float spreadMult = (0.72 + uSpread * 0.45) * (1.0 - epochNorm * 0.08);
+    float inspiralCycle = fract(epochProgress * 1.45 + aPhase * 0.15915494);
+    float decayPull = mix(1.0, 1.0 - inspiralCycle * 0.48, clamp(uDecayRate, 0.0, 1.0));
+
+    float r = max(morphR * spreadMult * decayPull, 0.65);
+    float kinRate = wSpiral * 1.0 + wEllip * 0.32 + wBurst * 1.25;
+    float angVel = (0.16 * kinRate) / (pow(max(r, 0.5), 0.6) + 0.45);
+    float angle = uSimEpoch * 0.16 * angVel + (1.0 - decayPull) * 2.4 + uTransitionSwirl * 0.85;
     float c = cos(angle);
     float s = sin(angle);
 
-    vec3 pos = position;
+    vec3 pos = basePos;
     pos.xz *= spreadMult * decayPull;
     pos.xz = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
+
+    float isPlume = smoothstep(1.1, 2.2, abs(aPosStarburst.y)) * wBurst;
+    pos.y *= mix(1.0 - epochNorm * 0.16 * (1.0 - wEllip * 0.7), 1.0 + epochNorm * 0.24, isPlume);
 
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    vColor = aColor;
+    vColor = baseCol;
     vPhase = aPhase;
-    gl_PointSize = clamp(aScale * uPixelRatio * (210.0 / max(-mvPosition.z, 2.0)), 8.0, 130.0);
+    vOpacityBoost = 1.0 + wBurst * 0.42 + wEllip * 0.16;
+    gl_PointSize = clamp(aScale * (1.0 + wBurst * 0.18) * uPixelRatio * (210.0 / max(-mvPosition.z, 2.0)), 8.0, 145.0);
   }
 `;
 
@@ -351,6 +499,7 @@ const NEBULA_FRAGMENT_SHADER = /* glsl */ `
   uniform float uIsLight;
   varying vec3 vColor;
   varying float vPhase;
+  varying float vOpacityBoost;
 
   void main() {
     vec2 uv = gl_PointCoord - 0.5;
@@ -362,7 +511,7 @@ const NEBULA_FRAGMENT_SHADER = /* glsl */ `
     float radial = smoothstep(0.5, 0.0, dist);
     float cloud = pow(radial, 2.3) * wisp;
 
-    float opacity = uIsLight > 0.5 ? 0.085 : 0.14;
+    float opacity = (uIsLight > 0.5 ? 0.085 : 0.14) * vOpacityBoost;
     gl_FragColor = vec4(vColor, cloud * opacity);
   }
 `;
@@ -559,6 +708,9 @@ export default function SovereignBrain3DCanvas({
   const mountRef = useRef<HTMLDivElement | null>(null);
 
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
+  const [galaxyPreset, setGalaxyPreset] = useState<GalaxyPresetId>('andromeda-spiral');
+  const [simEpoch, setSimEpoch] = useState<number>(0);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('overview');
   const [finish, setFinish] = useState<ObservatoryFinish>(
     polarity === 'light' ? 'stone' : 'cosmos',
@@ -568,6 +720,7 @@ export default function SovereignBrain3DCanvas({
   const [orbitalDecay, setOrbitalDecay] = useState<number>(0.0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [orbitalSpread, setOrbitalSpread] = useState<number>(0.65);
+  const [morphProgress, setMorphProgress] = useState<number>(1);
   const [dockOpen, setDockOpen] = useState<boolean>(false);
   const [contextLost, setContextLost] = useState<boolean>(false);
   const [callout, setCallout] = useState<ProjectedCallout | null>(null);
@@ -575,6 +728,10 @@ export default function SovereignBrain3DCanvas({
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
+  const galaxyPresetRef = useRef<GalaxyPresetId>(galaxyPreset);
+  const simEpochRef = useRef<number>(simEpoch);
+  const playbackRateRef = useRef<number>(playbackRate);
+  const isScrubbingRef = useRef<boolean>(false);
   const finishRef = useRef<ObservatoryFinish>(finish);
   const spinSpeedRef = useRef<number>(spinSpeed);
   const starDensityRef = useRef<number>(starDensity);
@@ -588,10 +745,16 @@ export default function SovereignBrain3DCanvas({
     hubId: selectedHubId,
     nonce: hubFocusNonce,
   });
-  const presetCommandRef = useRef<{ preset: CameraPreset; nonce: number }>({
-    preset: 'overview',
+  const presetCommandRef = useRef<{
+    pos: [number, number, number];
+    target: [number, number, number];
+    nonce: number;
+  }>({
+    pos: CAMERA_PRESETS.overview.pos,
+    target: CAMERA_PRESETS.overview.target,
     nonce: 0,
   });
+  const morphPulseRef = useRef<number>(0);
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -600,6 +763,14 @@ export default function SovereignBrain3DCanvas({
   useEffect(() => {
     hitlRef.current = hitlConfidence;
   }, [hitlConfidence]);
+
+  useEffect(() => {
+    galaxyPresetRef.current = galaxyPreset;
+  }, [galaxyPreset]);
+
+  useEffect(() => {
+    playbackRateRef.current = playbackRate;
+  }, [playbackRate]);
 
   useEffect(() => {
     finishRef.current = finish;
@@ -638,12 +809,12 @@ export default function SovereignBrain3DCanvas({
     setFinish(polarity === 'light' ? 'stone' : 'cosmos');
   }, [polarity]);
 
-  // Open cinema dock by default on larger non-compact desktop screens
+  // Open control dock by default on tablet/desktop screens so physics sliders are immediately accessible
   useEffect(() => {
-    if (!compact && typeof window !== 'undefined' && window.innerWidth >= 768) {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
       setDockOpen(true);
     }
-  }, [compact]);
+  }, []);
 
   // Cinema Mode keyboard shortcut: press H to toggle Observatory Controls dock
   useEffect(() => {
@@ -678,7 +849,77 @@ export default function SovereignBrain3DCanvas({
 
   const applyCameraPreset = (preset: CameraPreset) => {
     setCameraPreset(preset);
-    presetCommandRef.current = { preset, nonce: presetCommandRef.current.nonce + 1 };
+    const p = CAMERA_PRESETS[preset];
+    presetCommandRef.current = {
+      pos: p.pos,
+      target: p.target,
+      nonce: presetCommandRef.current.nonce + 1,
+    };
+  };
+
+  const applyGalaxyTypePreset = (preset: GalaxyTypePreset) => {
+    setGalaxyPreset(preset.id);
+    setSpinSpeed(preset.spinSpeed);
+    setStarDensity(preset.starDensity);
+    setOrbitalDecay(preset.orbitalDecay);
+    setOrbitalSpread(preset.orbitalSpread);
+    morphPulseRef.current = 1.0;
+    presetCommandRef.current = {
+      pos: preset.cameraPos,
+      target: preset.cameraTarget,
+      nonce: presetCommandRef.current.nonce + 1,
+    };
+  };
+
+  const handleScrubEpoch = (epochMyr: number) => {
+    const clamped = Math.max(TIMELINE_MIN_MYR, Math.min(TIMELINE_MAX_MYR, epochMyr));
+    simEpochRef.current = clamped;
+    setSimEpoch(clamped);
+  };
+
+  const handleTogglePause = () => {
+    setIsPaused((prev) => {
+      if (prev) {
+        // Resuming from timeline boundary wraps smoothly to opposite end
+        if (playbackRateRef.current > 0 && simEpochRef.current >= TIMELINE_MAX_MYR - 0.5) {
+          simEpochRef.current = TIMELINE_MIN_MYR;
+          setSimEpoch(TIMELINE_MIN_MYR);
+        } else if (playbackRateRef.current < 0 && simEpochRef.current <= TIMELINE_MIN_MYR + 0.5) {
+          simEpochRef.current = TIMELINE_MAX_MYR;
+          setSimEpoch(TIMELINE_MAX_MYR);
+        }
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const handleRewind = () => {
+    if (simEpochRef.current <= TIMELINE_MIN_MYR + 0.5) {
+      simEpochRef.current = TIMELINE_MAX_MYR;
+      setSimEpoch(TIMELINE_MAX_MYR);
+    }
+    setIsPaused(false);
+    setPlaybackRate((prev) => (prev === -2 ? -4 : prev === -4 ? -1 : -2));
+  };
+
+  const handleFastForward = () => {
+    if (simEpochRef.current >= TIMELINE_MAX_MYR - 0.5) {
+      simEpochRef.current = TIMELINE_MIN_MYR;
+      setSimEpoch(TIMELINE_MIN_MYR);
+    }
+    setIsPaused(false);
+    setPlaybackRate((prev) => (prev === 2 ? 4 : prev === 4 ? 1 : 2));
+  };
+
+  const handleStepEpoch = (deltaMyr: number) => {
+    setIsPaused(true);
+    handleScrubEpoch(simEpochRef.current + deltaMyr);
+  };
+
+  const handleJumpToPresent = () => {
+    handleScrubEpoch(0);
+    setPlaybackRate(1);
   };
 
   useEffect(() => {
@@ -787,13 +1028,19 @@ export default function SovereignBrain3DCanvas({
     }
 
     // =========================================================================
-    // 1. 28,000-STAR MULTI-ARM LOGARITHMIC SPIRAL GALAXY (UNIFIED GPU & SW WEBGL)
+    // 1. 28,000-STAR MULTI-MORPHOLOGY GALAXY (SPIRAL / ELLIPTICAL / STARBURST)
     // =========================================================================
     const starCount = 28000;
     const starPositions = new Float32Array(starCount * 3);
+    const starPosElliptical = new Float32Array(starCount * 3);
+    const starPosStarburst = new Float32Array(starCount * 3);
+
     const starColors = new Float32Array(starCount * 3);
+    const starColElliptical = new Float32Array(starCount * 3);
+    const starColStarburst = new Float32Array(starCount * 3);
+
+    const starRadiusMorph = new Float32Array(starCount * 3);
     const starScales = new Float32Array(starCount);
-    const starRadii = new Float32Array(starCount);
     const starPhases = new Float32Array(starCount);
     const starTwinkles = new Float32Array(starCount);
 
@@ -801,43 +1048,57 @@ export default function SovereignBrain3DCanvas({
     const branches = 5;
     const maxGalaxyRadius = 15.8;
 
-    const paletteInit = CORE_HEX_BY_FINISH[finishRef.current];
-    const colHot = new THREE.Color(paletteInit.coreInner);
-    const colGold = new THREE.Color(paletteInit.coreOuter);
-    const colArm1 = new THREE.Color(paletteInit.armPrimary);
-    const colArm2 = new THREE.Color(paletteInit.armSecondary);
-    const colAccent = new THREE.Color(paletteInit.armAccent);
-    const colHii = new THREE.Color(paletteInit.hiiKnot);
+    // 18 ancient globular cluster centers for Elliptical Dense morphology
+    const globularCenters: [number, number, number][] = [];
+    for (let gc = 0; gc < 18; gc++) {
+      const r = 4.2 + rand() * 6.8;
+      const th = rand() * Math.PI * 2;
+      const ph = Math.acos(2 * rand() - 1);
+      globularCenters.push([
+        r * Math.sin(ph) * Math.cos(th) * 1.18,
+        r * Math.cos(ph) * 0.84,
+        r * Math.sin(ph) * Math.sin(th) * 0.96,
+      ]);
+    }
 
-    // Structural roles for re-tinting on Observatory Finish switches
-    // 0=bulge, 1=armPrimary, 2=armSecondary, 3=emeraldCluster, 4=halo, 5=hiiKnot
+    // 14 super-star-cluster knots for Active Starburst morphology
+    const starburstKnots: [number, number, number][] = [];
+    for (let sk = 0; sk < 14; sk++) {
+      const r = 1.6 + rand() * 6.8;
+      const th = (sk / 14) * Math.PI * 2 + (rand() - 0.5) * 0.4;
+      starburstKnots.push([Math.cos(th) * r, (rand() - 0.5) * 0.85, Math.sin(th) * r]);
+    }
+
+    // Structural roles for finish-aware palette updates across all 3 galaxy types
     const starRole = new Uint8Array(starCount);
+    const ellipRole = new Uint8Array(starCount); // 0=nucleus, 1=spheroid, 2=globularCluster, 3=halo
+    const burstRole = new Uint8Array(starCount); // 0=nucleus, 1=diskBlue, 2=knotEmerald, 3=plumeCrimson, 4=plumeViolet, 5=halo
+
+    const ellipTiltCos = Math.cos(0.24);
+    const ellipTiltSin = Math.sin(0.24);
 
     for (let i = 0; i < starCount; i++) {
       const i3 = i * 3;
       const pick = rand();
 
-      let x = 0;
-      let y = 0;
-      let z = 0;
-      let radius = 0;
-
+      // --- A. ANDROMEDA-LIKE SPIRAL ---
+      let sx = 0;
+      let sy = 0;
+      let sz = 0;
       if (pick < 0.22) {
-        // Dense central galactic bulge
         const u = Math.pow(rand(), 1.9);
-        radius = 0.5 + u * 3.2;
+        const radius = 0.5 + u * 3.2;
         const theta = rand() * Math.PI * 2;
         const phi = Math.acos(2 * rand() - 1);
-        x = radius * Math.sin(phi) * Math.cos(theta);
-        y = radius * Math.cos(phi) * 0.42;
-        z = radius * Math.sin(phi) * Math.sin(theta);
+        sx = radius * Math.sin(phi) * Math.cos(theta);
+        sy = radius * Math.cos(phi) * 0.42;
+        sz = radius * Math.sin(phi) * Math.sin(theta);
         starRole[i] = 0;
         starScales[i] = 0.9 + rand() * 2.2;
       } else if (pick < 0.88) {
-        // 5 Logarithmic spiral arms + warm H-II star-forming knots
         const branchIdx = i % branches;
         const t = Math.pow(rand(), 1.35);
-        radius = 1.65 + t * (maxGalaxyRadius - 1.65);
+        const radius = 1.65 + t * (maxGalaxyRadius - 1.65);
         const branchAngle = (branchIdx / branches) * Math.PI * 2;
         const spinAngle = Math.log(radius + 0.55) * 2.25;
 
@@ -847,42 +1108,146 @@ export default function SovereignBrain3DCanvas({
           Math.pow(rand(), 2.4) * (0.72 * Math.exp(-t * 1.45) + 0.14) * (rand() < 0.5 ? 1 : -1);
 
         const finalAngle = branchAngle + spinAngle + radialScatter * 0.36;
-        x = Math.cos(finalAngle) * radius + radialScatter * 0.35;
-        y = verticalSpread;
-        z = Math.sin(finalAngle) * radius + (rand() - 0.5) * 0.45 * t;
+        sx = Math.cos(finalAngle) * radius + radialScatter * 0.35;
+        sy = verticalSpread;
+        sz = Math.sin(finalAngle) * radius + (rand() - 0.5) * 0.45 * t;
 
         const subPick = rand();
         if (subPick < 0.08) {
-          starRole[i] = 5; // Warm H-II star-forming emission knot
+          starRole[i] = 5;
           starScales[i] = 1.6 + rand() * 2.2;
         } else if (subPick < 0.24) {
-          starRole[i] = 3; // Sovereign Emerald star cluster
+          starRole[i] = 3;
           starScales[i] = 1.35 + rand() * 2.35;
         } else {
           starRole[i] = branchIdx % 2 === 0 ? 1 : 2;
           starScales[i] = 0.72 + Math.pow(rand(), 2.0) * 2.85;
         }
       } else {
-        // Deep-space cosmic background starfield dome
-        radius = 17.5 + rand() * 22.0;
+        const radius = 17.5 + rand() * 22.0;
         const theta = rand() * Math.PI * 2;
         const phi = Math.acos(2 * rand() - 1);
-        x = radius * Math.sin(phi) * Math.cos(theta);
-        y = radius * Math.cos(phi) * 0.72;
-        z = radius * Math.sin(phi) * Math.sin(theta);
+        sx = radius * Math.sin(phi) * Math.cos(theta);
+        sy = radius * Math.cos(phi) * 0.72;
+        sz = radius * Math.sin(phi) * Math.sin(theta);
         starRole[i] = 4;
         starScales[i] = 0.75 + rand() * 1.65;
       }
 
-      starPositions[i3] = x;
-      starPositions[i3 + 1] = y;
-      starPositions[i3 + 2] = z;
-      starRadii[i] = Math.hypot(x, z);
+      starPositions[i3] = sx;
+      starPositions[i3 + 1] = sy;
+      starPositions[i3 + 2] = sz;
+      const spiralR = Math.hypot(sx, sz);
+
+      // --- B. ELLIPTICAL DENSE (Triaxial E3 Spheroid + Globular Clusters) ---
+      let ex = sx;
+      let ey = sy;
+      let ez = sz;
+      if (pick >= 0.88) {
+        // Keep deep-space background star dome anchored
+        ellipRole[i] = 3;
+      } else if (pick > 0.78) {
+        // Ancient globular cluster knots orbiting the elliptical halo
+        const c = globularCenters[i % globularCenters.length];
+        const jR = Math.pow(rand(), 1.8) * 0.62;
+        const th = rand() * Math.PI * 2;
+        const ph = Math.acos(2 * rand() - 1);
+        ex = c[0] + jR * Math.sin(ph) * Math.cos(th);
+        ey = c[1] + jR * Math.cos(ph);
+        ez = c[2] + jR * Math.sin(ph) * Math.sin(th);
+        ellipRole[i] = 2;
+      } else {
+        // Steep de Vaucouleurs triaxial density distribution
+        const u = Math.pow(rand(), 2.35);
+        const r = 0.42 + u * 12.2;
+        const th = rand() * Math.PI * 2;
+        const ph = Math.acos(2 * rand() - 1);
+        const rawX = r * Math.sin(ph) * Math.cos(th) * 1.28;
+        const rawY = r * Math.cos(ph) * 0.84;
+        const rawZ = r * Math.sin(ph) * Math.sin(th) * 0.94;
+        ex = rawX * ellipTiltCos - rawY * ellipTiltSin;
+        ey = rawX * ellipTiltSin + rawY * ellipTiltCos;
+        ez = rawZ;
+        ellipRole[i] = r < 2.6 ? 0 : 1;
+      }
+      starPosElliptical[i3] = ex;
+      starPosElliptical[i3 + 1] = ey;
+      starPosElliptical[i3 + 2] = ez;
+      const ellipR = Math.hypot(ex, ez);
+
+      // --- C. ACTIVE STARBURST (Compact Knotty Disk + Bipolar Superwind Plumes) ---
+      let bx = sx;
+      let by = sy;
+      let bz = sz;
+      if (pick >= 0.88) {
+        burstRole[i] = 5;
+      } else if (pick < 0.18) {
+        // Intense hyper-luminous starburst nucleus
+        const r = 0.4 + Math.pow(rand(), 1.85) * 2.4;
+        const th = rand() * Math.PI * 2;
+        const ph = Math.acos(2 * rand() - 1);
+        bx = r * Math.sin(ph) * Math.cos(th);
+        by = r * Math.cos(ph) * 0.65;
+        bz = r * Math.sin(ph) * Math.sin(th);
+        burstRole[i] = 0;
+      } else if (pick < 0.43) {
+        // Dramatic Bipolar Superwind Outflow Plumes erupting along +/-Y cones
+        const sign = i % 2 === 0 ? 1 : -1;
+        const hNorm = Math.pow(rand(), 1.12);
+        const h = 0.75 + hNorm * 9.1;
+        const coneR = (0.48 + Math.pow(hNorm, 1.18) * 3.9) * (0.45 + rand() * 0.65);
+        const filamentIdx = i % 6;
+        const filAng =
+          (filamentIdx / 6) * Math.PI * 2 + h * 0.34 + (rand() - 0.5) * 0.58;
+        bx = Math.cos(filAng) * coneR;
+        by = sign * h;
+        bz = Math.sin(filAng) * coneR;
+        burstRole[i] = rand() < 0.66 ? 3 : 4;
+      } else if (pick < 0.57) {
+        // Luminous super-star-cluster knots
+        const k = starburstKnots[i % starburstKnots.length];
+        const jR = Math.pow(rand(), 1.6) * 0.95;
+        const th = rand() * Math.PI * 2;
+        const ph = Math.acos(2 * rand() - 1);
+        bx = k[0] + jR * Math.sin(ph) * Math.cos(th);
+        by = k[1] + jR * Math.cos(ph) * 0.52;
+        bz = k[2] + jR * Math.sin(ph) * Math.sin(th);
+        burstRole[i] = 2;
+      } else {
+        // Compact turbulent starburst disk with 3 clumpy ragged arms
+        const bArm = i % 3;
+        const t = Math.pow(rand(), 1.25);
+        const r = 1.45 + t * 9.8;
+        const ang =
+          (bArm / 3) * Math.PI * 2 +
+          Math.log(r + 0.5) * 1.9 +
+          (rand() - 0.5) * (0.65 + t * 0.9);
+        bx = Math.cos(ang) * r;
+        by = (rand() - 0.5) * (1.25 * Math.exp(-t * 0.9) + 0.32);
+        bz = Math.sin(ang) * r;
+        burstRole[i] = rand() < 0.24 ? 2 : 1;
+      }
+      starPosStarburst[i3] = bx;
+      starPosStarburst[i3 + 1] = by;
+      starPosStarburst[i3 + 2] = bz;
+      const burstR = Math.hypot(bx, bz);
+
+      starRadiusMorph[i3] = spiralR;
+      starRadiusMorph[i3 + 1] = ellipR;
+      starRadiusMorph[i3 + 2] = burstR;
       starPhases[i] = rand() * Math.PI * 2;
       starTwinkles[i] = 0.8 + rand() * 2.6;
     }
 
+    const colHot = new THREE.Color();
+    const colGold = new THREE.Color();
+    const colArm1 = new THREE.Color();
+    const colArm2 = new THREE.Color();
+    const colAccent = new THREE.Color();
+    const colHii = new THREE.Color();
+
     const applyStarPalette = (targetFinish: ObservatoryFinish) => {
+      // 1. Andromeda Spiral palette
       const p = CORE_HEX_BY_FINISH[targetFinish];
       colHot.set(p.coreInner);
       colGold.set(p.coreOuter);
@@ -891,11 +1256,28 @@ export default function SovereignBrain3DCanvas({
       colAccent.set(p.armAccent);
       colHii.set(p.hiiKnot);
 
+      // 2. Elliptical Dense palette
+      const ep = ELLIPTICAL_HEX_BY_FINISH[targetFinish];
+      const eNuc = new THREE.Color(ep.nucleus);
+      const eInner = new THREE.Color(ep.innerGold);
+      const eOuter = new THREE.Color(ep.outerAmber);
+      const eCluster = new THREE.Color(ep.cluster);
+      const eHalo = new THREE.Color(ep.halo);
+
+      // 3. Active Starburst palette
+      const bp = STARBURST_HEX_BY_FINISH[targetFinish];
+      const bNuc = new THREE.Color(bp.nucleus);
+      const bDisk = new THREE.Color(bp.diskBlue);
+      const bKnot = new THREE.Color(bp.knotEmerald);
+      const bPlume1 = new THREE.Color(bp.plumeCrimson);
+      const bPlume2 = new THREE.Color(bp.plumeViolet);
+
       for (let i = 0; i < starCount; i++) {
         const i3 = i * 3;
-        const role = starRole[i];
-        const rNorm = Math.min(starRadii[i] / maxGalaxyRadius, 1);
+        const rNorm = Math.min(starRadiusMorph[i3] / maxGalaxyRadius, 1);
 
+        // Spiral color
+        const role = starRole[i];
         if (role === 0) {
           _tmpColor.copy(colHot).lerp(colGold, Math.min(rNorm * 3.2, 1));
         } else if (role === 1) {
@@ -909,33 +1291,76 @@ export default function SovereignBrain3DCanvas({
         } else {
           _tmpColor.copy(colArm2).lerp(colHot, targetFinish === 'stone' ? 0.1 : 0.45);
         }
-
         starColors[i3] = _tmpColor.r;
         starColors[i3 + 1] = _tmpColor.g;
         starColors[i3 + 2] = _tmpColor.b;
+
+        // Elliptical color
+        const eR = Math.min(starRadiusMorph[i3 + 1] / 12.5, 1);
+        const er = ellipRole[i];
+        if (er === 0) {
+          _tmpColor2.copy(eNuc).lerp(eInner, Math.min(eR * 3.4, 1));
+        } else if (er === 1) {
+          _tmpColor2.copy(eInner).lerp(eOuter, Math.min(eR * 1.2, 1));
+        } else if (er === 2) {
+          _tmpColor2.copy(eCluster).lerp(eNuc, 0.28);
+        } else {
+          _tmpColor2.copy(eHalo).lerp(eNuc, targetFinish === 'stone' ? 0.08 : 0.35);
+        }
+        starColElliptical[i3] = _tmpColor2.r;
+        starColElliptical[i3 + 1] = _tmpColor2.g;
+        starColElliptical[i3 + 2] = _tmpColor2.b;
+
+        // Starburst color
+        const bR = Math.min(starRadiusMorph[i3 + 2] / 11.2, 1);
+        const br = burstRole[i];
+        if (br === 0) {
+          _tmpColor3.copy(bNuc).lerp(bDisk, Math.min(bR * 2.5, 1));
+        } else if (br === 1) {
+          _tmpColor3.copy(bDisk).lerp(bNuc, 0.22);
+        } else if (br === 2) {
+          _tmpColor3.copy(bKnot).lerp(bNuc, 0.25);
+        } else if (br === 3) {
+          _tmpColor3.copy(bPlume1).lerp(bNuc, 0.14);
+        } else if (br === 4) {
+          _tmpColor3.copy(bPlume2).lerp(bPlume1, 0.35);
+        } else {
+          _tmpColor3.copy(bDisk).lerp(bNuc, targetFinish === 'stone' ? 0.08 : 0.38);
+        }
+        starColStarburst[i3] = _tmpColor3.r;
+        starColStarburst[i3 + 1] = _tmpColor3.g;
+        starColStarburst[i3 + 2] = _tmpColor3.b;
       }
+
       if (galaxyGeo.attributes.aColor) {
         (galaxyGeo.attributes.aColor as THREE.BufferAttribute).needsUpdate = true;
+        (galaxyGeo.attributes.aColorElliptical as THREE.BufferAttribute).needsUpdate = true;
+        (galaxyGeo.attributes.aColorStarburst as THREE.BufferAttribute).needsUpdate = true;
       }
     };
 
     const galaxyGeo = new THREE.BufferGeometry();
     galaxyGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    galaxyGeo.setAttribute('aPosElliptical', new THREE.BufferAttribute(starPosElliptical, 3));
+    galaxyGeo.setAttribute('aPosStarburst', new THREE.BufferAttribute(starPosStarburst, 3));
     galaxyGeo.setAttribute('aColor', new THREE.BufferAttribute(starColors, 3));
+    galaxyGeo.setAttribute('aColorElliptical', new THREE.BufferAttribute(starColElliptical, 3));
+    galaxyGeo.setAttribute('aColorStarburst', new THREE.BufferAttribute(starColStarburst, 3));
+    galaxyGeo.setAttribute('aRadiusMorph', new THREE.BufferAttribute(starRadiusMorph, 3));
     galaxyGeo.setAttribute('aScale', new THREE.BufferAttribute(starScales, 1));
-    galaxyGeo.setAttribute('aRadius', new THREE.BufferAttribute(starRadii, 1));
     galaxyGeo.setAttribute('aPhase', new THREE.BufferAttribute(starPhases, 1));
     galaxyGeo.setAttribute('aTwinkle', new THREE.BufferAttribute(starTwinkles, 1));
     applyStarPalette(finishRef.current);
 
     const galaxyUniforms = {
-      uTime: { value: 0 },
-      uSpinPhase: { value: 0 },
-      uDecayPhase: { value: 0 },
+      uRealTime: { value: 0 },
+      uSimEpoch: { value: simEpochRef.current },
       uDecayRate: { value: orbitalDecayRef.current },
       uDensity: { value: starDensityRef.current },
       uPixelRatio: { value: dpr },
       uSpread: { value: spreadRef.current },
+      uMorphWeights: { value: _morphWeights.clone() },
+      uTransitionSwirl: { value: 0 },
       uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
     };
 
@@ -953,15 +1378,20 @@ export default function SovereignBrain3DCanvas({
     scene.add(galaxyPoints);
 
     // =========================================================================
-    // 2. VOLUMETRIC NEBULA & GALACTIC DUST CLOUDS (UNIFIED COUNT)
+    // 2. VOLUMETRIC NEBULA & GALACTIC DUST CLOUDS (3-MORPHOLOGY GPU BLEND)
     // =========================================================================
     const nebulaCount = 1100;
     const nebPos = new Float32Array(nebulaCount * 3);
+    const nebPosEllip = new Float32Array(nebulaCount * 3);
+    const nebPosBurst = new Float32Array(nebulaCount * 3);
     const nebCol = new Float32Array(nebulaCount * 3);
+    const nebColEllip = new Float32Array(nebulaCount * 3);
+    const nebColBurst = new Float32Array(nebulaCount * 3);
+    const nebRadiusMorph = new Float32Array(nebulaCount * 3);
     const nebScales = new Float32Array(nebulaCount);
-    const nebRadii = new Float32Array(nebulaCount);
     const nebPhases = new Float32Array(nebulaCount);
     const nebRole = new Uint8Array(nebulaCount);
+    const nebBurstRole = new Uint8Array(nebulaCount);
 
     for (let i = 0; i < nebulaCount; i++) {
       const i3 = i * 3;
@@ -972,14 +1402,55 @@ export default function SovereignBrain3DCanvas({
         (branchIdx / branches) * Math.PI * 2 +
         Math.log(radius + 0.55) * 2.25 +
         (rand() - 0.5) * 0.6;
-      const x = Math.cos(angle) * radius;
-      const y = (rand() - 0.5) * 0.55;
-      const z = Math.sin(angle) * radius;
+      const nx = Math.cos(angle) * radius;
+      const ny = (rand() - 0.5) * 0.55;
+      const nz = Math.sin(angle) * radius;
 
-      nebPos[i3] = x;
-      nebPos[i3 + 1] = y;
-      nebPos[i3 + 2] = z;
-      nebRadii[i] = radius;
+      nebPos[i3] = nx;
+      nebPos[i3 + 1] = ny;
+      nebPos[i3 + 2] = nz;
+
+      // Elliptical diffuse triaxial warm gas glow
+      const eR = 0.9 + Math.pow(rand(), 1.65) * 8.4;
+      const eTh = rand() * Math.PI * 2;
+      const ePh = Math.acos(2 * rand() - 1);
+      const eRawX = eR * Math.sin(ePh) * Math.cos(eTh) * 1.24;
+      const eRawY = eR * Math.cos(ePh) * 0.82;
+      const eRawZ = eR * Math.sin(ePh) * Math.sin(eTh) * 0.92;
+      nebPosEllip[i3] = eRawX * ellipTiltCos - eRawY * ellipTiltSin;
+      nebPosEllip[i3 + 1] = eRawX * ellipTiltSin + eRawY * ellipTiltCos;
+      nebPosEllip[i3 + 2] = eRawZ;
+
+      // Active Starburst compact disk + billowing ionized bipolar plumes
+      let bnx = 0;
+      let bny = 0;
+      let bnz = 0;
+      if (i % 5 < 2) {
+        // 40% bipolar superwind nebula clouds
+        const sign = i % 2 === 0 ? 1 : -1;
+        const hNorm = Math.pow(rand(), 1.05);
+        const h = 1.0 + hNorm * 8.4;
+        const cR = (0.65 + hNorm * 3.4) * (0.4 + rand() * 0.7);
+        const cA = rand() * Math.PI * 2;
+        bnx = Math.cos(cA) * cR;
+        bny = sign * h;
+        bnz = Math.sin(cA) * cR;
+        nebBurstRole[i] = rand() < 0.65 ? 2 : 3;
+      } else {
+        const bR = 1.2 + Math.pow(rand(), 1.25) * 8.2;
+        const bA = rand() * Math.PI * 2;
+        bnx = Math.cos(bA) * bR;
+        bny = (rand() - 0.5) * 1.1;
+        bnz = Math.sin(bA) * bR;
+        nebBurstRole[i] = rand() < 0.5 ? 0 : 1;
+      }
+      nebPosBurst[i3] = bnx;
+      nebPosBurst[i3 + 1] = bny;
+      nebPosBurst[i3 + 2] = bnz;
+
+      nebRadiusMorph[i3] = radius;
+      nebRadiusMorph[i3 + 1] = Math.hypot(nebPosEllip[i3], nebPosEllip[i3 + 2]);
+      nebRadiusMorph[i3 + 2] = Math.hypot(bnx, bnz);
       nebScales[i] = 2.8 + rand() * 5.2;
       nebPhases[i] = rand() * Math.PI * 2;
       nebRole[i] = branchIdx % 3;
@@ -990,6 +1461,17 @@ export default function SovereignBrain3DCanvas({
       const c0 = new THREE.Color(p.coreOuter);
       const c1 = new THREE.Color(p.armPrimary);
       const c2 = new THREE.Color(p.armAccent);
+
+      const ep = ELLIPTICAL_HEX_BY_FINISH[targetFinish];
+      const ec0 = new THREE.Color(ep.innerGold);
+      const ec1 = new THREE.Color(ep.outerAmber);
+
+      const bp = STARBURST_HEX_BY_FINISH[targetFinish];
+      const bc0 = new THREE.Color(bp.diskBlue);
+      const bc1 = new THREE.Color(bp.knotEmerald);
+      const bc2 = new THREE.Color(bp.plumeCrimson);
+      const bc3 = new THREE.Color(bp.plumeViolet);
+
       for (let i = 0; i < nebulaCount; i++) {
         const i3 = i * 3;
         const r = nebRole[i];
@@ -997,26 +1479,44 @@ export default function SovereignBrain3DCanvas({
         nebCol[i3] = _tmpColor.r;
         nebCol[i3 + 1] = _tmpColor.g;
         nebCol[i3 + 2] = _tmpColor.b;
+
+        _tmpColor2.copy(i % 2 === 0 ? ec0 : ec1);
+        nebColEllip[i3] = _tmpColor2.r;
+        nebColEllip[i3 + 1] = _tmpColor2.g;
+        nebColEllip[i3 + 2] = _tmpColor2.b;
+
+        const br = nebBurstRole[i];
+        _tmpColor3.copy(br === 0 ? bc0 : br === 1 ? bc1 : br === 2 ? bc2 : bc3);
+        nebColBurst[i3] = _tmpColor3.r;
+        nebColBurst[i3 + 1] = _tmpColor3.g;
+        nebColBurst[i3 + 2] = _tmpColor3.b;
       }
       if (nebulaGeo.attributes.aColor) {
         (nebulaGeo.attributes.aColor as THREE.BufferAttribute).needsUpdate = true;
+        (nebulaGeo.attributes.aColorElliptical as THREE.BufferAttribute).needsUpdate = true;
+        (nebulaGeo.attributes.aColorStarburst as THREE.BufferAttribute).needsUpdate = true;
       }
     };
 
     const nebulaGeo = new THREE.BufferGeometry();
     nebulaGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+    nebulaGeo.setAttribute('aPosElliptical', new THREE.BufferAttribute(nebPosEllip, 3));
+    nebulaGeo.setAttribute('aPosStarburst', new THREE.BufferAttribute(nebPosBurst, 3));
     nebulaGeo.setAttribute('aColor', new THREE.BufferAttribute(nebCol, 3));
+    nebulaGeo.setAttribute('aColorElliptical', new THREE.BufferAttribute(nebColEllip, 3));
+    nebulaGeo.setAttribute('aColorStarburst', new THREE.BufferAttribute(nebColBurst, 3));
+    nebulaGeo.setAttribute('aRadiusMorph', new THREE.BufferAttribute(nebRadiusMorph, 3));
     nebulaGeo.setAttribute('aScale', new THREE.BufferAttribute(nebScales, 1));
-    nebulaGeo.setAttribute('aRadius', new THREE.BufferAttribute(nebRadii, 1));
     nebulaGeo.setAttribute('aPhase', new THREE.BufferAttribute(nebPhases, 1));
     applyNebulaPalette(finishRef.current);
 
     const nebulaUniforms = {
-      uSpinPhase: { value: 0 },
-      uDecayPhase: { value: 0 },
+      uSimEpoch: { value: simEpochRef.current },
       uDecayRate: { value: orbitalDecayRef.current },
       uPixelRatio: { value: dpr },
       uSpread: { value: spreadRef.current },
+      uMorphWeights: { value: _morphWeights.clone() },
+      uTransitionSwirl: { value: 0 },
       uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
     };
 
@@ -1185,6 +1685,9 @@ export default function SovereignBrain3DCanvas({
       const orbitSpeed = (isLeft ? 0.22 : 0.12) / Math.pow(baseRadius * 0.28, 0.55);
       const inclinationX = (localIdx - 1.5) * 0.075 * (isLeft ? 1 : -1.15);
       const inclinationZ = (isLeft ? 0.06 : -0.07) * ((localIdx % 2) * 2 - 1);
+      // Triaxial 3D shell orbital inclinations for Elliptical Dense morphology
+      const ellipticalInclinationX = ((index % 4) - 1.5) * 0.42 * (isLeft ? 1 : -1);
+      const ellipticalInclinationZ = ((index % 3) - 1) * 0.36;
 
       const orbitGroup = new THREE.Group();
       orbitGroup.rotation.set(inclinationX, 0, inclinationZ);
@@ -1381,6 +1884,8 @@ export default function SovereignBrain3DCanvas({
         decayFactor: 1.0,
         inclinationX,
         inclinationZ,
+        ellipticalInclinationX,
+        ellipticalInclinationZ,
         satellites,
         curve,
       });
@@ -1517,13 +2022,15 @@ export default function SovereignBrain3DCanvas({
     let rafId = 0;
     let syncTimerId = 0;
     let activeSync: WebGLSync | null = null;
-    let elapsed = 0;
-    let spinPhase = 0;
-    let decayPhase = 0;
+    let realTime = 0;
     let lastTime = performance.now();
     let lastAppliedFinish: ObservatoryFinish = finishRef.current;
     let lastAppliedDensity = -1;
     let lastHudSyncMs = 0;
+    let lastEpochUiSyncMs = 0;
+    let lastMorphUiSyncMs = 0;
+    let morphUiSettled = true;
+    let transitionSwirl = 0;
 
     // WebGL2 fenceSync pacing helper for Software WebGL (yields via setTimeout)
     const glCtx = renderer.getContext();
@@ -1568,11 +2075,67 @@ export default function SovereignBrain3DCanvas({
       const rawDt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
 
-      const effectiveSpeed = reducedMotion || isPausedRef.current ? 0 : spinSpeedRef.current;
-      const effectiveDecay = reducedMotion || isPausedRef.current ? 0 : orbitalDecayRef.current;
-      elapsed += rawDt * (effectiveSpeed === 0 ? 0.12 : 1.0);
-      spinPhase += rawDt * effectiveSpeed;
-      decayPhase += rawDt * effectiveDecay;
+      realTime += rawDt;
+
+      // Advance deterministic cosmic timeline (Myr) when playing and not actively scrubbing
+      const playing = !reducedMotion && !isPausedRef.current && !isScrubbingRef.current;
+      if (playing && spinSpeedRef.current > 0.001) {
+        const deltaMyr = rawDt * 4.8 * playbackRateRef.current * spinSpeedRef.current;
+        const nextEpoch = simEpochRef.current + deltaMyr;
+        if (nextEpoch >= TIMELINE_MAX_MYR) {
+          simEpochRef.current = TIMELINE_MAX_MYR;
+          setSimEpoch(TIMELINE_MAX_MYR);
+          setIsPaused(true);
+        } else if (nextEpoch <= TIMELINE_MIN_MYR) {
+          simEpochRef.current = TIMELINE_MIN_MYR;
+          setSimEpoch(TIMELINE_MIN_MYR);
+          setIsPaused(true);
+        } else {
+          simEpochRef.current = nextEpoch;
+          if (now - lastEpochUiSyncMs > 80) {
+            lastEpochUiSyncMs = now;
+            setSimEpoch(nextEpoch);
+          }
+        }
+      }
+
+      const curEpoch = simEpochRef.current;
+      const epochProgress = (curEpoch - TIMELINE_MIN_MYR) / (TIMELINE_MAX_MYR - TIMELINE_MIN_MYR);
+
+      // Smooth GPU morph interpolation between Spiral, Elliptical Dense, and Active Starburst
+      const targetTuple = MORPH_TARGET_BY_PRESET[galaxyPresetRef.current];
+      _morphTarget.set(targetTuple[0], targetTuple[1], targetTuple[2]);
+      _morphWeights.x = THREE.MathUtils.damp(_morphWeights.x, _morphTarget.x, 3.1, rawDt);
+      _morphWeights.y = THREE.MathUtils.damp(_morphWeights.y, _morphTarget.y, 3.1, rawDt);
+      _morphWeights.z = THREE.MathUtils.damp(_morphWeights.z, _morphTarget.z, 3.1, rawDt);
+      const wSum = _morphWeights.x + _morphWeights.y + _morphWeights.z;
+      if (wSum > 0.0001) {
+        _morphWeights.divideScalar(wSum);
+      }
+
+      // Organic swirl peak mid-transition during one-click preset morphs
+      const morphDominance = Math.max(_morphWeights.x, _morphWeights.y, _morphWeights.z);
+      const targetSwirl = Math.sin(Math.min(1, (1 - morphDominance) * 2.1) * Math.PI);
+      transitionSwirl = THREE.MathUtils.damp(transitionSwirl, targetSwirl, 5.0, rawDt);
+      morphPulseRef.current = Math.max(0, morphPulseRef.current - rawDt * 1.4);
+
+      // Sync morph transition progress bar cleanly (works even while paused and always settles to 1)
+      const activeTargetWeight =
+        galaxyPresetRef.current === 'andromeda-spiral'
+          ? _morphWeights.x
+          : galaxyPresetRef.current === 'elliptical-dense'
+            ? _morphWeights.y
+            : _morphWeights.z;
+      if (activeTargetWeight < 0.99) {
+        morphUiSettled = false;
+        if (now - lastMorphUiSyncMs > 50) {
+          lastMorphUiSyncMs = now;
+          setMorphProgress(activeTargetWeight);
+        }
+      } else if (!morphUiSettled) {
+        morphUiSettled = true;
+        setMorphProgress(1);
+      }
 
       // Handle Finish palette switches cleanly
       const curFinish = finishRef.current;
@@ -1616,12 +2179,12 @@ export default function SovereignBrain3DCanvas({
         scene.fog.color.copy(scene.background as THREE.Color);
       }
       hemiLight.intensity = isStone ? 1.35 : 0.9;
-      solarPointLight.intensity = isStone ? 2.6 : 4.2;
+      solarPointLight.intensity =
+        (isStone ? 2.6 : 4.2) * (1.0 + _morphWeights.z * 0.25 + _morphWeights.y * 0.15);
 
-      // Update GLSL Galaxy & Nebula Uniforms (smooth integrated spin & orbital decay)
-      galaxyUniforms.uTime.value = elapsed;
-      galaxyUniforms.uSpinPhase.value = spinPhase;
-      galaxyUniforms.uDecayPhase.value = decayPhase;
+      // Update GLSL Galaxy & Nebula Uniforms (GPU morphology + deterministic timeline)
+      galaxyUniforms.uRealTime.value = realTime;
+      galaxyUniforms.uSimEpoch.value = curEpoch;
       galaxyUniforms.uDecayRate.value = THREE.MathUtils.damp(
         galaxyUniforms.uDecayRate.value,
         orbitalDecayRef.current,
@@ -1635,59 +2198,120 @@ export default function SovereignBrain3DCanvas({
         5,
         rawDt,
       );
+      galaxyUniforms.uMorphWeights.value.copy(_morphWeights);
+      galaxyUniforms.uTransitionSwirl.value = transitionSwirl;
       galaxyUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
-      nebulaUniforms.uSpinPhase.value = spinPhase;
-      nebulaUniforms.uDecayPhase.value = decayPhase;
+      nebulaUniforms.uSimEpoch.value = curEpoch;
       nebulaUniforms.uDecayRate.value = galaxyUniforms.uDecayRate.value;
       nebulaUniforms.uSpread.value = galaxyUniforms.uSpread.value;
+      nebulaUniforms.uMorphWeights.value.copy(_morphWeights);
+      nebulaUniforms.uTransitionSwirl.value = transitionSwirl;
       nebulaUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
 
-      // Update Solar Core, Corona, Relativistic Photon Halo & Accretion Disk
+      // Update Solar Core, Corona, Photon Halo & Accretion Disk with morphology color blending
       const opaPass = hitlRef.current >= 0.88;
-      solarUniforms.uTime.value = elapsed;
-      solarUniforms.uPulse.value = 0.5 + 0.5 * Math.sin(elapsed * 2.2);
-      solarUniforms.uColorHot.value.set(
+      const coreTime = curEpoch * 0.22 + realTime * 0.25;
+      solarUniforms.uTime.value = coreTime;
+      solarUniforms.uPulse.value =
+        0.5 + 0.5 * Math.sin(realTime * 2.2) + morphPulseRef.current * 0.55;
+
+      // Blend core colors across Spiral -> Elliptical (golden-amber) -> Starburst (cyan-magenta)
+      _coreHotCol.set(
         isStone ? '#FEF3C7' : curFinish === 'nocturnal' ? '#E8F6FF' : '#FFFBEB',
       );
-      solarUniforms.uColorMid.value.set(
+      _tmpColor.set(isStone ? '#FDE68A' : '#FFFBEB');
+      _tmpColor2.set(isStone ? '#E0F2FE' : '#F0F9FF');
+      solarUniforms.uColorHot.value
+        .copy(_coreHotCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
+
+      _coreMidCol.set(
         opaPass
           ? curFinish === 'nocturnal'
             ? '#38BDF8'
             : '#F59E0B'
           : '#D97706',
       );
-      solarUniforms.uColorEdge.value.set(opaPass ? '#34D399' : '#F59E0B');
+      _tmpColor.set('#F59E0B');
+      _tmpColor2.set('#38BDF8');
+      solarUniforms.uColorMid.value
+        .copy(_coreMidCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
 
-      coronaUniforms.uColor.value.set(opaPass ? '#6FCB9F' : '#F59E0B');
-      coronaUniforms.uIntensity.value = isStone ? 0.25 : 0.68;
+      _coreEdgeCol.set(opaPass ? '#34D399' : '#F59E0B');
+      _tmpColor.set('#FBBF24');
+      _tmpColor2.set('#FB7185');
+      solarUniforms.uColorEdge.value
+        .copy(_coreEdgeCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
 
-      photonHaloUniforms.uTime.value = elapsed;
-      photonHaloUniforms.uColorInner.value.set(
+      _coronaCol.set(opaPass ? '#6FCB9F' : '#F59E0B');
+      _tmpColor.set('#F59E0B');
+      _tmpColor2.set('#F43F5E');
+      coronaUniforms.uColor.value
+        .copy(_coronaCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
+      coronaUniforms.uIntensity.value =
+        (isStone ? 0.25 : 0.68) * (1.0 + _morphWeights.z * 0.28 + morphPulseRef.current * 0.25);
+
+      photonHaloUniforms.uTime.value = coreTime;
+      _haloInCol.set(
         isStone ? '#B45309' : curFinish === 'nocturnal' ? '#E0F2FE' : '#FFF7D6',
       );
-      photonHaloUniforms.uColorOuter.value.set(opaPass ? '#34D399' : '#F59E0B');
-      photonHaloUniforms.uIntensity.value = isStone ? 0.24 : 0.72;
+      _tmpColor.set(isStone ? '#92400E' : '#FEF3C7');
+      _tmpColor2.set(isStone ? '#0369A1' : '#E0F2FE');
+      photonHaloUniforms.uColorInner.value
+        .copy(_haloInCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
+
+      _haloOutCol.set(opaPass ? '#34D399' : '#F59E0B');
+      _tmpColor.set('#D97706');
+      _tmpColor2.set('#E879F9');
+      photonHaloUniforms.uColorOuter.value
+        .copy(_haloOutCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
+      photonHaloUniforms.uIntensity.value =
+        (isStone ? 0.24 : 0.72) * (1.0 + _morphWeights.y * 0.18 + _morphWeights.z * 0.24);
       photonHaloMesh.quaternion.copy(camera.quaternion);
 
-      accretionUniforms.uTime.value = elapsed;
-      accretionUniforms.uInnerCol.value.set(isStone ? '#B45309' : '#FDE68A');
-      accretionUniforms.uOuterCol.value.set(
-        opaPass ? (isStone ? '#1C6E46' : '#38BDF8') : '#F59E0B',
-      );
-      accretionUniforms.uOpacity.value = isStone ? 0.42 : 0.72;
+      accretionUniforms.uTime.value = curEpoch * 0.28 + realTime * 0.16;
+      _accInCol.set(isStone ? '#B45309' : '#FDE68A');
+      _tmpColor.set(isStone ? '#92400E' : '#FCD34D');
+      _tmpColor2.set(isStone ? '#0284C7' : '#7DD3FC');
+      accretionUniforms.uInnerCol.value
+        .copy(_accInCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
 
-      solarMesh.rotation.y += rawDt * 0.14 * (effectiveSpeed + 0.2);
-      opaRingGroup.rotation.y -= rawDt * 0.28 * (effectiveSpeed + 0.25);
+      _accOutCol.set(opaPass ? (isStone ? '#1C6E46' : '#38BDF8') : '#F59E0B');
+      _tmpColor.set('#D97706');
+      _tmpColor2.set('#FB7185');
+      accretionUniforms.uOuterCol.value
+        .copy(_accOutCol)
+        .lerp(_tmpColor, _morphWeights.y)
+        .lerp(_tmpColor2, _morphWeights.z);
+      // Soften flat equatorial accretion disk slightly in Elliptical Dense spheroid
+      accretionUniforms.uOpacity.value =
+        (isStone ? 0.42 : 0.72) * (1.0 - _morphWeights.y * 0.38 + _morphWeights.z * 0.2);
+
+      // Deterministic core & OPA gyroscope rotations anchored to simEpoch
+      solarMesh.rotation.y = curEpoch * 0.048 + realTime * 0.04;
+      opaRingGroup.rotation.y = -curEpoch * 0.092 - realTime * 0.05;
       opaRingMat.color.set(opaPass ? (isStone ? '#1C6E46' : '#6FCB9F') : '#D97706');
       opaRingMat.emissive.set(opaPass ? '#1C6E46' : '#B45309');
 
-      // Check Camera Preset triggers
+      // Check Camera / Galaxy Preset Fly-To triggers
       if (presetCommandRef.current.nonce !== lastHandledPresetNonce) {
         lastHandledPresetNonce = presetCommandRef.current.nonce;
-        const p = CAMERA_PRESETS[presetCommandRef.current.preset];
-        _camGoalPos.set(...p.pos);
-        _camGoalTarget.set(...p.target);
+        _camGoalPos.set(...presetCommandRef.current.pos);
+        _camGoalTarget.set(...presetCommandRef.current.target);
         trackedHubId = null;
         cameraFlyActive = true;
       }
@@ -1703,11 +2327,12 @@ export default function SovereignBrain3DCanvas({
         }
       }
 
-      // Update 8 Orbiting Hub Assemblies, Satellites, Filaments & Photons
+      // Update 8 Orbiting Hub Assemblies, Satellites, Filaments & Photons (Deterministic to simEpoch)
       const spreadScale = 0.72 + galaxyUniforms.uSpread.value * 0.45;
       const selIds = selectedIdsRef.current;
       const curHovered = hoveredHubRef.current;
       const curSelectedHub = selectedHubRef.current;
+      const absRate = isPausedRef.current ? 1 : Math.abs(playbackRateRef.current);
 
       let packetIdx = 0;
 
@@ -1720,29 +2345,44 @@ export default function SovereignBrain3DCanvas({
         const isSelected = curSelectedHub === meta.hubId;
         const isHovered = curHovered === meta.hubId;
 
-        // Advance Keplerian orbital position with gravitational orbital decay & conservation of angular momentum
-        const targetDecayScale =
-          orbitalDecayRef.current > 0.001
-            ? 1.0 -
-              orbitalDecayRef.current * 0.34 -
-              0.045 *
-                orbitalDecayRef.current *
-                (0.5 + 0.5 * Math.sin(decayPhase * 0.85 + h * 0.7))
-            : 1.0;
-        meta.decayFactor = THREE.MathUtils.damp(
-          meta.decayFactor,
-          targetDecayScale,
-          orbitalDecayRef.current > 0.001 ? 1.6 + orbitalDecayRef.current * 1.4 : 2.8,
+        // Smoothly tilt orbital planes into 3D triaxial orbits during Elliptical Dense preset
+        const targetIncX =
+          meta.inclinationX * (1 - _morphWeights.y) +
+          meta.ellipticalInclinationX * _morphWeights.y;
+        const targetIncZ =
+          meta.inclinationZ * (1 - _morphWeights.y) +
+          meta.ellipticalInclinationZ * _morphWeights.y;
+        meta.orbitGroup.rotation.x = THREE.MathUtils.damp(
+          meta.orbitGroup.rotation.x,
+          targetIncX,
+          4.0,
           rawDt,
         );
-        const keplerBoost = 1 / Math.pow(Math.max(meta.decayFactor, 0.55), 1.45);
-        meta.currentAngle += rawDt * meta.orbitSpeed * effectiveSpeed * keplerBoost;
+        meta.orbitGroup.rotation.z = THREE.MathUtils.damp(
+          meta.orbitGroup.rotation.z,
+          targetIncZ,
+          4.0,
+          rawDt,
+        );
+
+        // Deterministic orbital decay radius across timeline (-500 Myr wider -> +500 Myr tighter)
+        const activeDecay = galaxyUniforms.uDecayRate.value;
+        const targetDecayScale =
+          activeDecay > 0.001
+            ? Math.max(0.56, 1.0 - activeDecay * (0.12 + epochProgress * 0.36))
+            : 1.0;
+        meta.decayFactor = THREE.MathUtils.damp(meta.decayFactor, targetDecayScale, 6.0, rawDt);
+
+        const keplerBoost = 1 / Math.pow(Math.max(meta.decayFactor, 0.56), 1.35);
+        meta.currentAngle =
+          meta.initialAngle + curEpoch * 0.175 * meta.orbitSpeed * keplerBoost;
 
         const curOrbitR = Math.max(2.05, meta.baseRadius * spreadScale * meta.decayFactor);
         meta.orbitRingLine.scale.setScalar(curOrbitR / meta.baseRadius);
         meta.trailMat.uniforms.uHeadAngle.value = meta.currentAngle;
         meta.trailMat.uniforms.uRadius.value = curOrbitR;
-        meta.trailMat.uniforms.uArcSpan.value = 1.18 + (1.0 - meta.decayFactor) * 2.9;
+        meta.trailMat.uniforms.uArcSpan.value =
+          (1.12 + (1.0 - meta.decayFactor) * 2.7) * (0.85 + Math.min(absRate, 4) * 0.16);
         meta.trailMat.uniforms.uOpacity.value = isSelected
           ? 0.92
           : isHovered
@@ -1754,7 +2394,7 @@ export default function SovereignBrain3DCanvas({
                 : 0.24;
         meta.hubGroup.position.set(
           Math.cos(meta.currentAngle) * curOrbitR,
-          Math.sin(elapsed * 1.1 + h) * 0.08,
+          Math.sin(curEpoch * 0.16 + h) * 0.08,
           Math.sin(meta.currentAngle) * curOrbitR,
         );
 
@@ -1770,7 +2410,7 @@ export default function SovereignBrain3DCanvas({
         );
 
         // Emissive intensity pulse for active/selected hubs
-        const pulseWave = 0.5 + 0.5 * Math.sin(elapsed * 3.1 + h * 0.8);
+        const pulseWave = 0.5 + 0.5 * Math.sin(realTime * 3.1 + h * 0.8);
         meta.coreMat.emissiveIntensity = isSelected
           ? 1.15 + pulseWave * 0.75
           : isActiveHub
@@ -1797,11 +2437,12 @@ export default function SovereignBrain3DCanvas({
           meta.rippleMat.opacity = 0;
         }
 
-        // Orbiting Module Satellites (13 Spenta Apps)
+        // Orbiting Module Satellites (13 Spenta Apps, deterministic to simEpoch)
         for (let s = 0; s < meta.satellites.length; s++) {
           const sat = meta.satellites[s];
           const satActive = selIds.includes(sat.appId);
-          const satAng = sat.phase + elapsed * sat.orbitSpeed * (satActive ? 1.1 : 0.5);
+          const satAng =
+            sat.phase + curEpoch * 0.21 * sat.orbitSpeed * (satActive ? 1.1 : 0.55);
           sat.mesh.position.set(
             Math.cos(satAng) * sat.orbitRadius,
             Math.sin(satAng) * sat.orbitRadius * Math.sin(sat.inclination),
@@ -1833,10 +2474,11 @@ export default function SovereignBrain3DCanvas({
               ? 0.28
               : 0.06;
 
-        // Telemetry Photons streaming along active/selected filaments
+        // Telemetry Photons streaming along active/selected filaments (positive modulo safe for negative epochs)
         for (let p = 0; p < packetsPerHub; p++) {
           if (isActiveHub || isSelected) {
-            const tFlow = (elapsed * 0.34 + p / packetsPerHub + h * 0.17) % 1;
+            const rawFlow = curEpoch * 0.068 + p / packetsPerHub + h * 0.17;
+            const tFlow = ((rawFlow % 1) + 1) % 1;
             meta.curve.getPoint(tFlow, _packetPos);
             _dummyObj.position.copy(_packetPos);
             _dummyObj.scale.setScalar(isSelected ? 1.25 : 0.9);
@@ -1851,18 +2493,16 @@ export default function SovereignBrain3DCanvas({
       packetInst.instanceMatrix.needsUpdate = true;
       packetMat.color.set(isStone ? '#1C6E46' : '#A7F3D0');
 
-      // Smooth Camera Fly-To / Hub Tracking
+      // Smooth Camera Fly-To / Hub Tracking (zero per-frame allocations)
       if (cameraFlyActive) {
         if (trackedHubId) {
           const tMeta = hubMetas.find((h) => h.hubId === trackedHubId);
           if (tMeta) {
             tMeta.hubGroup.getWorldPosition(_worldPos);
             _camGoalTarget.copy(_worldPos).multiplyScalar(0.65);
-            const radialDir = _worldPos.clone().normalize();
-            _camGoalPos
-              .copy(_worldPos)
-              .addScaledVector(radialDir, 4.4)
-              .add(new THREE.Vector3(0, 2.35, 0));
+            _radialDir.copy(_worldPos).normalize();
+            _camGoalPos.copy(_worldPos).addScaledVector(_radialDir, 4.4);
+            _camGoalPos.y += 2.35;
           }
         }
         camera.position.x = THREE.MathUtils.damp(camera.position.x, _camGoalPos.x, 4.2, rawDt);
@@ -2054,16 +2694,23 @@ export default function SovereignBrain3DCanvas({
         ))}
       </div>
 
-      {/* Top-Left Minimal Observatory Title + OPA Status Readout (No backdrop-blur over WebGL) */}
-      <div className="pointer-events-none absolute top-3 left-3 z-10 flex flex-col gap-1 max-w-[65%]">
+      {/* Top-Left Minimal Observatory Title + Galaxy Type & OPA Readout (No backdrop-blur over WebGL) */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex flex-col gap-1 max-w-[70%]">
         <div
-          className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] tracking-[0.14em] uppercase ${
+          className={`inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] tracking-[0.1em] ${
             isLightMode
               ? 'bg-[#FAF8F4]/92 border-[#D4CEC2] text-[#16213A]'
               : 'bg-[#0A1024]/88 border-[#25345C] text-[#D9E3FA]'
           }`}
         >
-          <span className="font-bold">SPENTA SPIRAL GALAXY</span>
+          <span className="font-bold">
+            {(
+              GALAXY_TYPE_PRESETS.find((p) => p.id === galaxyPreset)?.shortLabel ??
+              'Andromeda Spiral'
+            ).toUpperCase()}
+          </span>
+          <span className="opacity-40">·</span>
+          <span className="tabular-nums">{formatEpochMyr(simEpoch)}</span>
           <span className="opacity-40">·</span>
           <span className={opaPass ? 'text-[#1C6E46] dark:text-[#6FCB9F]' : 'text-amber-500'}>
             OPA {hitlConfidence.toFixed(2)} {opaPass ? 'PASS' : 'HITL'}
@@ -2131,19 +2778,38 @@ export default function SovereignBrain3DCanvas({
               WebGL Context Interrupted
             </div>
             <p className="text-xs text-[#C3CCE4]">
-              Restoring GPU telemetry for the Spenta Spiral Galaxy. All 8 sovereign hubs remain selectable in the inspector.
+              Restoring GPU telemetry for the Spenta 3D Neural Core galaxy. All 8 sovereign hubs remain selectable in the inspector.
             </p>
           </div>
         </div>
       )}
 
-      {/* Dedicated Collapsible Spiral Galaxy Control Panel Component */}
+      {/* Dedicated Collapsible 3D Neural Core Control Panel with Galaxy Type Presets & Timeline Scrub */}
       <GalaxyControlPanel
         isLightMode={isLightMode}
         dockOpen={dockOpen}
         onToggleDock={() => setDockOpen((v) => !v)}
+        galaxyPreset={galaxyPreset}
+        onSelectGalaxyPreset={(preset) => {
+          setMorphProgress(0.05);
+          applyGalaxyTypePreset(preset);
+        }}
+        morphProgress={morphProgress}
+        simEpoch={simEpoch}
+        onScrubEpoch={handleScrubEpoch}
+        onScrubStart={() => {
+          isScrubbingRef.current = true;
+        }}
+        onScrubEnd={() => {
+          isScrubbingRef.current = false;
+        }}
         isPaused={isPaused}
-        onTogglePause={() => setIsPaused((p) => !p)}
+        playbackRate={playbackRate}
+        onTogglePause={handleTogglePause}
+        onRewind={handleRewind}
+        onFastForward={handleFastForward}
+        onStepEpoch={handleStepEpoch}
+        onJumpToPresent={handleJumpToPresent}
         cameraPreset={cameraPreset}
         onSelectCameraPreset={applyCameraPreset}
         finish={finish}
@@ -2156,28 +2822,18 @@ export default function SovereignBrain3DCanvas({
         starDensity={starDensity}
         onStarDensityChange={setStarDensity}
         orbitalDecay={orbitalDecay}
-        onOrbitalDecayChange={(val) => {
-          setOrbitalDecay(val);
-          if (isPaused) setIsPaused(false);
-        }}
+        onOrbitalDecayChange={setOrbitalDecay}
         orbitalSpread={orbitalSpread}
         onOrbitalSpreadChange={setOrbitalSpread}
         totalStarCapacity={28000}
         activeHubCount={BRAIN_HUBS.length}
-        onApplyPhysicsPreset={(preset: GalaxyPhysicsPreset) => {
-          setSpinSpeed(preset.spinSpeed);
-          setStarDensity(preset.starDensity);
-          setOrbitalDecay(preset.orbitalDecay);
-          setOrbitalSpread(preset.orbitalSpread);
-          if (isPaused) setIsPaused(false);
-        }}
         onReset={() => {
-          setSpinSpeed(0.85);
-          setStarDensity(1.0);
-          setOrbitalDecay(0.0);
-          setOrbitalSpread(0.65);
+          const baseline = GALAXY_TYPE_PRESETS[0];
+          applyGalaxyTypePreset(baseline);
+          handleScrubEpoch(0);
+          setPlaybackRate(1);
           setIsPaused(false);
-          applyCameraPreset('overview');
+          setCameraPreset('overview');
         }}
       />
     </div>

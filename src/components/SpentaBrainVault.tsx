@@ -958,7 +958,7 @@ export function SpentaBrainVault() {
       {/* VIEW 3: 3D SOVEREIGN NEURAL CORE */}
       {viewMode === 'brain3d' && (
         <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-[#F2EFE9] dark:bg-[#0B1020] p-3 sm:p-4">
-          <div className="h-[390px] sm:h-[520px] w-full">
+          <div className="h-[480px] sm:h-[600px] w-full">
             <SovereignBrain3D
               selectedHubId={activeBrainSelection.hubId}
               hubFocusNonce={activeBrainSelection.nonce}

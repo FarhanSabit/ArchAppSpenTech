@@ -161,9 +161,7 @@ export function TheBrainView() {
     selectBrainNode,
   } = usePathwayBrainSync();
 
-  const [visualMode, setVisualMode] = useState<'radar' | '3d'>(() =>
-    activeBrainSelection.source === 'pathway' ? '3d' : 'radar',
-  );
+  const [visualMode, setVisualMode] = useState<'radar' | '3d'>('3d');
   const [backdropVariant, setBackdropVariant] = useState<BrainBackdropVariantId>('auto');
   const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
   const [returnContext, setReturnContext] = useState<{ tab: NavTab; label: string } | null>(null);
@@ -816,12 +814,11 @@ export function TheBrainView() {
             </>
           ) : (
             <div
-              className={`flex-1 min-h-[390px] sm:min-h-[470px] lg:min-h-[520px] rounded-[10px] overflow-hidden border ${
+              className={`flex-1 min-h-[480px] sm:min-h-[560px] lg:min-h-[600px] rounded-[10px] overflow-hidden border ${
                 isDark ? 'border-[#232B4A] bg-[#0B1020]' : 'border-[#E4DFD6] bg-[#F2EFE9]'
               }`}
             >
               <SovereignBrain3D
-                compact
                 polarity={brainPolarity}
                 selectedHubId={selectedHubId}
                 hubFocusNonce={hubFocusNonce}
