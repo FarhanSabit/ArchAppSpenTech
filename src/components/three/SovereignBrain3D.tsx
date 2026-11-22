@@ -127,7 +127,7 @@ export function SovereignBrain3D(props: SovereignBrain3DProps) {
                 isLight ? 'border-[#1F3863]' : 'border-[#8FA6E8]'
               }`}
             />
-            <span>Initializing 3D Sovereign Neural Core…</span>
+            <span>Initializing 3D Spiral Galaxy Neural Core…</span>
           </div>
         }
       >

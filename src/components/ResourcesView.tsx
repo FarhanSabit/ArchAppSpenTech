@@ -166,7 +166,7 @@ export function ResourcesView() {
         <div
           role="tablist"
           aria-label="Resources workspace view"
-          className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] shrink-0 self-start lg:self-auto"
+          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-[#F2EFE9] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] self-start lg:self-auto"
         >
           <button
             type="button"
@@ -229,7 +229,7 @@ export function ResourcesView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredCases.map((cs) => (
             <article
               key={cs.id}
@@ -292,7 +292,7 @@ export function ResourcesView() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {COMPLIANCE_FRAMEWORKS.map((fw) => (
             <article
               key={fw.id}
@@ -379,10 +379,15 @@ export function ResourcesView() {
 
               <div className="pt-2 border-t border-[#232B4A] grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
                 <div>
-                  <span className="text-[#8E96B0] block text-[10px]">EST. BUILD SCOPE</span>
+                  <span className="text-[#8E96B0] block text-[10px]">ONE-TIME BUILD</span>
                   <span className="text-base font-bold text-white">
-                    ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K
+                    ${(stackMetrics.oneTimeBuildUsd / 1000).toFixed(1)}K
                   </span>
+                  {stackMetrics.quarterlyRetainerUsd > 0 && (
+                    <span className="block text-[10px] text-[#6FCB9F]">
+                      + ${(stackMetrics.quarterlyRetainerUsd / 1000).toFixed(1)}K/qtr
+                    </span>
+                  )}
                 </div>
                 <div>
                   <span className="text-[#8E96B0] block text-[10px]">RECOMMENDED SERVER</span>

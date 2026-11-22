@@ -371,19 +371,19 @@ export function TheBrainView() {
             />
           </div>
         )}
-        <div className="relative z-10">
+        <div className="relative z-10 min-w-0">
           <div className={`text-[11px] font-mono font-semibold ${brandInk}`}>
-            Spenta Dhaka Edition · Sovereign Operational Tech Radar &amp; Dual-Studio 3D Neural Core
+            Spenta Dhaka Edition · Sovereign Operational Tech Radar &amp; 3D Spiral Galaxy Neural Core
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-balance">
-            The Brain — Sovereign Tech Radar, 3D Core &amp; 0.88 HITL Simulator
+            The Brain — Sovereign Tech Radar, 3D Galaxy Core &amp; 0.88 HITL Simulator
           </h1>
           <p className={`text-xs sm:text-sm mt-1 max-w-3xl leading-relaxed ${bodyInk}`}>
-            Inspect all 13 modules across CORE, PRODUCTION, and PILOT rings with live synergy arcs, explore the Spenta Heritage 3D Neural Core synced to your Architecture Profile, and test deterministic OPA 0.88 confidence gating.
+            Inspect all 13 modules across CORE, PRODUCTION, and PILOT rings with live synergy arcs, explore the realistic 3D Spiral Galaxy &amp; Solar Core synced to your Architecture Profile, and test deterministic OPA 0.88 confidence gating.
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
+        <div className="relative z-10 flex flex-wrap items-center gap-2 self-start xl:self-auto">
           {returnContext && (
             <button
               type="button"
@@ -407,7 +407,7 @@ export function TheBrainView() {
           <div
             role="group"
             aria-label="Brain visualization mode"
-            className={`inline-flex rounded-lg p-1 border ${recessedBox}`}
+            className={`inline-flex flex-wrap rounded-lg p-1 border ${recessedBox}`}
           >
             <button
               type="button"
@@ -911,11 +911,14 @@ export function TheBrainView() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-2 pt-1 font-mono tabular-nums">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono tabular-nums">
               <div className={`rounded-lg border p-2.5 ${recessedBox}`}>
-                <div className={`text-[10px] ${mutedInk}`}>Build Scope</div>
+                <div className={`text-[10px] ${mutedInk}`}>
+                  {inspectedApp.billingCadence === 'quarterly-retainer' ? 'Qtr. Retainer' : 'Build Scope'}
+                </div>
                 <div className="text-xs font-bold mt-0.5">
                   ${(inspectedApp.setupUsd / 1000).toFixed(1)}K
+                  {inspectedApp.billingCadence === 'quarterly-retainer' ? '/qtr' : ''}
                 </div>
               </div>
               <div className={`rounded-lg border p-2.5 ${recessedBox}`}>
@@ -1378,7 +1381,7 @@ export function TheBrainView() {
         </div>
 
         {blueprintTab === 'pillars' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-5">
             {filteredPillars.map((pillar) => (
               <article
                 key={pillar.id}

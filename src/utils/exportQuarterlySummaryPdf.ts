@@ -57,9 +57,12 @@ export interface QuarterlyExecutiveSummaryData {
   annualEbitdaK: number;
   annualNetProfitK: number;
   cumNetK: number;
-  cashMultiple: number;
-  fiveYearMultiple: number;
+  capitalEfficiencyMultiple: number;
+  fiveYearCapitalEfficiency: number;
   fiveYearCumNetM: number;
+  exitEbitdaMultiple: number;
+  safeEquityRoiMultiple: number;
+  impliedExitEvM: number;
   milestone: string;
   quarters: QuarterRow[];
   selectedQuarterRow: QuarterRow;
@@ -205,9 +208,9 @@ export function exportQuarterlySummaryToPdf(data: QuarterlyExecutiveSummaryData)
       fill: COLORS.emeraldBg,
     },
     {
-      label: 'SAFE RETURN (YTD)',
-      value: `${data.cashMultiple.toFixed(2)}x`,
-      sub: `5-Yr Return: ${data.fiveYearMultiple.toFixed(2)}x`,
+      label: `SAFE EXIT ROI (${data.exitEbitdaMultiple}x)`,
+      value: `${data.safeEquityRoiMultiple.toFixed(2)}x`,
+      sub: `Cap. Eff.: ${data.capitalEfficiencyMultiple.toFixed(2)}x (${data.fiveYearCapitalEfficiency.toFixed(2)}x 5Y)`,
       color: COLORS.forest,
       fill: COLORS.mist,
     },
@@ -347,9 +350,9 @@ export function exportQuarterlySummaryToPdf(data: QuarterlyExecutiveSummaryData)
     ['Active Scenario', data.scenarioLabel],
     ['BDT / USD FX Rate', `${data.fxRate} BDT (120 base)`],
     ['Effective Corp. Tax', `${data.taxRate.toFixed(1)}% (25.0% base)`],
-    ['20-FTE Dhaka Burn', `$${data.dhakaY1UsdK}K/yr (64.8M BDT)`],
-    ['SAFE Structure', '$500K | $4.5M Cap | 20% Disc.'],
-    ['5-Yr Cum. Net Cash', `$${data.fiveYearCumNetM.toFixed(3)}M (${data.fiveYearMultiple.toFixed(2)}x)`],
+    ['20-FTE Dhaka Burn', `$${data.dhakaY1UsdK}K/yr ($12.98/hr loaded)`],
+    ['SAFE Terms (~11.1%)', '$500K | $4.5M Cap | 20% Disc.'],
+    ['5Y Cap. Eff. / Exit ROI', `${data.fiveYearCapitalEfficiency.toFixed(2)}x CapEff | ${data.safeEquityRoiMultiple.toFixed(2)}x SAFE`],
   ];
 
   let ly = y + 14;
@@ -429,7 +432,7 @@ export function exportQuarterlySummaryToPdf(data: QuarterlyExecutiveSummaryData)
   const mLines = doc
     .splitTextToSize(
       sanitizePdfText(
-        `${data.milestone}. Quarterly phasing assumes 21%/24%/26%/29% seasonal ramp across Q1-Q4. Enterprise USD/AUD/EUR billings naturally hedge BDT engineering payroll ($11.50/hr blended Dhaka R&D Hub).`,
+        `${data.milestone}. Quarterly phasing assumes 21%/24%/26%/29% seasonal ramp across Q1-Q4. Enterprise USD/AUD/EUR billings naturally hedge BDT engineering payroll ($12.98/hr fully loaded across 20-FTE Dhaka R&D Hub; $11.50/hr base payroll).`,
       ),
       contentW - 9,
     )

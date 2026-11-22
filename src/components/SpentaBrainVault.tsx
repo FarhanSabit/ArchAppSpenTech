@@ -4,8 +4,10 @@ import {
   ArrowUpRight,
   Box,
   Check,
+  Copy,
   Cpu,
   Database,
+  Download,
   Grid2x2,
   Landmark,
   Layers,
@@ -13,6 +15,7 @@ import {
   Network,
   Plus,
   Search,
+  Share2,
   Shield,
   ShoppingBag,
   Sparkles,
@@ -34,6 +37,7 @@ import {
 } from '../data/spentaManifest';
 import { useStack } from '../store/StackContext';
 import { usePathwayBrainSync } from '../hooks/usePathwayBrainSync';
+import { copyTextWithFallback } from '../utils/shareUrlCodec';
 import { SovereignBrain3D } from './three/SovereignBrain3D';
 
 type VaultViewMode = 'matrix' | 'grid' | 'brain3d';
@@ -44,7 +48,7 @@ const GOVERNANCE_MARQUEE_ITEMS = [
   '<50MS QUANTIZED EDGE INFERENCE',
   'AMD SEV-SNP & INTEL TDX TEE ENCLAVES',
   '13 COMPOSABLE SOVEREIGN MODULES',
-  'DUAL-SHORE: SAN JOSE · AUSTRALIA · DHAKA ($11.50/HR)',
+  'DUAL-SHORE: SAN JOSE · AUSTRALIA · DHAKA ($12.98/HR LOADED)',
   'HIPAA · SOC 2 · ISO 27001 · BB ICT V4.0',
   'SELF-HOSTED LLAMA 3.2 VISION · LAYOUTLMV3 · WHISPER',
 ];
@@ -102,6 +106,9 @@ export function SpentaBrainVault() {
     setAutoNotice,
     stackMetrics,
     setDrawerOpen,
+    buildShareUrl,
+    exportStackJson,
+    buildExecutiveBrief,
     pendingNavFocus,
     clearPendingNavFocus,
   } = useStack();
@@ -111,7 +118,25 @@ export function SpentaBrainVault() {
   const [engineFilter, setEngineFilter] = useState<'all' | EngineType>('all');
   const [deployFilter, setDeployFilter] = useState<'all' | DeploymentMode>('all');
   const [hoveredAppId, setHoveredAppId] = useState<string | null>(null);
+  const [matrixShareCopied, setMatrixShareCopied] = useState(false);
+  const [matrixBriefCopied, setMatrixBriefCopied] = useState(false);
   const { activeBrainSelection, selectBrainNode } = usePathwayBrainSync();
+
+  const handleMatrixShare = async () => {
+    const ok = await copyTextWithFallback(buildShareUrl({ tab: 'App Vault' }));
+    if (ok) {
+      setMatrixShareCopied(true);
+      window.setTimeout(() => setMatrixShareCopied(false), 2000);
+    }
+  };
+
+  const handleMatrixCopyBrief = async () => {
+    const ok = await copyTextWithFallback(buildExecutiveBrief());
+    if (ok) {
+      setMatrixBriefCopied(true);
+      window.setTimeout(() => setMatrixBriefCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     if (pendingNavFocus?.type === 'app') {
@@ -345,13 +370,22 @@ export function SpentaBrainVault() {
 
       {/* Live Compact Stack Summary Strip */}
       <div className="rounded-xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[#4A5568] dark:text-[#A4ADC6] tabular-nums">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 font-mono text-[#4A5568] dark:text-[#A4ADC6] tabular-nums">
           <span>
             <strong className="text-[#1C6E46] dark:text-[#6FCB9F]">{selectedApps.length}</strong> / 13 Modules
           </span>
           <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span>
-            Build Scope: <strong className="text-[#16213A] dark:text-[#E7EBF5]">${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K</strong>
+            One-Time Build:{' '}
+            <strong className="text-[#16213A] dark:text-[#E7EBF5]">
+              ${(stackMetrics.oneTimeBuildUsd / 1000).toFixed(1)}K
+            </strong>
+            {stackMetrics.quarterlyRetainerUsd > 0 && (
+              <span className="text-[#5F6576] dark:text-[#8E96B0]">
+                {' '}
+                + ${(stackMetrics.quarterlyRetainerUsd / 1000).toFixed(1)}K/qtr
+              </span>
+            )}
           </span>
           <span className="text-[#D4CEC2] dark:text-[#2F3A60]">·</span>
           <span>
@@ -380,17 +414,77 @@ export function SpentaBrainVault() {
 
       {/* VIEW 1: STRICTLY ORTHOGONAL RESPONSIVE BENTO ARCHITECTURE MATRIX */}
       {viewMode === 'matrix' && (
-        <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E4DFD6] dark:border-[#232B4A]">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-[#16213A] dark:text-[#E7EBF5]">
-                Spenta Sovereign AI Brain — Orthogonal Architecture Matrix
-              </h2>
-              <p className="text-xs text-[#5F6576] dark:text-[#8E96B0] mt-0.5">
-                Left: Operations Engine (Hubs 01–04) · Center: Live L1–L6 Core Processor · Right: Experience &amp; IR4 Engine (Hubs 05–08)
-              </p>
+        <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] bg-obsidian-grid p-4 sm:p-5 space-y-4">
+          <div className="space-y-3 pb-3 border-b border-[#E4DFD6] dark:border-[#232B4A]">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-bold text-[#16213A] dark:text-[#E7EBF5]">
+                  Spenta Sovereign AI Brain — Orthogonal Architecture Matrix
+                </h2>
+                <p className="text-xs text-[#5F6576] dark:text-[#8E96B0] mt-0.5">
+                  Left: Operations Engine (Hubs 01–04) · Center: Live L1–L6 Core Processor · Right: Experience &amp; IR4 Engine (Hubs 05–08)
+                </p>
+              </div>
+
+              {/* Top-Right Quick-Action Toolbar: Share, Export, Copy */}
+              <div
+                role="toolbar"
+                aria-label="Architecture Matrix Quick Actions"
+                className="flex flex-wrap items-center gap-1.5 self-start md:self-auto shrink-0"
+              >
+                <button
+                  type="button"
+                  onClick={handleMatrixShare}
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white/95 dark:bg-[#0F1529]/95 hover:border-[#1F3863] dark:hover:border-[#8FA6E8] text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  title="Copy shareable link for this App Vault architecture"
+                >
+                  {matrixShareCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={2} />
+                      <span className="text-[#1C6E46] dark:text-[#6FCB9F]">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5 text-[#1F3863] dark:text-[#8FA6E8]" strokeWidth={1.75} />
+                      <span>Share</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => exportStackJson()}
+                  disabled={selectedApps.length === 0}
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg border border-[#E4DFD6] dark:border-[#232B4A] bg-white/95 dark:bg-[#0F1529]/95 hover:border-[#1C6E46] dark:hover:border-[#6FCB9F] disabled:opacity-45 disabled:cursor-not-allowed text-xs font-semibold text-[#16213A] dark:text-[#E7EBF5] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  title="Download composed stack configuration as JSON"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#1C6E46] dark:text-[#6FCB9F]" strokeWidth={1.75} />
+                  <span>Export</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleMatrixCopyBrief}
+                  disabled={selectedApps.length === 0}
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg border border-[#1F3863]/20 dark:border-[#8FA6E8]/30 bg-[#1F3863] hover:bg-[#162848] dark:bg-[#8FA6E8] dark:hover:bg-[#A6B9F0] disabled:opacity-45 disabled:cursor-not-allowed text-xs font-semibold text-white dark:text-[#0B1020] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                  title="Copy executive stack brief to clipboard"
+                >
+                  {matrixBriefCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" strokeWidth={2.25} />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#1C6E46] dark:bg-[#6FCB9F]" /> In Stack
               </span>
@@ -737,7 +831,7 @@ export function SpentaBrainVault() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {apps.map((app) => {
                     const isSelected = selectedIds.includes(app.id);
                     const activeSynergies = app.integratesWith.filter((id) =>

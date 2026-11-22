@@ -159,6 +159,8 @@ export interface SavedProposal {
 
 export interface StackMetrics {
   totalSetupUsd: number;
+  oneTimeBuildUsd: number;
+  quarterlyRetainerUsd: number;
   blendedGmPct: number;
   tier: ServerTierId;
   activeLayers: Set<string>;
@@ -588,6 +590,8 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     if (selectedApps.length === 0) {
       return {
         totalSetupUsd: 0,
+        oneTimeBuildUsd: 0,
+        quarterlyRetainerUsd: 0,
         blendedGmPct: 0,
         tier: 4,
         activeLayers: new Set<string>(),
@@ -596,7 +600,13 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const totalSetupUsd = selectedApps.reduce((sum, app) => sum + app.setupUsd, 0);
+    const oneTimeBuildUsd = selectedApps
+      .filter((app) => app.billingCadence !== 'quarterly-retainer')
+      .reduce((sum, app) => sum + app.setupUsd, 0);
+    const quarterlyRetainerUsd = selectedApps
+      .filter((app) => app.billingCadence === 'quarterly-retainer')
+      .reduce((sum, app) => sum + app.setupUsd, 0);
+    const totalSetupUsd = oneTimeBuildUsd + quarterlyRetainerUsd;
     const blendedGmPct =
       selectedApps.reduce((sum, app) => sum + app.gmPct, 0) / selectedApps.length;
 
@@ -626,6 +636,8 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
 
     return {
       totalSetupUsd,
+      oneTimeBuildUsd,
+      quarterlyRetainerUsd,
       blendedGmPct,
       tier: minTier,
       activeLayers,
@@ -700,7 +712,11 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
       `  Hardware: ${tierSpec.hardware} (${tierSpec.vramRam})`,
       `  Est. CapEx: ${tierSpec.capex} | Throughput: ${tierSpec.speed}`,
       '',
-      `Estimated Build Scope: $${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K`,
+      `One-Time Build Scope: $${(stackMetrics.oneTimeBuildUsd / 1000).toFixed(1)}K`,
+      ...(stackMetrics.quarterlyRetainerUsd > 0
+        ? [`Recurring Quarterly Retainers (Q1): $${(stackMetrics.quarterlyRetainerUsd / 1000).toFixed(1)}K/qtr`]
+        : []),
+      `Initial Engagement Scope: $${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K`,
       `Blended Conservative GM: ${stackMetrics.blendedGmPct.toFixed(1)}%`,
       `Governance Baseline: OPA Policy-as-Code + 0.88 Confidence HITL Gate`,
       `Contact: ${SPENTA_CONTACT_EMAIL}`,

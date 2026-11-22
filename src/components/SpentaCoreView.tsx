@@ -721,7 +721,7 @@ export function SpentaCoreView() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {tierList.map((tier) => {
                 const isRecommended = tier.id === stackMetrics.tier;
                 const isFocused = tier.id === selectedTierId;
@@ -837,35 +837,36 @@ export function SpentaCoreView() {
           </section>
 
           {/* Section 3: Dual-Shore Delivery Pod Advantage */}
-          <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-5">
+          <section className="rounded-2xl border border-[#E4DFD6] dark:border-[#232B4A] bg-white dark:bg-[#141A32] p-4 sm:p-5">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              <div className="lg:col-span-5 space-y-3">
+              <div className="lg:col-span-5 min-w-0 space-y-3">
                 <div className="inline-flex items-center gap-2 text-[11px] font-mono font-bold uppercase tracking-wider text-[#1C6E46] dark:text-[#6FCB9F]">
                   <Globe2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span>Dual-Shore Delivery Pods</span>
+                  <span>Dual-Shore Delivery Pods (Normalized 20-FTE)</span>
                 </div>
                 <h2 className="text-base sm:text-lg font-bold text-[#16213A] dark:text-[#E7EBF5]">
                   San Jose &amp; Australia Orchestration + 20-FTE Dhaka R&amp;D Hub
                 </h2>
                 <p className="text-xs sm:text-sm text-[#4A5568] dark:text-[#A4ADC6] leading-relaxed">
                   Spenta pairs senior Western architecture and client governance with a full-stack 20-FTE Dhaka R&amp;D engineering center running at{' '}
-                  <strong className="font-mono text-[#16213A] dark:text-[#E7EBF5]">$11.50/hr</strong>{' '}
-                  blended loaded cost (
+                  <strong className="font-mono text-[#16213A] dark:text-[#E7EBF5]">$12.98/hr</strong>{' '}
+                  fully loaded (<span className="font-mono">$11.50/hr</span> base payroll +{' '}
+                  <span className="font-mono">$1.48/hr</span> enclave overhead ={' '}
                   <strong className="font-mono text-[#16213A] dark:text-[#E7EBF5]">
                     $540K / 64.8M BDT
                   </strong>{' '}
-                  Y1 budget).
+                  Y1 budget across 41,600 hrs/yr).
                 </p>
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
                     <div className="text-[10px] font-mono uppercase text-[#5F6576] dark:text-[#8E96B0]">
-                      Client Cost Edge
+                      20-FTE Annual Edge
                     </div>
                     <div className="font-mono text-xl font-extrabold text-[#1C6E46] dark:text-[#6FCB9F] mt-0.5 tabular-nums">
-                      40%–60%
+                      $540K vs $4.78M
                     </div>
                     <div className="text-[11px] text-[#4A5568] dark:text-[#A4ADC6]">
-                      vs. Western AI agencies
+                      8.9× cost advantage vs. US/AU pods
                     </div>
                   </div>
                   <div className="rounded-xl bg-[#FAF8F4] dark:bg-[#0F1529] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
@@ -882,12 +883,12 @@ export function SpentaCoreView() {
                 </div>
               </div>
 
-              <div className="lg:col-span-7 h-[260px] w-full">
+              <div className="lg:col-span-7 min-w-0 h-[260px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={DUAL_SHORE_COMPARISON}
                     layout="vertical"
-                    margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                    margin={{ top: 8, right: 16, left: 4, bottom: 8 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -909,9 +910,9 @@ export function SpentaCoreView() {
                     <YAxis
                       type="category"
                       dataKey="role"
-                      width={150}
+                      width={136}
                       tick={{
-                        fontSize: 10.5,
+                        fontSize: 10,
                         fontWeight: 600,
                         fill: isDark ? '#E7EBF5' : '#16213A',
                       }}
@@ -919,10 +920,18 @@ export function SpentaCoreView() {
                       tickLine={false}
                     />
                     <Tooltip
-                      formatter={(value: unknown) => [
-                        `$${Number(value).toFixed(2)} / hr`,
-                        'Blended Loaded Rate',
-                      ]}
+                      formatter={(value: unknown, _name: unknown, props: { payload?: { annualTeamUsd?: number; edgeLabel?: string } }) => {
+                        const annual = props.payload?.annualTeamUsd;
+                        const annualFmt = annual
+                          ? annual >= 1000000
+                            ? `$${(annual / 1000000).toFixed(2)}M/yr`
+                            : `$${(annual / 1000).toFixed(0)}K/yr`
+                          : '';
+                        return [
+                          `$${Number(value).toFixed(2)}/hr (${annualFmt})`,
+                          props.payload?.edgeLabel ?? '20-FTE Loaded Pod',
+                        ];
+                      }}
                       contentStyle={{
                         borderRadius: '10px',
                         backgroundColor: isDark ? '#141A32' : '#FFFFFF',
@@ -947,7 +956,7 @@ export function SpentaCoreView() {
       ) : (
         /* Audit Log Tab */
         <div className="space-y-5">
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-2xl p-4 bg-[#1F3863] dark:bg-[#0F1529] text-white border border-[#1F3863] dark:border-[#6FCB9F]/35">
               <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#6FCB9F]">
                 Total Audit Events

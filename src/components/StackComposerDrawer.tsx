@@ -215,7 +215,8 @@ export function StackComposerDrawer() {
                         {app.shortName}
                       </div>
                       <div className="text-[11px] font-mono text-[#4A5163] dark:text-[#C8D0E4] mt-0.5 tabular-nums">
-                        ${(app.setupUsd / 1000).toFixed(1)}K · {app.gmPct.toFixed(1)}% GM · Tier{' '}
+                        ${(app.setupUsd / 1000).toFixed(1)}K
+                        {app.billingCadence === 'quarterly-retainer' ? '/qtr' : ''} · {app.gmPct.toFixed(1)}% GM · Tier{' '}
                         {app.minServerTier}
                       </div>
                       <div className="text-[11px] text-[#5F6576] dark:text-[#8E96B0] mt-0.5 truncate">
@@ -291,11 +292,16 @@ export function StackComposerDrawer() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
               <div className="text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
-                Est. Build Scope
+                One-Time Build
               </div>
               <div className="font-mono text-xl font-bold text-[#16213A] dark:text-[#E7EBF5] mt-0.5 tabular-nums">
-                ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K
+                ${(stackMetrics.oneTimeBuildUsd / 1000).toFixed(1)}K
               </div>
+              {stackMetrics.quarterlyRetainerUsd > 0 && (
+                <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0] mt-0.5 tabular-nums">
+                  + ${(stackMetrics.quarterlyRetainerUsd / 1000).toFixed(1)}K/qtr retainers
+                </div>
+              )}
             </div>
             <div className="rounded-xl bg-white dark:bg-[#141A32] border border-[#E4DFD6] dark:border-[#232B4A] p-3">
               <div className="text-[10px] font-mono uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0]">
@@ -304,6 +310,11 @@ export function StackComposerDrawer() {
               <div className="font-mono text-xl font-bold text-[#1C6E46] dark:text-[#6FCB9F] mt-0.5 tabular-nums">
                 {stackMetrics.blendedGmPct.toFixed(1)}%
               </div>
+              {stackMetrics.quarterlyRetainerUsd > 0 && (
+                <div className="text-[10px] font-mono text-[#5F6576] dark:text-[#8E96B0] mt-0.5 tabular-nums">
+                  Total Scope: ${(stackMetrics.totalSetupUsd / 1000).toFixed(1)}K
+                </div>
+              )}
             </div>
           </div>
         </div>

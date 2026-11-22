@@ -398,7 +398,7 @@ export function PitchDeckView() {
           </div>
         </aside>
 
-        <div className="lg:col-span-9 space-y-4 order-1 lg:order-2">
+        <div className="lg:col-span-9 min-w-0 space-y-4 order-1 lg:order-2">
           {/* 16:9 Aspect Slide Stage with Smooth Directional Fade-In/Out Transition */}
           <div
             className={`relative rounded-2xl border overflow-hidden transition-colors duration-200 motion-reduce:transition-none ${
@@ -722,7 +722,7 @@ export function PitchDeckView() {
                 <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mb-2">
                   Slide Selection
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {(
                     [
                       { id: 'all', label: `Full Deck (${total})` },
@@ -782,7 +782,7 @@ export function PitchDeckView() {
                 <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5F6576] dark:text-[#8E96B0] mb-2">
                   Document Color Theme
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {(
                     [
                       { id: 'auto', label: 'Deck Native' },

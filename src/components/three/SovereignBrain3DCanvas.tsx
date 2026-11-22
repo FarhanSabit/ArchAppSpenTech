@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ChevronDown, ChevronUp, Pause, Play, RotateCcw } from 'lucide-react';
 import { BRAIN_HUBS, SPENTA_APPS } from '../../data/spentaManifest';
 import { useStack } from '../../store/StackContext';
 
@@ -14,21 +17,46 @@ interface SovereignBrain3DCanvasProps {
   hubFocusNonce?: number;
 }
 
-type CameraPreset = 'overview' | 'operations' | 'experience' | 'top';
-type MaterialFinish = 'heritage-light' | 'heritage-dark' | 'obsidian';
+type CameraPreset = 'overview' | 'operations' | 'experience' | 'ecliptic';
+type ObservatoryFinish = 'cosmos' | 'nocturnal' | 'stone';
 
-interface HubNodeMeta {
+interface SatelliteMeta {
+  appId: string;
+  mesh: THREE.Mesh;
+  mat: THREE.MeshStandardMaterial;
+  orbitRadius: number;
+  orbitSpeed: number;
+  phase: number;
+  inclination: number;
+}
+
+interface HubOrbitMeta {
   hubId: string;
-  group: THREE.Group;
-  glassShellMat: THREE.MeshPhysicalMaterial;
-  innerCoreMat: THREE.MeshStandardMaterial;
-  collarMat: THREE.MeshPhysicalMaterial;
-  capMat: THREE.MeshPhysicalMaterial;
-  lineMat: THREE.LineBasicMaterial;
+  num: string;
+  side: 'left' | 'right';
+  accentHex: string;
+  orbitGroup: THREE.Group;
+  hubGroup: THREE.Group;
+  orbitRingLine: THREE.LineLoop;
+  orbitRingMat: THREE.LineBasicMaterial;
+  coreMat: THREE.MeshStandardMaterial;
+  shellMat: THREE.MeshPhysicalMaterial;
+  gimbalMesh: THREE.Mesh;
+  gimbalMat: THREE.MeshStandardMaterial;
+  spireMat: THREE.MeshStandardMaterial;
+  filamentLine: THREE.Line;
+  filamentGeo: THREE.BufferGeometry;
+  filamentMat: THREE.LineBasicMaterial;
   rippleMesh: THREE.Mesh;
   rippleMat: THREE.MeshBasicMaterial;
   rippleTimer: number;
-  basePos: THREE.Vector3;
+  baseRadius: number;
+  orbitSpeed: number;
+  initialAngle: number;
+  currentAngle: number;
+  inclinationX: number;
+  inclinationZ: number;
+  satellites: SatelliteMeta[];
   curve: THREE.QuadraticBezierCurve3;
 }
 
@@ -49,6 +77,60 @@ interface ProjectedNodeAnchor {
   accent: string;
 }
 
+// Pre-allocated scratch math objects (zero GC inside animation loop)
+const _worldPos = new THREE.Vector3();
+const _projVec = new THREE.Vector3();
+const _midCtrl = new THREE.Vector3();
+const _packetPos = new THREE.Vector3();
+const _camGoalPos = new THREE.Vector3();
+const _camGoalTarget = new THREE.Vector3();
+const _dummyObj = new THREE.Object3D();
+const _tmpColor = new THREE.Color();
+
+// Palette constants
+const BG_COLORS: Record<ObservatoryFinish, THREE.Color> = {
+  cosmos: new THREE.Color('#040712'),
+  nocturnal: new THREE.Color('#0B1020'),
+  stone: new THREE.Color('#EDEAE2'),
+};
+
+const CORE_HEX_BY_FINISH: Record<
+  ObservatoryFinish,
+  { coreInner: string; coreOuter: string; armPrimary: string; armSecondary: string; armAccent: string }
+> = {
+  cosmos: {
+    coreInner: '#FFF7E0',
+    coreOuter: '#F59E0B',
+    armPrimary: '#60A5FA',
+    armSecondary: '#818CF8',
+    armAccent: '#34D399',
+  },
+  nocturnal: {
+    coreInner: '#E8F4FF',
+    coreOuter: '#6FCB9F',
+    armPrimary: '#8FA6E8',
+    armSecondary: '#38BDF8',
+    armAccent: '#6FCB9F',
+  },
+  stone: {
+    coreInner: '#B45309',
+    coreOuter: '#1F3863',
+    armPrimary: '#1F3863',
+    armSecondary: '#0F766E',
+    armAccent: '#1C6E46',
+  },
+};
+
+const CAMERA_PRESETS: Record<
+  CameraPreset,
+  { pos: [number, number, number]; target: [number, number, number] }
+> = {
+  overview: { pos: [0.0, 7.6, 13.8], target: [0, -0.15, 0] },
+  operations: { pos: [-7.2, 4.8, 9.6], target: [-1.4, 0, 0] },
+  experience: { pos: [7.6, 5.1, 10.2], target: [1.4, 0, 0] },
+  ecliptic: { pos: [0.0, 1.8, 15.2], target: [0, 0, 0] },
+};
+
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
   const full =
@@ -68,158 +150,303 @@ function hexToRgba(hex: string, alpha: number): string {
 
 function getEmissiveCssVars(accent: string, isLight: boolean): React.CSSProperties {
   return {
-    '--brain-emissive-border': hexToRgba(accent, isLight ? 0.52 : 0.62),
+    '--brain-emissive-border': hexToRgba(accent, isLight ? 0.52 : 0.65),
     '--brain-emissive-bright': hexToRgba(accent, isLight ? 0.92 : 0.98),
     '--brain-emissive-dim': hexToRgba(accent, isLight ? 0.16 : 0.24),
-    '--brain-emissive-glow': hexToRgba(accent, isLight ? 0.42 : 0.62),
-    '--brain-emissive-inner': hexToRgba(accent, isLight ? 0.2 : 0.34),
+    '--brain-emissive-glow': hexToRgba(accent, isLight ? 0.42 : 0.64),
+    '--brain-emissive-inner': hexToRgba(accent, isLight ? 0.2 : 0.36),
   } as React.CSSProperties;
 }
 
-// Pre-allocated scratch math objects (zero GC inside animation loop)
-const _packetPos = new THREE.Vector3();
-const _worldPos = new THREE.Vector3();
-const _projVec = new THREE.Vector3();
-
-// Semantic OPA gate colors
-const _passLightColor = new THREE.Color('#1C6E46');
-const _passDarkColor = new THREE.Color('#6FCB9F');
-const _passObsidianColor = new THREE.Color('#1EB56A');
-const _holdLightColor = new THREE.Color('#B45309');
-const _holdDarkColor = new THREE.Color('#E0B063');
-
-// Three-way Studio Finish Palettes (Warm Stone Light, Nocturnal Navy Dark, Obsidian Ti)
-const _bgHeritageLight = new THREE.Color('#F2EFE9');
-const _bgHeritageDark = new THREE.Color('#0B1020');
-const _bgObsidian = new THREE.Color('#07130F');
-
-const _rimHeritageLight = new THREE.Color('#3B66B0');
-const _rimHeritageDark = new THREE.Color('#7FA6FF');
-const _rimObsidian = new THREE.Color('#14B8A6');
-
-const _hemiSkyLight = new THREE.Color('#FFFFFF');
-const _hemiGroundLight = new THREE.Color('#D7D0C4');
-const _hemiSkyDark = new THREE.Color('#9BB4F0');
-const _hemiGroundDark = new THREE.Color('#090E1C');
-const _hemiSkyObsidian = new THREE.Color('#99F6E4');
-const _hemiGroundObsidian = new THREE.Color('#051A13');
-
-const _metalHeritageLight = new THREE.Color('#1F3863');
-const _metalHeritageDark = new THREE.Color('#B8C9F5');
-const _metalObsidian = new THREE.Color('#D1FAE5');
-
-const _glassLeftLight = new THREE.Color('#DCE6F5');
-const _glassRightLight = new THREE.Color('#D4ECE4');
-const _glassLeftDark = new THREE.Color('#1C3159');
-const _glassRightDark = new THREE.Color('#143839');
-const _glassLeftObsidian = new THREE.Color('#0D2F22');
-const _glassRightObsidian = new THREE.Color('#0B2C2B');
-
-const _pedestalLight = new THREE.Color('#E6E1D8');
-const _pedestalDark = new THREE.Color('#141C36');
-const _pedestalObsidian = new THREE.Color('#0F231B');
-
-const _packetLight = new THREE.Color('#1F3863');
-const _packetDark = new THREE.Color('#8FA6E8');
-const _packetObsidian = new THREE.Color('#A7F3D0');
-
-const CAMERA_PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: [number, number, number] }> = {
-  overview: { pos: [0, 2.35, 10.2], target: [0, -0.1, 0] },
-  operations: { pos: [-5.6, 1.8, 7.6], target: [-1.1, 0, 0] },
-  experience: { pos: [5.6, 1.8, 7.6], target: [1.1, 0, 0] },
-  top: { pos: [0, 9.8, 2.8], target: [0, 0, 0] },
-};
-
-function createProceduralCircuitTexture(maxAnisotropy: number): THREE.CanvasTexture {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.strokeStyle = 'rgba(31, 56, 99, 0.24)';
-  ctx.lineWidth = 2;
-  for (let r = 46; r <= 236; r += 38) {
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.strokeStyle = 'rgba(28, 110, 70, 0.22)';
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(size / 2 + Math.cos(a) * 44, size / 2 + Math.sin(a) * 44);
-    ctx.lineTo(size / 2 + Math.cos(a) * 238, size / 2 + Math.sin(a) * 238);
-    ctx.stroke();
-
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(31, 56, 99, 0.55)' : 'rgba(28, 110, 70, 0.55)';
-    ctx.beginPath();
-    ctx.arc(size / 2 + Math.cos(a) * 198, size / 2 + Math.sin(a) * 198, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = maxAnisotropy;
-  tex.needsUpdate = true;
-  return tex;
+// Deterministic pseudo-random generator for stable starfield across reloads
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-/**
- * Procedural anisotropic brushed-titanium bump & roughness grain map (zero external assets).
- */
-function createBrushedMetalGrainTexture(maxAnisotropy: number): THREE.CanvasTexture {
-  const size = 256;
+function createPlanetaryBandTexture(accentHex: string): THREE.CanvasTexture {
+  const w = 256;
+  const h = 128;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = '#808080';
-  ctx.fillRect(0, 0, size, size);
-
-  for (let y = 0; y < size; y++) {
-    const base = 116 + Math.floor(Math.sin(y * 0.45) * 14);
-    for (let s = 0; s < 5; s++) {
-      const shade = Math.max(70, Math.min(205, base + ((y * 17 + s * 31) % 42) - 21));
-      ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
-      const x = (y * 37 + s * 61) % size;
-      const w = 36 + ((y + s * 13) % 88);
-      ctx.fillRect(x, y, w, 1);
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 3);
-  tex.anisotropy = maxAnisotropy;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function createContactShadowTexture(): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  const grad = ctx.createRadialGradient(size / 2, size / 2, 12, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, 'rgba(11, 16, 32, 0.58)');
-  grad.addColorStop(0.5, 'rgba(22, 33, 58, 0.24)');
-  grad.addColorStop(1, 'rgba(22, 33, 58, 0)');
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#0F172A');
+  grad.addColorStop(0.28, accentHex);
+  grad.addColorStop(0.5, '#F8FAFC');
+  grad.addColorStop(0.72, accentHex);
+  grad.addColorStop(1, '#0F172A');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = 1.5;
+  for (let y = 16; y < h; y += 16) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.needsUpdate = true;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 }
+
+// ============================================================================
+// CUSTOM GLSL SHADERS — SPIRAL GALAXY, VOLUMETRIC NEBULA, SOLAR CORE & ACCRETION
+// ============================================================================
+
+const GALAXY_VERTEX_SHADER = /* glsl */ `
+  uniform float uTime;
+  uniform float uSpinSpeed;
+  uniform float uPixelRatio;
+  uniform float uSpread;
+
+  attribute float aScale;
+  attribute float aRadius;
+  attribute float aPhase;
+  attribute float aTwinkle;
+  attribute vec3 aColor;
+
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vRadiusNorm;
+
+  void main() {
+    float r = aRadius * (0.72 + uSpread * 0.45);
+    // Differential Keplerian rotation: inner bulge spins faster than outer spiral arms
+    float angVel = 0.24 / (pow(max(r, 0.35), 0.58) + 0.32);
+    float angle = uTime * uSpinSpeed * angVel;
+    float c = cos(angle);
+    float s = sin(angle);
+
+    vec3 pos = position;
+    pos.xz *= (0.72 + uSpread * 0.45);
+    vec2 rotatedXZ = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
+    pos.x = rotatedXZ.x;
+    pos.z = rotatedXZ.y;
+    // Gentle galactic disk harmonic ripple
+    pos.y += sin(r * 1.15 - uTime * 0.6 + aPhase) * 0.045;
+
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+
+    float twinkle = 0.76 + 0.24 * sin(uTime * aTwinkle + aPhase);
+    vTwinkle = twinkle;
+    vColor = aColor;
+    vRadiusNorm = clamp(r / 15.0, 0.0, 1.0);
+
+    float size = aScale * uPixelRatio * (115.0 / max(-mvPosition.z, 1.2));
+    gl_PointSize = clamp(size * twinkle, 1.2, 26.0);
+  }
+`;
+
+const GALAXY_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uIsLight;
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vRadiusNorm;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    if (dist > 0.5) discard;
+
+    // Airy disk bright core + soft optical corona
+    float core = exp(-dist * dist * 34.0);
+    float halo = exp(-dist * dist * 9.5) * 0.65;
+    float alpha = clamp((core + halo) * vTwinkle, 0.0, 1.0);
+
+    vec3 col = mix(vColor, vec3(1.0), core * (1.0 - uIsLight * 0.72));
+    float finalAlpha = uIsLight > 0.5 ? alpha * 0.72 : alpha * 0.92;
+    gl_FragColor = vec4(col, finalAlpha);
+  }
+`;
+
+const NEBULA_VERTEX_SHADER = /* glsl */ `
+  uniform float uTime;
+  uniform float uSpinSpeed;
+  uniform float uPixelRatio;
+  uniform float uSpread;
+
+  attribute float aScale;
+  attribute float aRadius;
+  attribute float aPhase;
+  attribute vec3 aColor;
+
+  varying vec3 vColor;
+  varying float vPhase;
+
+  void main() {
+    float r = aRadius * (0.72 + uSpread * 0.45);
+    float angVel = 0.16 / (pow(max(r, 0.5), 0.6) + 0.45);
+    float angle = uTime * uSpinSpeed * angVel;
+    float c = cos(angle);
+    float s = sin(angle);
+
+    vec3 pos = position;
+    pos.xz *= (0.72 + uSpread * 0.45);
+    pos.xz = vec2(pos.x * c - pos.z * s, pos.x * s + pos.z * c);
+
+    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+    gl_Position = projectionMatrix * mvPosition;
+
+    vColor = aColor;
+    vPhase = aPhase;
+    gl_PointSize = clamp(aScale * uPixelRatio * (210.0 / max(-mvPosition.z, 2.0)), 8.0, 130.0);
+  }
+`;
+
+const NEBULA_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uIsLight;
+  varying vec3 vColor;
+  varying float vPhase;
+
+  void main() {
+    vec2 uv = gl_PointCoord - 0.5;
+    float dist = length(uv);
+    if (dist > 0.5) discard;
+
+    float ang = atan(uv.y, uv.x);
+    float wisp = 0.85 + 0.15 * sin(ang * 3.0 + vPhase);
+    float radial = smoothstep(0.5, 0.0, dist);
+    float cloud = pow(radial, 2.3) * wisp;
+
+    float opacity = uIsLight > 0.5 ? 0.085 : 0.14;
+    gl_FragColor = vec4(vColor, cloud * opacity);
+  }
+`;
+
+const SOLAR_CORE_VERTEX_SHADER = /* glsl */ `
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying vec3 vViewDir;
+
+  void main() {
+    vPos = position;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vNormal = normalize(mat3(modelMatrix) * normal);
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const SOLAR_CORE_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColorHot;
+  uniform vec3 uColorMid;
+  uniform vec3 uColorEdge;
+  uniform float uPulse;
+
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying vec3 vViewDir;
+
+  float hash(vec3 p) {
+    p = fract(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+
+  float noise(vec3 x) {
+    vec3 i = floor(x);
+    vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+          mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+      mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+          mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y),
+      f.z
+    );
+  }
+
+  float fbm(vec3 p) {
+    float v = 0.0;
+    float a = 0.5;
+    for (int i = 0; i < 4; i++) {
+      v += a * noise(p);
+      p = p * 2.05 + vec3(0.14, -0.11, 0.09);
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vec3 p = normalize(vPos) * 3.1;
+    float n1 = fbm(p + vec3(uTime * 0.22, -uTime * 0.16, uTime * 0.12));
+    float n2 = fbm(p * 1.9 - vec3(uTime * 0.18, uTime * 0.25, -uTime * 0.15) + n1 * 1.15);
+    float plasma = clamp(n2 * 1.22, 0.0, 1.0);
+
+    float ndotv = clamp(dot(normalize(vNormal), normalize(vViewDir)), 0.0, 1.0);
+    float fresnel = pow(1.0 - ndotv, 2.2);
+
+    vec3 baseCol = mix(uColorMid, uColorHot, smoothstep(0.28, 0.86, plasma));
+    vec3 finalCol = mix(baseCol, uColorEdge, fresnel * 0.78);
+    finalCol *= (1.05 + uPulse * 0.18 + fresnel * 0.55);
+
+    gl_FragColor = vec4(finalCol, 1.0);
+  }
+`;
+
+const CORONA_FRAGMENT_SHADER = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uIntensity;
+  varying vec3 vNormal;
+  varying vec3 vViewDir;
+
+  void main() {
+    float ndotv = abs(dot(normalize(vNormal), normalize(vViewDir)));
+    float glow = pow(clamp(1.0 - ndotv, 0.0, 1.0), 2.8);
+    gl_FragColor = vec4(uColor, glow * uIntensity);
+  }
+`;
+
+const ACCRETION_VERTEX_SHADER = /* glsl */ `
+  varying vec2 vLocalXZ;
+  void main() {
+    vLocalXZ = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const ACCRETION_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uInnerCol;
+  uniform vec3 uOuterCol;
+  uniform float uOpacity;
+
+  varying vec2 vLocalXZ;
+
+  void main() {
+    float r = length(vLocalXZ);
+    float t = clamp((r - 1.15) / 1.35, 0.0, 1.0);
+    float angle = atan(vLocalXZ.y, vLocalXZ.x);
+
+    float spiral1 = sin(angle * 4.0 - r * 7.5 + uTime * 1.45) * 0.5 + 0.5;
+    float spiral2 = sin(angle * 7.0 - r * 11.0 + uTime * 2.1) * 0.5 + 0.5;
+    float rings = sin(r * 24.0 - uTime * 1.2) * 0.5 + 0.5;
+
+    float streak = mix(spiral1, spiral2, 0.45) * 0.75 + rings * 0.25;
+    float edgeFade = smoothstep(0.0, 0.18, t) * smoothstep(1.0, 0.15, t);
+
+    vec3 col = mix(uInnerCol, uOuterCol, t) * (0.75 + streak * 0.65);
+    float alpha = edgeFade * (0.35 + streak * 0.65) * uOpacity;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
 
 export default function SovereignBrain3DCanvas({
   compact = false,
@@ -228,36 +455,39 @@ export default function SovereignBrain3DCanvas({
   selectedHubId = null,
   hubFocusNonce = 0,
 }: SovereignBrain3DCanvasProps) {
+  const { selectedIds, hitlConfidence, appMap } = useStack();
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const { selectedIds, hitlConfidence, toggleApp } = useStack();
+
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
-  const [projectedCallout, setProjectedCallout] = useState<ProjectedCallout | null>(null);
-  const [projectedAnchors, setProjectedAnchors] = useState<ProjectedNodeAnchor[]>([]);
-  const [contextLost, setContextLost] = useState(false);
-  const [dockCollapsed, setDockCollapsed] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 480 : false,
+  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('overview');
+  const [finish, setFinish] = useState<ObservatoryFinish>(
+    polarity === 'light' ? 'stone' : 'cosmos',
   );
-  const [activePreset, setActivePreset] = useState<CameraPreset>('overview');
-  const [materialFinish, setMaterialFinish] = useState<MaterialFinish>(
-    polarity === 'light' ? 'heritage-light' : 'heritage-dark',
-  );
+  const [spinSpeed, setSpinSpeed] = useState<number>(0.85);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [orbitalSpread, setOrbitalSpread] = useState<number>(0.65);
+  const [dockOpen, setDockOpen] = useState<boolean>(false);
+  const [contextLost, setContextLost] = useState<boolean>(false);
+  const [callout, setCallout] = useState<ProjectedCallout | null>(null);
+  const [projectedNodes, setProjectedNodes] = useState<ProjectedNodeAnchor[]>([]);
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
+  const finishRef = useRef<ObservatoryFinish>(finish);
+  const spinSpeedRef = useRef<number>(spinSpeed);
+  const isPausedRef = useRef<boolean>(isPaused);
+  const spreadRef = useRef<number>(orbitalSpread);
+  const hoveredHubRef = useRef<string | null>(null);
   const selectedHubRef = useRef<string | null>(selectedHubId);
   const onSelectHubRef = useRef(onSelectHub);
-  const finishRef = useRef<MaterialFinish>(materialFinish);
-  const pendingPulseHubRef = useRef<string | null>(null);
-  const targetCamPosRef = useRef<THREE.Vector3 | null>(null);
-  const targetLookAtRef = useRef<THREE.Vector3 | null>(null);
-
-  // Sync OITS Heritage Light <-> Nocturnal Dark finish automatically with parent polarity toggle
-  useEffect(() => {
-    setMaterialFinish((prev) => {
-      if (prev === 'obsidian') return prev;
-      return polarity === 'light' ? 'heritage-light' : 'heritage-dark';
-    });
-  }, [polarity]);
+  const focusTriggerRef = useRef<{ hubId: string | null; nonce: number }>({
+    hubId: selectedHubId,
+    nonce: hubFocusNonce,
+  });
+  const presetCommandRef = useRef<{ preset: CameraPreset; nonce: number }>({
+    preset: 'overview',
+    nonce: 0,
+  });
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -268,510 +498,594 @@ export default function SovereignBrain3DCanvas({
   }, [hitlConfidence]);
 
   useEffect(() => {
-    selectedHubRef.current = selectedHubId;
-    if (selectedHubId) {
-      pendingPulseHubRef.current = selectedHubId;
-    }
-  }, [selectedHubId]);
+    finishRef.current = finish;
+  }, [finish]);
 
   useEffect(() => {
-    if (!hubFocusNonce || !selectedHubId) return;
-    pendingPulseHubRef.current = selectedHubId;
-    const isOpsHemisphere = ['healthcare', 'fintech', 'enterprise', 'infra'].includes(
-      selectedHubId,
-    );
-    const preset: CameraPreset = isOpsHemisphere ? 'operations' : 'experience';
-    setActivePreset(preset);
-    const cfg = CAMERA_PRESETS[preset];
-    targetCamPosRef.current = new THREE.Vector3(
-      cfg.pos[0],
-      cfg.pos[1],
-      compact ? cfg.pos[2] * 0.96 : cfg.pos[2],
-    );
-    targetLookAtRef.current = new THREE.Vector3(cfg.target[0], cfg.target[1], cfg.target[2]);
-  }, [hubFocusNonce, selectedHubId, compact]);
+    spinSpeedRef.current = spinSpeed;
+  }, [spinSpeed]);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
+    spreadRef.current = orbitalSpread;
+  }, [orbitalSpread]);
 
   useEffect(() => {
     onSelectHubRef.current = onSelectHub;
   }, [onSelectHub]);
 
   useEffect(() => {
-    finishRef.current = materialFinish;
-  }, [materialFinish]);
+    selectedHubRef.current = selectedHubId;
+    focusTriggerRef.current = { hubId: selectedHubId, nonce: hubFocusNonce };
+  }, [selectedHubId, hubFocusNonce]);
 
-  // Keyboard shortcut 'H' to collapse/expand bottom control dock
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag && ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-      if (e.key.toLowerCase() === 'h') {
-        setDockCollapsed((v) => !v);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    setFinish(polarity === 'light' ? 'stone' : 'cosmos');
+  }, [polarity]);
+
+  // Open cinema dock by default on larger non-compact desktop screens
+  useEffect(() => {
+    if (!compact && typeof window !== 'undefined' && window.innerWidth >= 768) {
+      setDockOpen(true);
+    }
+  }, [compact]);
+
+  const activeHubId = hoveredHubId ?? selectedHubId;
+  const activeHubMeta = useMemo(
+    () => (activeHubId ? BRAIN_HUBS.find((h) => h.id === activeHubId) ?? null : null),
+    [activeHubId],
+  );
+  const activeHubApps = useMemo(
+    () => (activeHubId ? SPENTA_APPS.filter((a) => a.hubId === activeHubId) : []),
+    [activeHubId],
+  );
 
   const applyCameraPreset = (preset: CameraPreset) => {
-    setActivePreset(preset);
-    const cfg = CAMERA_PRESETS[preset];
-    targetCamPosRef.current = new THREE.Vector3(
-      cfg.pos[0],
-      cfg.pos[1],
-      compact ? cfg.pos[2] * 0.96 : cfg.pos[2],
-    );
-    targetLookAtRef.current = new THREE.Vector3(cfg.target[0], cfg.target[1], cfg.target[2]);
+    setCameraPreset(preset);
+    presetCommandRef.current = { preset, nonce: presetCommandRef.current.nonce + 1 };
   };
-
-  const activeHubIds = useMemo(() => {
-    const set = new Set<string>();
-    SPENTA_APPS.forEach((app) => {
-      if (selectedIds.includes(app.id)) set.add(app.hubId);
-    });
-    return set;
-  }, [selectedIds]);
-
-  const inspectedHub = useMemo(() => {
-    const id = hoveredHubId ?? selectedHubId;
-    if (!id) return null;
-    return BRAIN_HUBS.find((h) => h.id === id) ?? null;
-  }, [hoveredHubId, selectedHubId]);
-
-  const inspectedApps = useMemo(() => {
-    if (!inspectedHub) return [];
-    return SPENTA_APPS.filter((a) => a.hubId === inspectedHub.id);
-  }, [inspectedHub]);
-
-  const hoveredCalloutHub = useMemo(() => {
-    if (!projectedCallout?.visible) return null;
-    const hub = BRAIN_HUBS.find((h) => h.id === projectedCallout.hubId);
-    if (!hub) return null;
-    const apps = SPENTA_APPS.filter((a) => a.hubId === hub.id);
-    const activeCount = apps.filter((a) => selectedIds.includes(a.id)).length;
-    return { hub, totalApps: apps.length, activeCount };
-  }, [projectedCallout, selectedIds]);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    const isSoftwareGl = (() => {
-      try {
-        const probeCanvas = document.createElement('canvas');
-        const glProbe = probeCanvas.getContext('webgl2');
-        if (!glProbe) return true;
-        const ext = glProbe.getExtension('WEBGL_debug_renderer_info');
-        const param = ext ? ext.UNMASKED_RENDERER_WEBGL : glProbe.RENDERER;
-        const gpu = String(glProbe.getParameter(param));
-        glProbe.getExtension('WEBGL_lose_context')?.loseContext();
-        return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
-      } catch {
-        return true;
-      }
-    })();
+    const width = Math.max(container.clientWidth, 300);
+    const height = Math.max(container.clientHeight, 340);
 
-    let renderer: THREE.WebGLRenderer;
+    // Software WebGL renderer detection (by renderer string only)
+    let isSoftwareGl = false;
     try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: !isSoftwareGl,
-        powerPreference: 'high-performance',
-        alpha: false,
-      });
+      const probeCanvas = document.createElement('canvas');
+      const probeGl =
+        probeCanvas.getContext('webgl2') || probeCanvas.getContext('webgl');
+      if (probeGl) {
+        const dbg = probeGl.getExtension('WEBGL_debug_renderer_info');
+        if (dbg) {
+          const rendererStr = String(
+            probeGl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) ?? '',
+          );
+          if (/SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(rendererStr)) {
+            isSoftwareGl = true;
+          }
+        }
+      }
     } catch {
-      setContextLost(true);
-      return;
+      isSoftwareGl = false;
     }
 
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(container.clientWidth || 640, container.clientHeight || 460);
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const dpr = isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !isSoftwareGl,
+      alpha: false,
+      powerPreference: isSoftwareGl ? 'default' : 'high-performance',
+    });
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(width, height);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.08;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    const handleContextLost = (e: Event) => {
-      e.preventDefault();
-      setContextLost(true);
-    };
-    renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
-
     const scene = new THREE.Scene();
-    const initialBg =
-      finishRef.current === 'heritage-light'
-        ? _bgHeritageLight.clone()
-        : finishRef.current === 'obsidian'
-          ? _bgObsidian.clone()
-          : _bgHeritageDark.clone();
-    scene.background = initialBg;
-    const fog = new THREE.FogExp2(initialBg.getHex(), 0.036);
-    scene.fog = fog;
+    scene.background = BG_COLORS[finishRef.current].clone();
 
-    // Mandatory Studio PBR Environment Reflection for Brushed Metal & Frosted Glass
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = envTex;
-    pmrem.dispose();
-
-    const camera = new THREE.PerspectiveCamera(
-      42,
-      (container.clientWidth || 640) / (container.clientHeight || 460),
-      0.1,
-      100,
-    );
-    const startCfg = CAMERA_PRESETS.overview;
-    camera.position.set(
-      startCfg.pos[0],
-      startCfg.pos[1],
-      compact ? startCfg.pos[2] * 0.96 : startCfg.pos[2],
-    );
+    const camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 140);
+    camera.position.set(...CAMERA_PRESETS.overview.pos);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = !isSoftwareGl;
-    controls.dampingFactor = 0.06;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
     controls.enablePan = false;
-    controls.minDistance = 6.2;
-    controls.maxDistance = 16.0;
-    controls.maxPolarAngle = Math.PI * 0.72;
-    controls.minPolarAngle = Math.PI * 0.16;
-    controls.target.set(0, -0.1, 0);
+    controls.minDistance = 4.8;
+    controls.maxDistance = 28.0;
+    controls.maxPolarAngle = Math.PI * 0.82;
+    controls.minPolarAngle = Math.PI * 0.12;
+    controls.target.set(...CAMERA_PRESETS.overview.target);
 
-    let isDraggingOrbit = false;
-    const onControlStart = () => {
-      isDraggingOrbit = true;
-      targetCamPosRef.current = null;
-      targetLookAtRef.current = null;
-    };
-    const onControlEnd = () => {
-      isDraggingOrbit = false;
-    };
-    controls.addEventListener('start', onControlStart);
-    controls.addEventListener('end', onControlEnd);
+    // Subtle studio PMREM for metallic gimbals and refractive hub shells
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const roomEnv = new RoomEnvironment();
+    const envTarget = pmrem.fromScene(roomEnv, 0.04);
+    scene.environment = envTarget.texture;
+    roomEnv.dispose();
+    pmrem.dispose();
 
-    // 3-Point Warm/Cool Studio Rig
-    const hemiLight = new THREE.HemisphereLight('#9BB4F0', '#090E1C', 0.95);
+    // Lighting rig
+    const hemiLight = new THREE.HemisphereLight('#C7D9FF', '#090F22', 0.95);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight('#FFF8F0', 1.9);
-    keyLight.position.set(6, 9, 7);
+    const solarPointLight = new THREE.PointLight('#FFF0C2', 4.2, 32, 1.35);
+    solarPointLight.position.set(0, 0, 0);
+    scene.add(solarPointLight);
+
+    const rimDirLight = new THREE.DirectionalLight('#6FCB9F', 1.15);
+    rimDirLight.position.set(-9, 8, -7);
+    scene.add(rimDirLight);
+
+    // GPU-only Post-Processing (UnrealBloomPass skipped on Software WebGL)
+    let composer: EffectComposer | null = null;
+    let bloomPass: UnrealBloomPass | null = null;
     if (!isSoftwareGl) {
-      keyLight.castShadow = true;
-      keyLight.shadow.mapSize.set(1024, 1024);
-      keyLight.shadow.camera.left = -7;
-      keyLight.shadow.camera.right = 7;
-      keyLight.shadow.camera.top = 7;
-      keyLight.shadow.camera.bottom = -7;
-      keyLight.shadow.bias = -0.0005;
-      keyLight.shadow.normalBias = 0.02;
+      composer = new EffectComposer(renderer);
+      composer.setPixelRatio(dpr);
+      composer.setSize(width, height);
+      const renderPass = new RenderPass(scene, camera);
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        finishRef.current === 'stone' ? 0.14 : 0.62,
+        0.52,
+        finishRef.current === 'stone' ? 0.86 : 0.48,
+      );
+      composer.addPass(renderPass);
+      composer.addPass(bloomPass);
     }
-    scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight('#7FA6FF', 1.35);
-    rimLight.position.set(-7, 4, -6);
-    scene.add(rimLight);
+    // =========================================================================
+    // 1. 36,000-STAR MULTI-ARM LOGARITHMIC SPIRAL GALAXY (CUSTOM GLSL)
+    // =========================================================================
+    const starCount = isSoftwareGl ? 10500 : 36000;
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+    const starScales = new Float32Array(starCount);
+    const starRadii = new Float32Array(starCount);
+    const starPhases = new Float32Array(starCount);
+    const starTwinkles = new Float32Array(starCount);
 
-    const coreLight = new THREE.PointLight('#6FCB9F', 2.2, 14);
-    coreLight.position.set(0, 0.2, 0);
-    scene.add(coreLight);
+    const rand = mulberry32(79372026);
+    const branches = 5;
+    const maxGalaxyRadius = 15.8;
 
-    const geometries: THREE.BufferGeometry[] = [];
-    const materials: THREE.Material[] = [];
-    const textures: THREE.Texture[] = [];
+    const paletteInit = CORE_HEX_BY_FINISH[finishRef.current];
+    const colHot = new THREE.Color(paletteInit.coreInner);
+    const colGold = new THREE.Color(paletteInit.coreOuter);
+    const colArm1 = new THREE.Color(paletteInit.armPrimary);
+    const colArm2 = new THREE.Color(paletteInit.armSecondary);
+    const colAccent = new THREE.Color(paletteInit.armAccent);
 
-    const maxAniso = renderer.capabilities.getMaxAnisotropy();
-    const circuitTex = createProceduralCircuitTexture(maxAniso);
-    const brushedGrainTex = createBrushedMetalGrainTexture(maxAniso);
-    const contactShadowTex = createContactShadowTexture();
-    textures.push(circuitTex, brushedGrainTex, contactShadowTex);
+    // Store structural roles so we can re-tint galaxy when switching Observatory Finish
+    const starRole = new Uint8Array(starCount); // 0=bulge, 1=armPrimary, 2=armSecondary, 3=emeraldCluster, 4=halo
 
-    // Grounded Brushed-Titanium Circuit Pedestal + Contact Shadow
-    const pedestalGeo = new THREE.CylinderGeometry(3.6, 4.1, 0.22, 48);
-    const pedestalMat = new THREE.MeshStandardMaterial({
-      color: '#141C36',
-      map: circuitTex,
-      roughness: 0.56,
-      metalness: 0.35,
-    });
-    const pedestalBevelGeo = new THREE.TorusGeometry(3.65, 0.06, 14, 64);
-    const pedestalBevelMat = new THREE.MeshPhysicalMaterial({
-      color: '#B8C9F5',
-      emissive: '#1F3863',
-      emissiveIntensity: 0.35,
-      roughness: 0.22,
-      metalness: 0.92,
-      anisotropy: 0.8,
-      clearcoat: 0.4,
-      bumpMap: brushedGrainTex,
-      bumpScale: 0.014,
-    });
-    const shadowPlaneGeo = new THREE.PlaneGeometry(7.2, 7.2);
-    const shadowPlaneMat = new THREE.MeshBasicMaterial({
-      map: contactShadowTex,
+    for (let i = 0; i < starCount; i++) {
+      const i3 = i * 3;
+      const pick = rand();
+
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      let radius = 0;
+
+      if (pick < 0.22) {
+        // Dense central galactic bulge
+        const u = Math.pow(rand(), 1.9);
+        radius = 0.5 + u * 3.2;
+        const theta = rand() * Math.PI * 2;
+        const phi = Math.acos(2 * rand() - 1);
+        x = radius * Math.sin(phi) * Math.cos(theta);
+        y = radius * Math.cos(phi) * 0.42;
+        z = radius * Math.sin(phi) * Math.sin(theta);
+        starRole[i] = 0;
+        starScales[i] = 0.9 + rand() * 2.1;
+      } else if (pick < 0.88) {
+        // 5 Logarithmic spiral arms
+        const branchIdx = i % branches;
+        const t = Math.pow(rand(), 1.35);
+        radius = 1.65 + t * (maxGalaxyRadius - 1.65);
+        const branchAngle = (branchIdx / branches) * Math.PI * 2;
+        const spinAngle = Math.log(radius + 0.55) * 2.25;
+
+        const scatterScale = (0.28 + Math.pow(t, 1.15) * 1.45) * (rand() < 0.5 ? 1 : -1);
+        const radialScatter = Math.pow(rand(), 2.2) * scatterScale;
+        const verticalSpread = Math.pow(rand(), 2.4) * (0.72 * Math.exp(-t * 1.45) + 0.14) * (rand() < 0.5 ? 1 : -1);
+
+        const finalAngle = branchAngle + spinAngle + radialScatter * 0.36;
+        x = Math.cos(finalAngle) * radius + radialScatter * 0.35;
+        y = verticalSpread;
+        z = Math.sin(finalAngle) * radius + (rand() - 0.5) * 0.45 * t;
+
+        if (rand() < 0.18) {
+          starRole[i] = 3; // Sovereign Emerald star cluster
+          starScales[i] = 1.4 + rand() * 2.4;
+        } else {
+          starRole[i] = branchIdx % 2 === 0 ? 1 : 2;
+          starScales[i] = 0.7 + Math.pow(rand(), 2.0) * 2.8;
+        }
+      } else {
+        // Deep-space cosmic background starfield dome
+        radius = 17.5 + rand() * 22.0;
+        const theta = rand() * Math.PI * 2;
+        const phi = Math.acos(2 * rand() - 1);
+        x = radius * Math.sin(phi) * Math.cos(theta);
+        y = radius * Math.cos(phi) * 0.72;
+        z = radius * Math.sin(phi) * Math.sin(theta);
+        starRole[i] = 4;
+        starScales[i] = 0.75 + rand() * 1.6;
+      }
+
+      starPositions[i3] = x;
+      starPositions[i3 + 1] = y;
+      starPositions[i3 + 2] = z;
+      starRadii[i] = Math.hypot(x, z);
+      starPhases[i] = rand() * Math.PI * 2;
+      starTwinkles[i] = 0.8 + rand() * 2.6;
+    }
+
+    const applyStarPalette = (targetFinish: ObservatoryFinish) => {
+      const p = CORE_HEX_BY_FINISH[targetFinish];
+      colHot.set(p.coreInner);
+      colGold.set(p.coreOuter);
+      colArm1.set(p.armPrimary);
+      colArm2.set(p.armSecondary);
+      colAccent.set(p.armAccent);
+
+      for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+        const role = starRole[i];
+        const rNorm = Math.min(starRadii[i] / maxGalaxyRadius, 1);
+
+        if (role === 0) {
+          _tmpColor.copy(colHot).lerp(colGold, Math.min(rNorm * 3.2, 1));
+        } else if (role === 1) {
+          _tmpColor.copy(colGold).lerp(colArm1, Math.min(0.25 + rNorm * 0.95, 1));
+        } else if (role === 2) {
+          _tmpColor.copy(colArm1).lerp(colArm2, Math.min(0.2 + rNorm * 0.95, 1));
+        } else if (role === 3) {
+          _tmpColor.copy(colAccent).lerp(colHot, 0.22);
+        } else {
+          _tmpColor.copy(colArm2).lerp(colHot, targetFinish === 'stone' ? 0.1 : 0.45);
+        }
+
+        starColors[i3] = _tmpColor.r;
+        starColors[i3 + 1] = _tmpColor.g;
+        starColors[i3 + 2] = _tmpColor.b;
+      }
+      if (galaxyGeo.attributes.aColor) {
+        (galaxyGeo.attributes.aColor as THREE.BufferAttribute).needsUpdate = true;
+      }
+    };
+
+    const galaxyGeo = new THREE.BufferGeometry();
+    galaxyGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    galaxyGeo.setAttribute('aColor', new THREE.BufferAttribute(starColors, 3));
+    galaxyGeo.setAttribute('aScale', new THREE.BufferAttribute(starScales, 1));
+    galaxyGeo.setAttribute('aRadius', new THREE.BufferAttribute(starRadii, 1));
+    galaxyGeo.setAttribute('aPhase', new THREE.BufferAttribute(starPhases, 1));
+    galaxyGeo.setAttribute('aTwinkle', new THREE.BufferAttribute(starTwinkles, 1));
+    applyStarPalette(finishRef.current);
+
+    const galaxyUniforms = {
+      uTime: { value: 0 },
+      uSpinSpeed: { value: spinSpeedRef.current },
+      uPixelRatio: { value: dpr },
+      uSpread: { value: spreadRef.current },
+      uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
+    };
+
+    const galaxyMat = new THREE.ShaderMaterial({
+      vertexShader: GALAXY_VERTEX_SHADER,
+      fragmentShader: GALAXY_FRAGMENT_SHADER,
+      uniforms: galaxyUniforms,
       transparent: true,
       depthWrite: false,
-      opacity: 0.45,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
+      blending:
+        finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
-    geometries.push(pedestalGeo, pedestalBevelGeo, shadowPlaneGeo);
-    materials.push(pedestalMat, pedestalBevelMat, shadowPlaneMat);
 
-    const pedestalGroup = new THREE.Group();
-    pedestalGroup.position.y = -2.85;
-    const pedestalMesh = new THREE.Mesh(pedestalGeo, pedestalMat);
-    pedestalMesh.position.y = 0.11;
-    pedestalMesh.receiveShadow = !isSoftwareGl;
-    const pedestalTrim = new THREE.Mesh(pedestalBevelGeo, pedestalBevelMat);
-    pedestalTrim.rotation.x = Math.PI / 2;
-    pedestalTrim.position.y = 0.22;
-    const contactShadow = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
-    contactShadow.rotation.x = -Math.PI / 2;
-    contactShadow.position.y = 0.24;
-    pedestalGroup.add(pedestalMesh, pedestalTrim, contactShadow);
-    scene.add(pedestalGroup);
+    const galaxyPoints = new THREE.Points(galaxyGeo, galaxyMat);
+    scene.add(galaxyPoints);
 
-    const rootGroup = new THREE.Group();
-    scene.add(rootGroup);
+    // =========================================================================
+    // 2. VOLUMETRIC NEBULA & GALACTIC DUST CLOUDS
+    // =========================================================================
+    const nebulaCount = isSoftwareGl ? 380 : 1400;
+    const nebPos = new Float32Array(nebulaCount * 3);
+    const nebCol = new Float32Array(nebulaCount * 3);
+    const nebScales = new Float32Array(nebulaCount);
+    const nebRadii = new Float32Array(nebulaCount);
+    const nebPhases = new Float32Array(nebulaCount);
+    const nebRole = new Uint8Array(nebulaCount);
 
-    // Composite Multi-Part Sovereign Neural Core
-    const brainCoreGroup = new THREE.Group();
-    rootGroup.add(brainCoreGroup);
+    for (let i = 0; i < nebulaCount; i++) {
+      const i3 = i * 3;
+      const branchIdx = i % branches;
+      const t = Math.pow(rand(), 1.2);
+      const radius = 2.0 + t * 11.8;
+      const angle =
+        (branchIdx / branches) * Math.PI * 2 +
+        Math.log(radius + 0.55) * 2.25 +
+        (rand() - 0.5) * 0.6;
+      const x = Math.cos(angle) * radius;
+      const y = (rand() - 0.5) * 0.55;
+      const z = Math.sin(angle) * radius;
 
-    const hemiOuterGeo = new THREE.IcosahedronGeometry(1.38, 2);
-    const hemiInnerGeo = new THREE.IcosahedronGeometry(0.92, 1);
-    const collarRibGeo = new THREE.TorusGeometry(1.44, 0.034, 12, 56);
-    geometries.push(hemiOuterGeo, hemiInnerGeo, collarRibGeo);
-
-    // Left Hemisphere — Operations Engine
-    const leftHemiGroup = new THREE.Group();
-    leftHemiGroup.position.x = -0.35;
-    leftHemiGroup.scale.set(0.84, 1.06, 0.92);
-    const leftGlassMat = new THREE.MeshPhysicalMaterial({
-      color: '#1C3159',
-      emissive: '#1F3863',
-      emissiveIntensity: 0.24,
-      roughness: 0.22,
-      metalness: 0.06,
-      transmission: isSoftwareGl ? 0 : 0.68,
-      ior: 1.52,
-      thickness: 1.2,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.14,
-      transparent: true,
-      opacity: isSoftwareGl ? 0.68 : 0.96,
-      depthWrite: !isSoftwareGl,
-      flatShading: true,
-    });
-    const leftInnerCoreMat = new THREE.MeshStandardMaterial({
-      color: '#1F3863',
-      emissive: '#3B66B0',
-      emissiveIntensity: 0.8,
-      roughness: 0.3,
-      metalness: 0.25,
-      flatShading: true,
-    });
-    const leftRibMat = new THREE.MeshPhysicalMaterial({
-      color: '#B8C9F5',
-      roughness: 0.2,
-      metalness: 0.94,
-      anisotropy: 0.8,
-      clearcoat: 0.35,
-      bumpMap: brushedGrainTex,
-      bumpScale: 0.015,
-    });
-    materials.push(leftGlassMat, leftInnerCoreMat, leftRibMat);
-
-    const leftGlassMesh = new THREE.Mesh(hemiOuterGeo, leftGlassMat);
-    leftGlassMesh.renderOrder = 2;
-    leftGlassMesh.castShadow = !isSoftwareGl;
-    const leftInnerMesh = new THREE.Mesh(hemiInnerGeo, leftInnerCoreMat);
-    const leftRib = new THREE.Mesh(collarRibGeo, leftRibMat);
-    leftRib.rotation.y = Math.PI / 2;
-    leftHemiGroup.add(leftInnerMesh, leftGlassMesh, leftRib);
-    brainCoreGroup.add(leftHemiGroup);
-
-    // Right Hemisphere — Experience Engine
-    const rightHemiGroup = new THREE.Group();
-    rightHemiGroup.position.x = 0.35;
-    rightHemiGroup.scale.set(0.84, 1.06, 0.92);
-    const rightGlassMat = new THREE.MeshPhysicalMaterial({
-      color: '#143839',
-      emissive: '#1C6E46',
-      emissiveIntensity: 0.24,
-      roughness: 0.22,
-      metalness: 0.06,
-      transmission: isSoftwareGl ? 0 : 0.68,
-      ior: 1.52,
-      thickness: 1.2,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.14,
-      transparent: true,
-      opacity: isSoftwareGl ? 0.68 : 0.96,
-      depthWrite: !isSoftwareGl,
-      flatShading: true,
-    });
-    const rightInnerCoreMat = new THREE.MeshStandardMaterial({
-      color: '#1C6E46',
-      emissive: '#1C6E46',
-      emissiveIntensity: 0.82,
-      roughness: 0.3,
-      metalness: 0.25,
-      flatShading: true,
-    });
-    const rightRibMat = new THREE.MeshPhysicalMaterial({
-      color: '#B8C9F5',
-      roughness: 0.2,
-      metalness: 0.94,
-      anisotropy: 0.8,
-      clearcoat: 0.35,
-      bumpMap: brushedGrainTex,
-      bumpScale: 0.015,
-    });
-    materials.push(rightGlassMat, rightInnerCoreMat, rightRibMat);
-
-    const rightGlassMesh = new THREE.Mesh(hemiOuterGeo, rightGlassMat);
-    rightGlassMesh.renderOrder = 2;
-    rightGlassMesh.castShadow = !isSoftwareGl;
-    const rightInnerMesh = new THREE.Mesh(hemiInnerGeo, rightInnerCoreMat);
-    const rightRib = new THREE.Mesh(collarRibGeo, rightRibMat);
-    rightRib.rotation.y = Math.PI / 2;
-    rightHemiGroup.add(rightInnerMesh, rightGlassMesh, rightRib);
-    brainCoreGroup.add(rightHemiGroup);
-
-    // L1–L6 Vertical Sovereign Stack Core Spine
-    const spineRingGeo = new THREE.TorusGeometry(0.44, 0.036, 12, 32);
-    geometries.push(spineRingGeo);
-    const spineMat = new THREE.MeshPhysicalMaterial({
-      color: '#B8C9F5',
-      emissive: '#1F3863',
-      emissiveIntensity: 0.45,
-      roughness: 0.18,
-      metalness: 0.92,
-      anisotropy: 0.85,
-      clearcoat: 0.45,
-      bumpMap: brushedGrainTex,
-      bumpScale: 0.012,
-    });
-    materials.push(spineMat);
-    for (let i = 0; i < 6; i++) {
-      const r = new THREE.Mesh(spineRingGeo, spineMat);
-      r.rotation.x = Math.PI / 2;
-      r.position.y = -0.85 + i * 0.34;
-      brainCoreGroup.add(r);
+      nebPos[i3] = x;
+      nebPos[i3 + 1] = y;
+      nebPos[i3 + 2] = z;
+      nebRadii[i] = radius;
+      nebScales[i] = 2.8 + rand() * 5.2;
+      nebPhases[i] = rand() * Math.PI * 2;
+      nebRole[i] = branchIdx % 3;
     }
 
-    // Orbiting OPA 0.88 HITL Governance Ring
+    const applyNebulaPalette = (targetFinish: ObservatoryFinish) => {
+      const p = CORE_HEX_BY_FINISH[targetFinish];
+      const c0 = new THREE.Color(p.coreOuter);
+      const c1 = new THREE.Color(p.armPrimary);
+      const c2 = new THREE.Color(p.armAccent);
+      for (let i = 0; i < nebulaCount; i++) {
+        const i3 = i * 3;
+        const r = nebRole[i];
+        _tmpColor.copy(r === 0 ? c0 : r === 1 ? c1 : c2);
+        nebCol[i3] = _tmpColor.r;
+        nebCol[i3 + 1] = _tmpColor.g;
+        nebCol[i3 + 2] = _tmpColor.b;
+      }
+      if (nebulaGeo.attributes.aColor) {
+        (nebulaGeo.attributes.aColor as THREE.BufferAttribute).needsUpdate = true;
+      }
+    };
+
+    const nebulaGeo = new THREE.BufferGeometry();
+    nebulaGeo.setAttribute('position', new THREE.BufferAttribute(nebPos, 3));
+    nebulaGeo.setAttribute('aColor', new THREE.BufferAttribute(nebCol, 3));
+    nebulaGeo.setAttribute('aScale', new THREE.BufferAttribute(nebScales, 1));
+    nebulaGeo.setAttribute('aRadius', new THREE.BufferAttribute(nebRadii, 1));
+    nebulaGeo.setAttribute('aPhase', new THREE.BufferAttribute(nebPhases, 1));
+    applyNebulaPalette(finishRef.current);
+
+    const nebulaUniforms = {
+      uTime: { value: 0 },
+      uSpinSpeed: { value: spinSpeedRef.current },
+      uPixelRatio: { value: dpr },
+      uSpread: { value: spreadRef.current },
+      uIsLight: { value: finishRef.current === 'stone' ? 1.0 : 0.0 },
+    };
+
+    const nebulaMat = new THREE.ShaderMaterial({
+      vertexShader: NEBULA_VERTEX_SHADER,
+      fragmentShader: NEBULA_FRAGMENT_SHADER,
+      uniforms: nebulaUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending:
+        finishRef.current === 'stone' ? THREE.NormalBlending : THREE.AdditiveBlending,
+    });
+
+    const nebulaPoints = new THREE.Points(nebulaGeo, nebulaMat);
+    scene.add(nebulaPoints);
+
+    // =========================================================================
+    // 3. PROCEDURAL ANIMATED SOLAR / GRAVITATIONAL CORE + OPA 0.88 GYRO RING
+    // =========================================================================
+    const coreGroup = new THREE.Group();
+    scene.add(coreGroup);
+
+    const solarGeo = new THREE.IcosahedronGeometry(0.96, isSoftwareGl ? 3 : 5);
+    const solarUniforms = {
+      uTime: { value: 0 },
+      uColorHot: { value: new THREE.Color('#FFFBEB') },
+      uColorMid: { value: new THREE.Color('#F59E0B') },
+      uColorEdge: { value: new THREE.Color('#34D399') },
+      uPulse: { value: 0 },
+    };
+    const solarMat = new THREE.ShaderMaterial({
+      vertexShader: SOLAR_CORE_VERTEX_SHADER,
+      fragmentShader: SOLAR_CORE_FRAGMENT_SHADER,
+      uniforms: solarUniforms,
+    });
+    const solarMesh = new THREE.Mesh(solarGeo, solarMat);
+    coreGroup.add(solarMesh);
+
+    const coronaGeo = new THREE.SphereGeometry(1.36, 32, 24);
+    const coronaUniforms = {
+      uColor: { value: new THREE.Color('#F59E0B') },
+      uIntensity: { value: 0.72 },
+    };
+    const coronaMat = new THREE.ShaderMaterial({
+      vertexShader: SOLAR_CORE_VERTEX_SHADER,
+      fragmentShader: CORONA_FRAGMENT_SHADER,
+      uniforms: coronaUniforms,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const coronaMesh = new THREE.Mesh(coronaGeo, coronaMat);
+    coreGroup.add(coronaMesh);
+
+    // Swirling Accretion Disk
+    const accretionGeo = new THREE.RingGeometry(1.15, 2.52, 96, 6);
+    const accretionUniforms = {
+      uTime: { value: 0 },
+      uInnerCol: { value: new THREE.Color('#FDE68A') },
+      uOuterCol: { value: new THREE.Color('#38BDF8') },
+      uOpacity: { value: 0.68 },
+    };
+    const accretionMat = new THREE.ShaderMaterial({
+      vertexShader: ACCRETION_VERTEX_SHADER,
+      fragmentShader: ACCRETION_FRAGMENT_SHADER,
+      uniforms: accretionUniforms,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const accretionDisk = new THREE.Mesh(accretionGeo, accretionMat);
+    accretionDisk.rotation.x = -Math.PI / 2;
+    coreGroup.add(accretionDisk);
+
+    // OPA 0.88 Governance Gyroscope Ring + 16 Calibration Collars
     const opaRingGroup = new THREE.Group();
-    rootGroup.add(opaRingGroup);
-    const opaTorusGeo = new THREE.TorusGeometry(2.48, 0.048, 14, 72);
-    const opaGateGeo = new THREE.BoxGeometry(0.16, 0.16, 0.26);
-    geometries.push(opaTorusGeo, opaGateGeo);
+    opaRingGroup.rotation.set(0.28, 0, -0.18);
+    coreGroup.add(opaRingGroup);
 
-    const opaRingMat = new THREE.MeshPhysicalMaterial({
-      color: '#1C6E46',
+    const opaRingGeo = new THREE.TorusGeometry(1.66, 0.028, 16, 96);
+    const opaRingMat = new THREE.MeshStandardMaterial({
+      color: '#6FCB9F',
       emissive: '#1C6E46',
-      emissiveIntensity: 0.52,
-      roughness: 0.22,
-      metalness: 0.88,
-      anisotropy: 0.75,
-      clearcoat: 0.4,
-      bumpMap: brushedGrainTex,
-      bumpScale: 0.012,
+      emissiveIntensity: 0.9,
+      metalness: 0.82,
+      roughness: 0.24,
     });
-    materials.push(opaRingMat);
-    const opaMainRing = new THREE.Mesh(opaTorusGeo, opaRingMat);
-    opaMainRing.rotation.x = Math.PI / 2 - 0.18;
-    opaRingGroup.add(opaMainRing);
+    const opaRingMesh = new THREE.Mesh(opaRingGeo, opaRingMat);
+    opaRingMesh.rotation.x = Math.PI / 2;
+    opaRingGroup.add(opaRingMesh);
 
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      const gate = new THREE.Mesh(opaGateGeo, opaRingMat);
-      gate.position.set(
-        Math.cos(angle) * 2.48,
-        Math.sin(angle) * 2.48 * Math.sin(0.18),
-        Math.sin(angle) * 2.48 * Math.cos(0.18),
-      );
-      gate.lookAt(0, 0, 0);
-      opaRingGroup.add(gate);
+    const tickGeo = new THREE.BoxGeometry(0.036, 0.08, 0.09);
+    const tickInst = new THREE.InstancedMesh(tickGeo, opaRingMat, 16);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      _dummyObj.position.set(Math.cos(a) * 1.66, 0, Math.sin(a) * 1.66);
+      _dummyObj.rotation.set(0, -a, 0);
+      _dummyObj.scale.setScalar(1);
+      _dummyObj.updateMatrix();
+      tickInst.setMatrixAt(i, _dummyObj.matrix);
     }
+    tickInst.instanceMatrix.needsUpdate = true;
+    opaRingGroup.add(tickInst);
 
-    // 8 Orbiting Composite Domain Hub Assemblies
-    const hubGlassGeo = new THREE.OctahedronGeometry(0.36, 0);
-    const hubInnerGeo = new THREE.OctahedronGeometry(0.19, 0);
-    const hubCollarGeo = new THREE.TorusGeometry(0.49, 0.036, 12, 32);
-    const hubCapGeo = new THREE.CylinderGeometry(0.08, 0.15, 0.12, 8);
-    const rippleRingGeo = new THREE.RingGeometry(0.45, 0.56, 36);
-    geometries.push(hubGlassGeo, hubInnerGeo, hubCollarGeo, hubCapGeo, rippleRingGeo);
+    // =========================================================================
+    // 4. 8 COMPOSITE ORBITING SPENTA HUB ASSEMBLIES + 13 MODULE SATELLITES
+    // =========================================================================
+    const hubMetas: HubOrbitMeta[] = [];
+    const hitProxies: THREE.Object3D[] = [];
+    const disposableTextures: THREE.Texture[] = [];
 
-    const hubNodes: HubNodeMeta[] = [];
-    const hitTargets: THREE.Object3D[] = [];
+    const hubShellGeo = new THREE.SphereGeometry(0.42, 28, 20);
+    const hubCoreGeo = new THREE.SphereGeometry(0.27, 24, 18);
+    const hubGimbalGeo = new THREE.TorusGeometry(0.56, 0.018, 12, 48);
+    const hubSpireGeo = new THREE.ConeGeometry(0.055, 0.22, 8);
+    const hubRippleGeo = new THREE.RingGeometry(0.44, 0.56, 36);
+    const satGeo = new THREE.SphereGeometry(0.075, 12, 10);
+    const proxyGeo = new THREE.SphereGeometry(0.76, 12, 10);
+    const proxyMat = new THREE.MeshBasicMaterial({ visible: false });
 
     BRAIN_HUBS.forEach((hub, index) => {
       const isLeft = hub.side === 'left';
-      const sideIdx = index % 4;
-      const angleBase = isLeft
-        ? Math.PI * (0.72 + sideIdx * 0.19)
-        : Math.PI * (-0.28 + sideIdx * 0.19);
-      const radius = 4.18;
-      const yOffset = (1.5 - sideIdx) * 0.85;
-      const basePos = new THREE.Vector3(
-        Math.cos(angleBase) * radius,
-        yOffset,
-        Math.sin(angleBase) * (radius * 0.65),
+      const localIdx = index % 4;
+      // Inner 4 orbits = Operations Engine; Outer 4 orbits = Experience & IR4 Engine
+      const baseRadius = isLeft
+        ? 3.15 + localIdx * 0.72
+        : 6.15 + localIdx * 0.78;
+      const initialAngle = isLeft
+        ? Math.PI * 0.65 + localIdx * (Math.PI * 0.48)
+        : -Math.PI * 0.2 + localIdx * (Math.PI * 0.48);
+      const orbitSpeed = (isLeft ? 0.22 : 0.12) / Math.pow(baseRadius * 0.28, 0.55);
+      const inclinationX = (localIdx - 1.5) * 0.075 * (isLeft ? 1 : -1.15);
+      const inclinationZ = (isLeft ? 0.06 : -0.07) * ((localIdx % 2) * 2 - 1);
+
+      const orbitGroup = new THREE.Group();
+      orbitGroup.rotation.set(inclinationX, 0, inclinationZ);
+      scene.add(orbitGroup);
+
+      // Keplerian Orbital Track Ring
+      const ringPts: THREE.Vector3[] = [];
+      const segments = 96;
+      for (let s = 0; s < segments; s++) {
+        const theta = (s / segments) * Math.PI * 2;
+        ringPts.push(new THREE.Vector3(Math.cos(theta) * baseRadius, 0, Math.sin(theta) * baseRadius));
+      }
+      const orbitRingGeo = new THREE.BufferGeometry().setFromPoints(ringPts);
+      const orbitRingMat = new THREE.LineBasicMaterial({
+        color: hub.accent,
+        transparent: true,
+        opacity: 0.22,
+      });
+      const orbitRingLine = new THREE.LineLoop(orbitRingGeo, orbitRingMat);
+      orbitGroup.add(orbitRingLine);
+
+      // Composite Hub Planetary/Station Group
+      const hubGroup = new THREE.Group();
+      hubGroup.position.set(
+        Math.cos(initialAngle) * baseRadius,
+        0,
+        Math.sin(initialAngle) * baseRadius,
       );
+      orbitGroup.add(hubGroup);
 
-      const group = new THREE.Group();
-      group.position.copy(basePos);
-      group.userData.hubId = hub.id;
+      const bandTex = createPlanetaryBandTexture(hub.accent);
+      disposableTextures.push(bandTex);
 
-      const glassShellMat = new THREE.MeshPhysicalMaterial({
+      const coreMat = new THREE.MeshStandardMaterial({
+        map: bandTex,
         color: hub.accent,
         emissive: hub.accent,
-        emissiveIntensity: 0.22,
-        roughness: 0.22,
-        metalness: 0.05,
-        transmission: isSoftwareGl ? 0 : 0.7,
-        ior: 1.5,
-        thickness: 0.9,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.12,
+        emissiveIntensity: 0.65,
+        metalness: 0.35,
+        roughness: 0.32,
+      });
+      const coreMesh = new THREE.Mesh(hubCoreGeo, coreMat);
+      hubGroup.add(coreMesh);
+
+      const shellMat = new THREE.MeshPhysicalMaterial({
+        color: hub.accent,
+        roughness: 0.14,
+        metalness: 0.08,
+        transmission: 0.55,
         transparent: true,
-        opacity: isSoftwareGl ? 0.65 : 0.94,
-        depthWrite: !isSoftwareGl,
+        opacity: 0.42,
+        ior: 1.38,
       });
+      const shellMesh = new THREE.Mesh(hubShellGeo, shellMat);
+      hubGroup.add(shellMesh);
 
-      const innerCoreMat = new THREE.MeshStandardMaterial({
-        color: '#FFFFFF',
+      const gimbalMat = new THREE.MeshStandardMaterial({
+        color: '#E2E8F0',
         emissive: hub.accent,
-        emissiveIntensity: 0.85,
-        roughness: 0.25,
-        metalness: 0.15,
-      });
-
-      const collarMat = new THREE.MeshPhysicalMaterial({
-        color: '#B8C9F5',
-        emissive: hub.accent,
-        emissiveIntensity: 0.22,
+        emissiveIntensity: 0.28,
+        metalness: 0.85,
         roughness: 0.22,
-        metalness: 0.92,
-        anisotropy: 0.82,
-        clearcoat: 0.35,
-        bumpMap: brushedGrainTex,
-        bumpScale: 0.015,
       });
+      const gimbalMesh = new THREE.Mesh(hubGimbalGeo, gimbalMat);
+      gimbalMesh.rotation.set(Math.PI * 0.42, 0.25, 0);
+      hubGroup.add(gimbalMesh);
 
-      const capMat = new THREE.MeshPhysicalMaterial({
-        color: '#1F3863',
-        roughness: 0.28,
-        metalness: 0.88,
-        anisotropy: 0.7,
-        bumpMap: brushedGrainTex,
-        bumpScale: 0.012,
+      // Polar Telemetry Spires (North & South)
+      const spireMat = new THREE.MeshStandardMaterial({
+        color: '#CBD5E1',
+        emissive: hub.accent,
+        emissiveIntensity: 0.4,
+        metalness: 0.78,
+        roughness: 0.25,
       });
+      const northSpire = new THREE.Mesh(hubSpireGeo, spireMat);
+      northSpire.position.y = 0.52;
+      hubGroup.add(northSpire);
 
+      const southSpire = new THREE.Mesh(hubSpireGeo, spireMat);
+      southSpire.position.y = -0.52;
+      southSpire.rotation.x = Math.PI;
+      hubGroup.add(southSpire);
+
+      // Selection Shockwave Ripple Ring
       const rippleMat = new THREE.MeshBasicMaterial({
         color: hub.accent,
         transparent: true,
@@ -779,815 +1093,921 @@ export default function SovereignBrain3DCanvas({
         side: THREE.DoubleSide,
         depthWrite: false,
       });
+      const rippleMesh = new THREE.Mesh(hubRippleGeo, rippleMat);
+      rippleMesh.rotation.x = -Math.PI / 2;
+      hubGroup.add(rippleMesh);
 
-      materials.push(glassShellMat, innerCoreMat, collarMat, capMat, rippleMat);
+      // Dedicated Raycast Proxy (Layer 1)
+      const hitProxy = new THREE.Mesh(proxyGeo, proxyMat);
+      hitProxy.userData = { hubId: hub.id };
+      hitProxy.layers.set(1);
+      hubGroup.add(hitProxy);
+      hitProxies.push(hitProxy);
 
-      const glassMesh = new THREE.Mesh(hubGlassGeo, glassShellMat);
-      glassMesh.renderOrder = 3;
-      glassMesh.userData.hubId = hub.id;
+      // Orbiting Module Satellites (representing SPENTA_APPS in this hub)
+      const hubApps = SPENTA_APPS.filter((a) => a.hubId === hub.id);
+      const satellites: SatelliteMeta[] = hubApps.map((app, sIdx) => {
+        const satMat = new THREE.MeshStandardMaterial({
+          color: '#E2E8F0',
+          emissive: hub.accent,
+          emissiveIntensity: 0.35,
+          metalness: 0.4,
+          roughness: 0.3,
+        });
+        const satMesh = new THREE.Mesh(satGeo, satMat);
+        hubGroup.add(satMesh);
+        return {
+          appId: app.id,
+          mesh: satMesh,
+          mat: satMat,
+          orbitRadius: 0.76 + sIdx * 0.22,
+          orbitSpeed: 1.05 + sIdx * 0.45,
+          phase: (sIdx / Math.max(hubApps.length, 1)) * Math.PI * 2,
+          inclination: (sIdx % 2 === 0 ? 1 : -1) * 0.36,
+        };
+      });
 
-      const innerMesh = new THREE.Mesh(hubInnerGeo, innerCoreMat);
-      innerMesh.userData.hubId = hub.id;
-
-      const collarMesh = new THREE.Mesh(hubCollarGeo, collarMat);
-      collarMesh.rotation.x = Math.PI / 3;
-      collarMesh.userData.hubId = hub.id;
-
-      const topCap = new THREE.Mesh(hubCapGeo, capMat);
-      topCap.position.y = 0.4;
-      topCap.userData.hubId = hub.id;
-
-      const botCap = new THREE.Mesh(hubCapGeo, capMat);
-      botCap.position.y = -0.4;
-      botCap.rotation.x = Math.PI;
-      botCap.userData.hubId = hub.id;
-
-      const rippleMesh = new THREE.Mesh(rippleRingGeo, rippleMat);
-      rippleMesh.visible = false;
-
-      group.add(innerMesh, glassMesh, collarMesh, topCap, botCap, rippleMesh);
-      rootGroup.add(group);
-      hitTargets.push(glassMesh, collarMesh, topCap, botCap);
-
-      const mid = basePos.clone().multiplyScalar(0.55);
-      mid.y += isLeft ? 0.55 : -0.45;
+      // Dynamic Gravitational Filament linking Hub <-> Solar Core
       const curve = new THREE.QuadraticBezierCurve3(
-        basePos,
-        mid,
-        new THREE.Vector3(isLeft ? -0.9 : 0.9, 0, 0),
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.8, 0),
+        hubGroup.position.clone(),
       );
-      const points = curve.getPoints(30);
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-      geometries.push(lineGeo);
-      const lineMat = new THREE.LineBasicMaterial({
+      const filamentGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(24));
+      const filamentMat = new THREE.LineBasicMaterial({
         color: hub.accent,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.16,
       });
-      materials.push(lineMat);
-      const line = new THREE.Line(lineGeo, lineMat);
-      rootGroup.add(line);
+      const filamentLine = new THREE.Line(filamentGeo, filamentMat);
+      scene.add(filamentLine);
 
-      hubNodes.push({
+      hubMetas.push({
         hubId: hub.id,
-        group,
-        glassShellMat,
-        innerCoreMat,
-        collarMat,
-        capMat,
-        lineMat,
+        num: hub.num,
+        side: hub.side,
+        accentHex: hub.accent,
+        orbitGroup,
+        hubGroup,
+        orbitRingLine,
+        orbitRingMat,
+        coreMat,
+        shellMat,
+        gimbalMesh,
+        gimbalMat,
+        spireMat,
+        filamentLine,
+        filamentGeo,
+        filamentMat,
         rippleMesh,
         rippleMat,
         rippleTimer: 0,
-        basePos,
+        baseRadius,
+        orbitSpeed,
+        initialAngle,
+        currentAngle: initialAngle,
+        inclinationX,
+        inclinationZ,
+        satellites,
         curve,
       });
     });
 
-    // InstancedMesh Synaptic Packets
-    const packetCount = BRAIN_HUBS.length * 4;
-    const packetGeo = new THREE.SphereGeometry(0.068, 8, 8);
-    geometries.push(packetGeo);
-    const packetMat = new THREE.MeshBasicMaterial({ color: '#8FA6E8' });
-    materials.push(packetMat);
-    const packetMesh = new THREE.InstancedMesh(packetGeo, packetMat, packetCount);
-    packetMesh.frustumCulled = false;
-    rootGroup.add(packetMesh);
+    // Instanced Telemetry Photons traveling along active Hub <-> Solar Core filaments
+    const packetsPerHub = 3;
+    const totalPackets = hubMetas.length * packetsPerHub;
+    const packetGeo = new THREE.SphereGeometry(0.068, 10, 8);
+    const packetMat = new THREE.MeshBasicMaterial({ color: '#A7F3D0' });
+    const packetInst = new THREE.InstancedMesh(packetGeo, packetMat, totalPackets);
+    scene.add(packetInst);
 
-    const dummy = new THREE.Object3D();
-
-    if (!isSoftwareGl) {
-      renderer.compile(scene, camera);
-    }
-
-    // Throttled Raycaster Pointer Interaction
+    // =========================================================================
+    // 5. INTERACTION, RAYCASTING & CAMERA FLY-TO CONTROLLER
+    // =========================================================================
     const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2();
-    let hoveredLocal: string | null = null;
+    raycaster.layers.set(1);
+    const pointerNdc = new THREE.Vector2(-10, -10);
     let lastRaycastMs = 0;
-    let pointerDownPos = { x: 0, y: 0 };
 
-    const updatePointer = (clientX: number, clientY: number) => {
+    let cameraFlyActive = false;
+    let trackedHubId: string | null = null;
+    let lastHandledPresetNonce = presetCommandRef.current.nonce;
+    let lastHandledFocusNonce = focusTriggerRef.current.nonce;
+
+    const handleControlStart = () => {
+      cameraFlyActive = false;
+      trackedHubId = null;
+    };
+    controls.addEventListener('start', handleControlStart);
+
+    const updatePointerNdc = (clientX: number, clientY: number) => {
       const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     };
 
     const handlePointerMove = (e: PointerEvent) => {
       const now = performance.now();
-      if (now - lastRaycastMs < 32) return;
+      if (now - lastRaycastMs < 40) return;
       lastRaycastMs = now;
-      updatePointer(e.clientX, e.clientY);
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(hitTargets, false);
-      const hitHubId = hits.length > 0 ? (hits[0].object.userData.hubId as string) : null;
-      if (hitHubId !== hoveredLocal) {
-        hoveredLocal = hitHubId;
+
+      updatePointerNdc(e.clientX, e.clientY);
+      raycaster.setFromCamera(pointerNdc, camera);
+      const hits = raycaster.intersectObjects(hitProxies, false);
+      const hitHubId =
+        hits.length > 0 ? String(hits[0].object.userData.hubId ?? '') : null;
+
+      if (hitHubId !== hoveredHubRef.current) {
+        hoveredHubRef.current = hitHubId;
         setHoveredHubId(hitHubId);
-        if (!hitHubId) setProjectedCallout(null);
         renderer.domElement.style.cursor = hitHubId ? 'pointer' : 'grab';
       }
     };
 
     const handlePointerLeave = () => {
-      hoveredLocal = null;
-      setHoveredHubId(null);
-      setProjectedCallout(null);
+      if (hoveredHubRef.current !== null) {
+        hoveredHubRef.current = null;
+        setHoveredHubId(null);
+      }
       renderer.domElement.style.cursor = 'grab';
     };
 
+    let pointerDownPos = { x: 0, y: 0 };
     const handlePointerDown = (e: PointerEvent) => {
       pointerDownPos = { x: e.clientX, y: e.clientY };
     };
 
     const handlePointerUp = (e: PointerEvent) => {
-      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-      if (dist > 6) return;
-      updatePointer(e.clientX, e.clientY);
-      raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(hitTargets, false);
+      const moved = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moved > 6) return; // Dragging camera, not clicking
+      updatePointerNdc(e.clientX, e.clientY);
+      raycaster.setFromCamera(pointerNdc, camera);
+      const hits = raycaster.intersectObjects(hitProxies, false);
       if (hits.length > 0) {
-        const hubId = hits[0].object.userData.hubId as string;
-        pendingPulseHubRef.current = hubId;
-        onSelectHubRef.current?.(hubId);
+        const hitHubId = String(hits[0].object.userData.hubId ?? '');
+        if (hitHubId) {
+          const meta = hubMetas.find((h) => h.hubId === hitHubId);
+          if (meta) meta.rippleTimer = 1.0;
+          trackedHubId = hitHubId;
+          cameraFlyActive = true;
+          onSelectHubRef.current?.(hitHubId);
+        }
       }
     };
 
+    renderer.domElement.style.cursor = 'grab';
     renderer.domElement.addEventListener('pointermove', handlePointerMove);
     renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointerup', handlePointerUp);
 
+    // WebGL Context Loss & Restoration Handling
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      setContextLost(true);
+    };
+    const handleContextRestored = () => {
+      setContextLost(false);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
+
+    // ResizeObserver
+    let currentWidth = width;
+    let currentHeight = height;
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const w = Math.max(200, Math.floor(entry.contentRect.width));
-        const h = Math.max(200, Math.floor(entry.contentRect.height));
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        const nextW = Math.max(Math.floor(entry.contentRect.width), 280);
+        const nextH = Math.max(Math.floor(entry.contentRect.height), 320);
+        if (nextW !== currentWidth || nextH !== currentHeight) {
+          currentWidth = nextW;
+          currentHeight = nextH;
+          camera.aspect = nextW / nextH;
+          camera.updateProjectionMatrix();
+          renderer.setSize(nextW, nextH);
+          composer?.setSize(nextW, nextH);
+        }
       }
     });
     resizeObserver.observe(container);
 
-    let frameId = 0;
+    // =========================================================================
+    // 6. MAIN ANIMATION LOOP + SOFTWARE WEBGL FENCESYNC PACING
+    // =========================================================================
     let disposed = false;
-    let lastTime = performance.now();
+    let rafId = 0;
     let elapsed = 0;
-    let lastCalloutSync = 0;
-    let lastAnchorSync = 0;
-    const prefersReducedMotion =
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let lastTime = performance.now();
+    let lastAppliedFinish: ObservatoryFinish = finishRef.current;
+    let lastHudSyncMs = 0;
 
-    function afterDraw(cb: () => void) {
-      const gl = renderer.getContext() as WebGL2RenderingContext;
-      if (typeof gl.fenceSync === 'function') {
-        const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        gl.flush();
-        const poll = () => {
-          if (disposed) {
-            if (sync) gl.deleteSync(sync);
-            return;
-          }
-          const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
-          if (state === gl.UNSIGNALED) {
-            frameId = window.setTimeout(poll, 5);
-          } else {
-            if (sync) gl.deleteSync(sync);
-            frameId = window.setTimeout(cb, 80);
-          }
-        };
-        frameId = window.setTimeout(poll, 5);
-      } else {
-        frameId = window.setTimeout(cb, 80);
+    // WebGL2 fenceSync pacing helper for Software WebGL
+    const glCtx = renderer.getContext();
+    const isWebGL2 =
+      typeof WebGL2RenderingContext !== 'undefined' &&
+      glCtx instanceof WebGL2RenderingContext;
+
+    const afterDraw = (cb: () => void) => {
+      if (!isSoftwareGl || !isWebGL2) {
+        rafId = requestAnimationFrame(cb);
+        return;
       }
-    }
+      const gl2 = glCtx as WebGL2RenderingContext;
+      const sync = gl2.fenceSync(gl2.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      if (!sync) {
+        rafId = requestAnimationFrame(cb);
+        return;
+      }
+      gl2.flush();
+      const poll = () => {
+        if (disposed) {
+          gl2.deleteSync(sync);
+          return;
+        }
+        const status = gl2.clientWaitSync(sync, 0, 0);
+        if (status === gl2.TIMEOUT_EXPIRED) {
+          rafId = requestAnimationFrame(poll);
+        } else {
+          gl2.deleteSync(sync);
+          rafId = requestAnimationFrame(cb);
+        }
+      };
+      rafId = requestAnimationFrame(poll);
+    };
 
     const tick = () => {
       if (disposed) return;
+
       const now = performance.now();
-      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      const rawDt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
-      elapsed += dt;
 
-      if (targetCamPosRef.current && targetLookAtRef.current) {
-        const alpha = 1 - Math.exp(-5.5 * dt);
-        camera.position.lerp(targetCamPosRef.current, alpha);
-        controls.target.lerp(targetLookAtRef.current, alpha);
-        if (camera.position.distanceTo(targetCamPosRef.current) < 0.04) {
-          targetCamPosRef.current = null;
-          targetLookAtRef.current = null;
+      const effectiveSpeed = reducedMotion || isPausedRef.current ? 0 : spinSpeedRef.current;
+      elapsed += rawDt * (effectiveSpeed === 0 ? 0.12 : 1.0);
+
+      // Handle Finish palette switches cleanly
+      const curFinish = finishRef.current;
+      const isStone = curFinish === 'stone';
+      if (curFinish !== lastAppliedFinish) {
+        lastAppliedFinish = curFinish;
+        applyStarPalette(curFinish);
+        applyNebulaPalette(curFinish);
+
+        const nextBlend = isStone ? THREE.NormalBlending : THREE.AdditiveBlending;
+        galaxyMat.blending = nextBlend;
+        galaxyMat.needsUpdate = true;
+        nebulaMat.blending = nextBlend;
+        nebulaMat.needsUpdate = true;
+        accretionMat.blending = nextBlend;
+        accretionMat.needsUpdate = true;
+
+        if (bloomPass) {
+          bloomPass.strength = isStone ? 0.14 : 0.62;
+          bloomPass.threshold = isStone ? 0.86 : 0.48;
         }
       }
 
-      // Smooth Three-Way Studio Finish Interpolation (Heritage Stone Light <-> Heritage Nocturnal <-> Obsidian Ti)
-      const finish = finishRef.current;
-      const isStoneLight = finish === 'heritage-light';
-      const isObsidian = finish === 'obsidian';
-      const fAlpha = 1 - Math.exp(-5.5 * dt);
+      // Smoothly lerp scene background & lighting
+      (scene.background as THREE.Color).lerp(BG_COLORS[curFinish], Math.min(1, rawDt * 6));
+      hemiLight.intensity = isStone ? 1.35 : 0.9;
+      solarPointLight.intensity = isStone ? 2.6 : 4.2;
 
-      const targetBg = isStoneLight
-        ? _bgHeritageLight
-        : isObsidian
-          ? _bgObsidian
-          : _bgHeritageDark;
-      const targetRim = isStoneLight
-        ? _rimHeritageLight
-        : isObsidian
-          ? _rimObsidian
-          : _rimHeritageDark;
-      const targetMetal = isStoneLight
-        ? _metalHeritageLight
-        : isObsidian
-          ? _metalObsidian
-          : _metalHeritageDark;
-      const targetGlassL = isStoneLight
-        ? _glassLeftLight
-        : isObsidian
-          ? _glassLeftObsidian
-          : _glassLeftDark;
-      const targetGlassR = isStoneLight
-        ? _glassRightLight
-        : isObsidian
-          ? _glassRightObsidian
-          : _glassRightDark;
-      const targetPedestal = isStoneLight
-        ? _pedestalLight
-        : isObsidian
-          ? _pedestalObsidian
-          : _pedestalDark;
-      const targetPacket = isStoneLight
-        ? _packetLight
-        : isObsidian
-          ? _packetObsidian
-          : _packetDark;
-
-      initialBg.lerp(targetBg, fAlpha);
-      fog.color.copy(initialBg);
-      rimLight.color.lerp(targetRim, fAlpha);
-      hemiLight.color.lerp(
-        isStoneLight ? _hemiSkyLight : isObsidian ? _hemiSkyObsidian : _hemiSkyDark,
-        fAlpha,
+      // Update GLSL Galaxy & Nebula Uniforms
+      galaxyUniforms.uTime.value = elapsed;
+      galaxyUniforms.uSpinSpeed.value = effectiveSpeed;
+      galaxyUniforms.uSpread.value = THREE.MathUtils.damp(
+        galaxyUniforms.uSpread.value,
+        spreadRef.current,
+        5,
+        rawDt,
       );
-      hemiLight.groundColor.lerp(
-        isStoneLight ? _hemiGroundLight : isObsidian ? _hemiGroundObsidian : _hemiGroundDark,
-        fAlpha,
+      galaxyUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
+
+      nebulaUniforms.uTime.value = elapsed;
+      nebulaUniforms.uSpinSpeed.value = effectiveSpeed;
+      nebulaUniforms.uSpread.value = galaxyUniforms.uSpread.value;
+      nebulaUniforms.uIsLight.value = isStone ? 1.0 : 0.0;
+
+      // Update Solar Core, Corona & Accretion Disk
+      const opaPass = hitlRef.current >= 0.88;
+      solarUniforms.uTime.value = elapsed;
+      solarUniforms.uPulse.value = 0.5 + 0.5 * Math.sin(elapsed * 2.2);
+      solarUniforms.uColorHot.value.set(
+        isStone ? '#FEF3C7' : curFinish === 'nocturnal' ? '#E8F6FF' : '#FFFBEB',
       );
-      hemiLight.intensity = THREE.MathUtils.damp(hemiLight.intensity, isStoneLight ? 1.35 : 0.85, 5, dt);
-      leftRibMat.color.lerp(targetMetal, fAlpha);
-      rightRibMat.color.lerp(targetMetal, fAlpha);
-      spineMat.color.lerp(targetMetal, fAlpha);
-      pedestalBevelMat.color.lerp(targetMetal, fAlpha);
-      pedestalMat.color.lerp(targetPedestal, fAlpha);
-      leftGlassMat.color.lerp(targetGlassL, fAlpha);
-      rightGlassMat.color.lerp(targetGlassR, fAlpha);
-      packetMat.color.lerp(targetPacket, fAlpha);
+      solarUniforms.uColorMid.value.set(
+        opaPass
+          ? curFinish === 'nocturnal'
+            ? '#38BDF8'
+            : '#F59E0B'
+          : '#D97706',
+      );
+      solarUniforms.uColorEdge.value.set(opaPass ? '#34D399' : '#F59E0B');
 
-      const currentSelected = new Set(selectedIdsRef.current);
-      const activeHubs = new Set<string>();
-      SPENTA_APPS.forEach((a) => {
-        if (currentSelected.has(a.id)) activeHubs.add(a.hubId);
-      });
+      coronaUniforms.uColor.value.set(opaPass ? '#6FCB9F' : '#F59E0B');
+      coronaUniforms.uIntensity.value = isStone ? 0.25 : 0.68;
 
-      const passHitl = hitlRef.current >= 0.88;
-      const targetRingColor = passHitl
-        ? isStoneLight
-          ? _passLightColor
-          : isObsidian
-            ? _passObsidianColor
-            : _passDarkColor
-        : isStoneLight
-          ? _holdLightColor
-          : _holdDarkColor;
+      accretionUniforms.uTime.value = elapsed;
+      accretionUniforms.uInnerCol.value.set(isStone ? '#B45309' : '#FDE68A');
+      accretionUniforms.uOuterCol.value.set(
+        opaPass ? (isStone ? '#1C6E46' : '#38BDF8') : '#F59E0B',
+      );
+      accretionUniforms.uOpacity.value = isStone ? 0.42 : 0.72;
 
-      const colorStep = 1 - Math.exp(-6 * dt);
-      opaRingMat.color.lerp(targetRingColor, colorStep);
-      opaRingMat.emissive.lerp(targetRingColor, colorStep);
-      coreLight.color.lerp(targetRingColor, colorStep);
-      coreLight.intensity = THREE.MathUtils.damp(coreLight.intensity, isStoneLight ? 1.15 : 2.35, 5, dt);
+      solarMesh.rotation.y += rawDt * 0.14 * (effectiveSpeed + 0.2);
+      opaRingGroup.rotation.y -= rawDt * 0.28 * (effectiveSpeed + 0.25);
+      opaRingMat.color.set(opaPass ? (isStone ? '#1C6E46' : '#6FCB9F') : '#D97706');
+      opaRingMat.emissive.set(opaPass ? '#1C6E46' : '#B45309');
 
-      brainCoreGroup.rotation.y += dt * 0.16;
-      opaRingGroup.rotation.y -= dt * (passHitl ? 0.28 : 0.62);
-      opaRingGroup.rotation.z = Math.sin(elapsed * 0.5) * 0.08;
-
-      const triggerPulseId = pendingPulseHubRef.current;
-      if (triggerPulseId) {
-        pendingPulseHubRef.current = null;
+      // Check Camera Preset triggers
+      if (presetCommandRef.current.nonce !== lastHandledPresetNonce) {
+        lastHandledPresetNonce = presetCommandRef.current.nonce;
+        const p = CAMERA_PRESETS[presetCommandRef.current.preset];
+        _camGoalPos.set(...p.pos);
+        _camGoalTarget.set(...p.target);
+        trackedHubId = null;
+        cameraFlyActive = true;
       }
 
-      let instIdx = 0;
-      let hoveredNodeRef: HubNodeMeta | null = null;
+      // Check external Hub Focus triggers (from Pathway -> 3D Brain sync)
+      if (focusTriggerRef.current.nonce !== lastHandledFocusNonce) {
+        lastHandledFocusNonce = focusTriggerRef.current.nonce;
+        if (focusTriggerRef.current.hubId) {
+          trackedHubId = focusTriggerRef.current.hubId;
+          cameraFlyActive = true;
+          const m = hubMetas.find((h) => h.hubId === focusTriggerRef.current.hubId);
+          if (m) m.rippleTimer = 1.0;
+        }
+      }
 
-      hubNodes.forEach((node, idx) => {
-        const isActive = activeHubs.has(node.hubId);
-        const isHovered = hoveredLocal === node.hubId;
-        const isSelected = selectedHubRef.current === node.hubId;
-        const isFocus = isHovered || isSelected;
+      // Update 8 Orbiting Hub Assemblies, Satellites, Filaments & Photons
+      const spreadScale = 0.72 + galaxyUniforms.uSpread.value * 0.45;
+      const selIds = selectedIdsRef.current;
+      const curHovered = hoveredHubRef.current;
+      const curSelectedHub = selectedHubRef.current;
 
-        if (isHovered) hoveredNodeRef = node;
+      let packetIdx = 0;
 
-        if (triggerPulseId === node.hubId) {
-          node.rippleTimer = 1.0;
-          node.rippleMesh.visible = true;
+      for (let h = 0; h < hubMetas.length; h++) {
+        const meta = hubMetas[h];
+        const hubAppsActiveCount = meta.satellites.filter((s) =>
+          selIds.includes(s.appId),
+        ).length;
+        const isActiveHub = hubAppsActiveCount > 0;
+        const isSelected = curSelectedHub === meta.hubId;
+        const isHovered = curHovered === meta.hubId;
+
+        // Advance Keplerian orbital position
+        meta.currentAngle += rawDt * meta.orbitSpeed * effectiveSpeed;
+        const curOrbitR = meta.baseRadius * spreadScale;
+        meta.orbitRingLine.scale.setScalar(spreadScale);
+        meta.hubGroup.position.set(
+          Math.cos(meta.currentAngle) * curOrbitR,
+          Math.sin(elapsed * 1.1 + h) * 0.08,
+          Math.sin(meta.currentAngle) * curOrbitR,
+        );
+
+        // Rotate gimbal & planetary core
+        meta.gimbalMesh.rotation.z += rawDt * (isSelected || isHovered ? 1.25 : 0.42);
+        meta.hubGroup.scale.setScalar(
+          THREE.MathUtils.damp(
+            meta.hubGroup.scale.x,
+            isSelected ? 1.24 : isHovered ? 1.14 : isActiveHub ? 1.06 : 0.94,
+            7,
+            rawDt,
+          ),
+        );
+
+        // Emissive intensity pulse for active/selected hubs
+        const pulseWave = 0.5 + 0.5 * Math.sin(elapsed * 3.1 + h * 0.8);
+        meta.coreMat.emissiveIntensity = isSelected
+          ? 1.15 + pulseWave * 0.75
+          : isActiveHub
+            ? 0.72 + pulseWave * 0.35
+            : 0.25;
+        meta.shellMat.opacity = isSelected ? 0.56 : isActiveHub ? 0.44 : 0.26;
+        meta.orbitRingMat.opacity = isSelected
+          ? 0.72
+          : isHovered
+            ? 0.52
+            : isActiveHub
+              ? 0.32
+              : isStone
+                ? 0.2
+                : 0.14;
+
+        // Coronal Shockwave Ripple
+        if (meta.rippleTimer > 0) {
+          meta.rippleTimer = Math.max(0, meta.rippleTimer - rawDt * 1.15);
+          const prog = 1 - meta.rippleTimer;
+          meta.rippleMesh.scale.setScalar(1 + prog * 2.4);
+          meta.rippleMat.opacity = meta.rippleTimer * 0.75;
+        } else {
+          meta.rippleMat.opacity = 0;
         }
 
-        if (node.rippleTimer > 0) {
-          node.rippleTimer = Math.max(0, node.rippleTimer - dt * 1.45);
-          const progress = 1 - node.rippleTimer;
-          const scale = 1 + progress * 2.15;
-          node.rippleMesh.scale.set(scale, scale, scale);
-          node.rippleMesh.lookAt(camera.position);
-          node.rippleMat.opacity = Math.sin(node.rippleTimer * Math.PI * 0.5) * 0.78;
-          if (node.rippleTimer <= 0.001) {
-            node.rippleMesh.visible = false;
-            node.rippleMat.opacity = 0;
+        // Orbiting Module Satellites (13 Spenta Apps)
+        for (let s = 0; s < meta.satellites.length; s++) {
+          const sat = meta.satellites[s];
+          const satActive = selIds.includes(sat.appId);
+          const satAng = sat.phase + elapsed * sat.orbitSpeed * (satActive ? 1.1 : 0.5);
+          sat.mesh.position.set(
+            Math.cos(satAng) * sat.orbitRadius,
+            Math.sin(satAng) * sat.orbitRadius * Math.sin(sat.inclination),
+            Math.sin(satAng) * sat.orbitRadius * Math.cos(sat.inclination),
+          );
+          sat.mesh.scale.setScalar(satActive ? 1.28 : 0.75);
+          sat.mat.emissiveIntensity = satActive ? 1.25 : 0.18;
+          sat.mat.color.set(satActive ? '#FFFFFF' : isStone ? '#64748B' : '#94A3B8');
+        }
+
+        // Update World Position & Dynamic Filament Curve
+        meta.hubGroup.getWorldPosition(_worldPos);
+        _midCtrl.set(_worldPos.x * 0.5, _worldPos.y * 0.5 + 1.05, _worldPos.z * 0.5);
+        meta.curve.v0.set(0, 0, 0);
+        meta.curve.v1.copy(_midCtrl);
+        meta.curve.v2.copy(_worldPos);
+
+        const posAttr = meta.filamentGeo.attributes.position as THREE.BufferAttribute;
+        for (let pt = 0; pt <= 24; pt++) {
+          meta.curve.getPoint(pt / 24, _packetPos);
+          posAttr.setXYZ(pt, _packetPos.x, _packetPos.y, _packetPos.z);
+        }
+        posAttr.needsUpdate = true;
+        meta.filamentMat.opacity = isSelected
+          ? 0.68
+          : isHovered
+            ? 0.48
+            : isActiveHub
+              ? 0.28
+              : 0.06;
+
+        // Telemetry Photons streaming along active/selected filaments
+        for (let p = 0; p < packetsPerHub; p++) {
+          if (isActiveHub || isSelected) {
+            const tFlow = (elapsed * 0.34 + p / packetsPerHub + h * 0.17) % 1;
+            meta.curve.getPoint(tFlow, _packetPos);
+            _dummyObj.position.copy(_packetPos);
+            _dummyObj.scale.setScalar(isSelected ? 1.25 : 0.9);
+          } else {
+            _dummyObj.position.set(0, -999, 0);
+            _dummyObj.scale.setScalar(0.001);
+          }
+          _dummyObj.updateMatrix();
+          packetInst.setMatrixAt(packetIdx++, _dummyObj.matrix);
+        }
+      }
+      packetInst.instanceMatrix.needsUpdate = true;
+      packetMat.color.set(isStone ? '#1C6E46' : '#A7F3D0');
+
+      // Smooth Camera Fly-To / Hub Tracking
+      if (cameraFlyActive) {
+        if (trackedHubId) {
+          const tMeta = hubMetas.find((h) => h.hubId === trackedHubId);
+          if (tMeta) {
+            tMeta.hubGroup.getWorldPosition(_worldPos);
+            _camGoalTarget.copy(_worldPos).multiplyScalar(0.65);
+            const radialDir = _worldPos.clone().normalize();
+            _camGoalPos
+              .copy(_worldPos)
+              .addScaledVector(radialDir, 4.4)
+              .add(new THREE.Vector3(0, 2.35, 0));
+          }
+        }
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, _camGoalPos.x, 4.2, rawDt);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, _camGoalPos.y, 4.2, rawDt);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, _camGoalPos.z, 4.2, rawDt);
+        controls.target.x = THREE.MathUtils.damp(controls.target.x, _camGoalTarget.x, 4.8, rawDt);
+        controls.target.y = THREE.MathUtils.damp(controls.target.y, _camGoalTarget.y, 4.8, rawDt);
+        controls.target.z = THREE.MathUtils.damp(controls.target.z, _camGoalTarget.z, 4.8, rawDt);
+
+        if (
+          !trackedHubId &&
+          camera.position.distanceTo(_camGoalPos) < 0.08 &&
+          controls.target.distanceTo(_camGoalTarget) < 0.05
+        ) {
+          cameraFlyActive = false;
+        }
+      }
+
+      controls.update();
+
+      // Render (GPU Bloom Pipeline or Software WebGL Direct Render)
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
+
+      // Throttled 2D Screen-Space Projection for Callout & Emissive Pulse Beacons (16 Hz)
+      if (now - lastHudSyncMs > 62) {
+        lastHudSyncMs = now;
+        const anchors: ProjectedNodeAnchor[] = [];
+        let nextCallout: ProjectedCallout | null = null;
+        const targetId = hoveredHubRef.current ?? selectedHubRef.current;
+
+        for (let h = 0; h < hubMetas.length; h++) {
+          const meta = hubMetas[h];
+          const isSelected = selectedHubRef.current === meta.hubId;
+          const isActive = meta.satellites.some((s) => selIds.includes(s.appId));
+
+          meta.hubGroup.getWorldPosition(_worldPos);
+          _projVec.copy(_worldPos).project(camera);
+
+          if (_projVec.z < 1 && _projVec.z > -1) {
+            const sx = (_projVec.x * 0.5 + 0.5) * currentWidth;
+            const sy = (-_projVec.y * 0.5 + 0.5) * currentHeight;
+
+            if (
+              (isSelected || isActive) &&
+              sx > 20 &&
+              sx < currentWidth - 20 &&
+              sy > 20 &&
+              sy < currentHeight - 20
+            ) {
+              anchors.push({
+                hubId: meta.hubId,
+                num: meta.num,
+                x: sx,
+                y: sy,
+                isSelected,
+                isActive,
+                accent: meta.accentHex,
+              });
+            }
+
+            if (targetId === meta.hubId) {
+              nextCallout = {
+                hubId: meta.hubId,
+                x: Math.min(Math.max(sx, 118), currentWidth - 118),
+                y: Math.min(Math.max(sy - 34, 48), currentHeight - 110),
+                visible: true,
+              };
+            }
           }
         }
 
-        const targetScale = isHovered ? 1.34 : isSelected ? 1.24 : isActive ? 1.1 : 0.88;
-        node.group.scale.x = THREE.MathUtils.damp(node.group.scale.x, targetScale, 8, dt);
-        node.group.scale.y = THREE.MathUtils.damp(node.group.scale.y, targetScale, 8, dt);
-        node.group.scale.z = THREE.MathUtils.damp(node.group.scale.z, targetScale, 8, dt);
-
-        node.group.position.y = node.basePos.y + Math.sin(elapsed * 1.4 + idx) * 0.11;
-        node.group.rotation.y += dt * (isFocus ? 1.15 : isActive ? 0.78 : 0.3);
-
-        node.collarMat.color.lerp(targetMetal, fAlpha);
-
-        const pulseWave = prefersReducedMotion
-          ? 0
-          : isFocus
-            ? 0.32 * (0.5 + 0.5 * Math.sin(elapsed * 3.4 + idx))
-            : isActive
-              ? 0.2 * (0.5 + 0.5 * Math.sin(elapsed * 2.4 + idx * 0.9))
-              : 0;
-        const lightDamp = isStoneLight ? 0.58 : 1.0;
-        node.glassShellMat.emissiveIntensity = THREE.MathUtils.damp(
-          node.glassShellMat.emissiveIntensity,
-          ((isFocus ? 0.65 : isActive ? 0.34 : 0.14) + pulseWave) * lightDamp,
-          7,
-          dt,
-        );
-        node.innerCoreMat.emissiveIntensity = THREE.MathUtils.damp(
-          node.innerCoreMat.emissiveIntensity,
-          ((isFocus ? 1.75 : isActive ? 1.05 : 0.45) + pulseWave * 1.45) * lightDamp,
-          7,
-          dt,
-        );
-        node.collarMat.emissiveIntensity = THREE.MathUtils.damp(
-          node.collarMat.emissiveIntensity,
-          ((isFocus ? 0.72 : isActive ? 0.34 : 0.1) + pulseWave * 0.65) * lightDamp,
-          7,
-          dt,
-        );
-        node.lineMat.opacity = THREE.MathUtils.damp(
-          node.lineMat.opacity,
-          isFocus ? 0.95 : isActive ? 0.74 : 0.24,
-          6,
-          dt,
-        );
-
-        for (let p = 0; p < 4; p++) {
-          const speed = isFocus ? 0.62 : isActive ? 0.42 : 0.14;
-          const t = (elapsed * speed + p * 0.25 + idx * 0.11) % 1;
-          node.curve.getPoint(t, _packetPos);
-          dummy.position.copy(_packetPos);
-          const s = isFocus ? 1.25 : isActive ? 1.0 : 0.36;
-          dummy.scale.set(s, s, s);
-          dummy.updateMatrix();
-          packetMesh.setMatrixAt(instIdx++, dummy.matrix);
-        }
-      });
-      packetMesh.instanceMatrix.needsUpdate = true;
-
-      controls.update();
-      renderer.render(scene, camera);
-
-      if (now - lastAnchorSync > 60) {
-        lastAnchorSync = now;
-        const w = container.clientWidth || 640;
-        const h = container.clientHeight || 460;
-        const nextAnchors: ProjectedNodeAnchor[] = [];
-        for (let i = 0; i < hubNodes.length; i++) {
-          const node = hubNodes[i];
-          const isNodeActive = activeHubs.has(node.hubId);
-          const isNodeSelected = selectedHubRef.current === node.hubId;
-          if (!isNodeActive && !isNodeSelected) continue;
-          node.group.getWorldPosition(_worldPos);
-          _projVec.copy(_worldPos).project(camera);
-          if (_projVec.z >= 1) continue;
-          const sx = ((_projVec.x + 1) / 2) * w;
-          const sy = ((-_projVec.y + 1) / 2) * h;
-          if (sx < 14 || sx > w - 14 || sy < 14 || sy > h - 14) continue;
-          const meta = BRAIN_HUBS[i];
-          nextAnchors.push({
-            hubId: node.hubId,
-            num: meta?.num ?? String(i + 1).padStart(2, '0'),
-            x: Math.round(sx),
-            y: Math.round(sy),
-            isSelected: isNodeSelected,
-            isActive: isNodeActive,
-            accent: meta?.accent ?? '#6FCB9F',
-          });
-        }
-        setProjectedAnchors(nextAnchors);
+        setProjectedNodes(anchors);
+        setCallout(nextCallout);
       }
 
-      if (hoveredNodeRef && !isDraggingOrbit && now - lastCalloutSync > 45) {
-        lastCalloutSync = now;
-        const targetNode = hoveredNodeRef as HubNodeMeta;
-        targetNode.group.getWorldPosition(_worldPos);
-        _projVec.copy(_worldPos).project(camera);
-        const w = container.clientWidth || 640;
-        const h = container.clientHeight || 460;
-        const rawX = ((_projVec.x + 1) / 2) * w;
-        const rawY = ((-_projVec.y + 1) / 2) * h;
-        const clampedX = Math.max(120, Math.min(w - 120, rawX));
-        const clampedY = Math.max(76, Math.min(h - 140, rawY - 42));
-        setProjectedCallout({
-          hubId: targetNode.hubId,
-          x: clampedX,
-          y: clampedY,
-          visible: _projVec.z < 1,
-        });
-      }
-
-      if (isSoftwareGl) {
-        afterDraw(tick);
-      } else {
-        frameId = requestAnimationFrame(tick);
-      }
+      afterDraw(tick);
     };
 
-    frameId = requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(frameId);
-      clearTimeout(frameId);
+      cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
-      controls.removeEventListener('start', onControlStart);
-      controls.removeEventListener('end', onControlEnd);
+      controls.removeEventListener('start', handleControlStart);
+      controls.dispose();
+
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
-      controls.dispose();
-      geometries.forEach((g) => g.dispose());
-      materials.forEach((m) => m.dispose());
-      textures.forEach((t) => t.dispose());
-      envTex.dispose();
+      renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
+
+      // Dispose all geometries, materials, textures & composer targets
+      galaxyGeo.dispose();
+      galaxyMat.dispose();
+      nebulaGeo.dispose();
+      nebulaMat.dispose();
+      solarGeo.dispose();
+      solarMat.dispose();
+      coronaGeo.dispose();
+      coronaMat.dispose();
+      accretionGeo.dispose();
+      accretionMat.dispose();
+      opaRingGeo.dispose();
+      opaRingMat.dispose();
+      tickGeo.dispose();
+      hubShellGeo.dispose();
+      hubCoreGeo.dispose();
+      hubGimbalGeo.dispose();
+      hubSpireGeo.dispose();
+      hubRippleGeo.dispose();
+      satGeo.dispose();
+      proxyGeo.dispose();
+      proxyMat.dispose();
+      packetGeo.dispose();
+      packetMat.dispose();
+
+      hubMetas.forEach((m) => {
+        m.orbitRingLine.geometry.dispose();
+        m.orbitRingMat.dispose();
+        m.coreMat.dispose();
+        m.shellMat.dispose();
+        m.gimbalMat.dispose();
+        m.spireMat.dispose();
+        m.filamentGeo.dispose();
+        m.filamentMat.dispose();
+        m.rippleMat.dispose();
+        m.satellites.forEach((s) => s.mat.dispose());
+      });
+      disposableTextures.forEach((t) => t.dispose());
+      envTarget.dispose();
+      composer?.dispose();
       renderer.dispose();
+      if (renderer.domElement.parentNode === container) {
+        container.removeChild(renderer.domElement);
+      }
     };
-  }, [compact]);
+  }, []);
 
-  const hitlPass = hitlConfidence >= 0.88;
-  const isLightHud = materialFinish === 'heritage-light';
-
-  if (contextLost) {
-    return (
-      <div
-        className={`w-full h-full min-h-[420px] rounded-[10px] p-6 flex flex-col justify-center items-center text-center ${
-          isLightHud ? 'bg-[#F2EFE9] text-[#16213A]' : 'bg-[#0B1020] text-[#E7EBF5]'
-        }`}
-      >
-        <div
-          className={`text-xs font-mono font-bold mb-2 ${
-            isLightHud ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
-          }`}
-        >
-          WebGL 2D Fallback Mode
-        </div>
-        <h3 className="text-lg font-bold">Spenta 3D Sovereign Neural Core</h3>
-        <p className={`text-xs max-w-md mt-2 ${isLightHud ? 'text-[#4A5163]' : 'text-[#C3CCE4]'}`}>
-          Hardware WebGL context is unavailable in this viewport. Inspect and compose all 8 hubs below.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 w-full max-w-2xl">
-          {BRAIN_HUBS.map((hub) => {
-            const active = activeHubIds.has(hub.id);
-            const selected = selectedHubId === hub.id;
-            const pulseClass = selected
-              ? 'brain-node-emissive-pulse--selected'
-              : active
-                ? 'brain-node-emissive-pulse'
-                : '';
-            return (
-              <button
-                key={hub.id}
-                type="button"
-                onClick={() => onSelectHub?.(hub.id)}
-                style={active || selected ? getEmissiveCssVars(hub.accent, isLightHud) : undefined}
-                className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${pulseClass} ${
-                  isLightHud
-                    ? selected
-                      ? 'bg-[#EEF3FB] border-[#1F3863] text-[#16213A]'
-                      : active
-                        ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#16213A]'
-                        : 'bg-[#FFFFFF] border-[#E4DFD6] text-[#4A5163]'
-                    : selected
-                      ? 'bg-[#1B2547] border-[#8FA6E8] text-[#E7EBF5]'
-                      : active
-                        ? 'bg-[#0F2A22] border-[#6FCB9F] text-[#E7EBF5]'
-                        : 'bg-[#141A32] border-[#232B4A] text-[#C3CCE4]'
-                }`}
-              >
-                <div className="text-[10px] font-mono font-bold">HUB {hub.num}</div>
-                <div className="text-xs font-semibold mt-0.5">{hub.label}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // Solid-surface HUD styling (zero backdrop-filter over WebGL)
-  const hudShell = isLightHud
-    ? 'bg-[#FAF8F4]/95 border-[#CFC8BC] text-[#16213A]'
-    : materialFinish === 'obsidian'
-      ? 'bg-[#07130F]/95 border-emerald-800/70 text-white'
-      : 'bg-[#0F1529]/95 border-[#2E3862] text-[#E7EBF5]';
-
-  const hudInactiveBtn = isLightHud
-    ? 'bg-[#FFFFFF] text-[#4A5163] hover:text-[#16213A] border border-[#E4DFD6]'
-    : materialFinish === 'obsidian'
-      ? 'bg-[#0E241C] text-slate-300 hover:text-white'
-      : 'bg-[#141A32] text-[#C3CCE4] hover:text-white border border-[#232B4A]';
+  const isLightMode = finish === 'stone';
+  const opaPass = hitlConfidence >= 0.88;
 
   return (
     <div
-      className={`relative w-full h-full min-h-[450px] rounded-[10px] overflow-hidden select-none ${
-        isLightHud ? 'bg-[#F2EFE9]' : materialFinish === 'obsidian' ? 'bg-[#07130F]' : 'bg-[#0B1020]'
+      className={`relative w-full h-full min-h-[380px] rounded-[12px] overflow-hidden select-none border ${
+        isLightMode
+          ? 'bg-[#EDEAE2] border-[#D8D2C6]'
+          : 'bg-[#040712] border-[#1F2A48]'
       }`}
     >
-      {/* Isolated Stable WebGL Canvas Container */}
-      <div ref={mountRef} className="w-full h-full min-h-[450px]" />
+      {/* Pure WebGL Spiral Galaxy Mount */}
+      <div ref={mountRef} className="w-full h-full" />
 
-      {/* Projected CSS Emissive Pulse Halos on Active & Selected 3D Brain Nodes (Zero backdrop-filter) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10" aria-hidden="true">
-        {projectedAnchors.map((anchor) => {
-          const size = anchor.isSelected ? 46 : 34;
-          return (
+      {/* Projected Emissive Pulse Beacons (synced with active/selected hubs) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {projectedNodes.map((node) => (
+          <div
+            key={node.hubId}
+            style={{
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              ...getEmissiveCssVars(node.accent, isLightMode),
+            }}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+          >
             <div
-              key={`pulse-${anchor.hubId}`}
-              className="brain-node-ring-pulse absolute rounded-full border"
-              style={{
-                left: `${anchor.x}px`,
-                top: `${anchor.y}px`,
-                width: `${size}px`,
-                height: `${size}px`,
-                borderColor: hexToRgba(anchor.accent, anchor.isSelected ? 0.88 : 0.58),
-                ...getEmissiveCssVars(anchor.accent, isLightHud),
-              }}
+              className={`rounded-full transition-transform duration-300 ${
+                node.isSelected
+                  ? 'w-11 h-11 brain-node-emissive-pulse--selected'
+                  : 'w-8 h-8 brain-node-emissive-pulse'
+              }`}
             />
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      {/* Minimal Top-Left Spec Badge (Zero Side-Flank Occlusion, Solid Surface) */}
-      <div className="absolute top-3 left-3 pointer-events-none flex flex-wrap items-center gap-2">
-        <div className={`border rounded-lg px-3 py-1.5 ${hudShell}`}>
-          <div
-            className={`text-[10px] font-mono font-semibold tabular-nums ${
-              isLightHud ? 'text-[#1F3863]' : materialFinish === 'obsidian' ? 'text-[#6EE7B7]' : 'text-[#8FA6E8]'
-            }`}
-          >
-            3D Neural Core · {activeHubIds.size}/8 Hubs · {selectedIds.length} Apps
-          </div>
-        </div>
+      {/* Top-Left Minimal Observatory Title + OPA Status Readout (No backdrop-blur over WebGL) */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex flex-col gap-1 max-w-[65%]">
         <div
-          className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-semibold tabular-nums ${
-            hitlPass
-              ? isLightHud
-                ? 'bg-[#EBF6F0] border-[#1C6E46] text-[#1C6E46]'
-                : 'bg-[#0F2A22] border-[#6FCB9F] text-[#6FCB9F]'
-              : isLightHud
-                ? 'bg-[#FDF5E6] border-[#8A5C10] text-[#8A5C10]'
-                : 'bg-[#2A2112] border-[#E0B063] text-[#E0B063]'
+          className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] tracking-[0.14em] uppercase ${
+            isLightMode
+              ? 'bg-[#FAF8F4]/92 border-[#D4CEC2] text-[#16213A]'
+              : 'bg-[#0A1024]/88 border-[#25345C] text-[#D9E3FA]'
           }`}
         >
-          OPA {hitlConfidence.toFixed(2)} · {hitlPass ? 'Auto-Commit' : 'HITL Audit'}
+          <span className="font-bold">SPENTA SPIRAL GALAXY</span>
+          <span className="opacity-40">·</span>
+          <span className={opaPass ? 'text-[#1C6E46] dark:text-[#6FCB9F]' : 'text-amber-500'}>
+            OPA {hitlConfidence.toFixed(2)} {opaPass ? 'PASS' : 'HITL'}
+          </span>
         </div>
-      </div>
-
-      {/* 3D-Projected Hover Telemetry Callout (Solid Surface, Zero backdrop-filter Over WebGL) */}
-      {projectedCallout && hoveredCalloutHub && (
-        <div
-          className="absolute pointer-events-none z-20 -translate-x-1/2 -translate-y-full transition-transform duration-100"
-          style={{ left: `${projectedCallout.x}px`, top: `${projectedCallout.y}px` }}
-        >
+        {!compact && (
           <div
-            className={`w-[232px] rounded-lg border px-3 py-2 shadow-lg ${
-              isLightHud
-                ? 'bg-[#FFFFFF] border-[#1F3863] text-[#16213A]'
-                : 'bg-[#0F1529] border-[#8FA6E8] text-[#E7EBF5]'
+            className={`text-[10px] font-mono px-1 ${
+              isLightMode ? 'text-[#4A5163]' : 'text-[#8E9DC2]'
             }`}
           >
-            <div className="flex items-center justify-between gap-2 text-[10px] font-mono">
-              <span className={isLightHud ? 'text-[#1F3863] font-bold' : 'text-[#8FA6E8] font-bold'}>
-                HUB {hoveredCalloutHub.hub.num} · {hoveredCalloutHub.hub.keyLayers.join('/')}
-              </span>
-              <span className="opacity-80 tabular-nums">
-                {hoveredCalloutHub.activeCount}/{hoveredCalloutHub.totalApps} active
-              </span>
-            </div>
-            <div className="text-xs font-bold mt-0.5 truncate">
-              {hoveredCalloutHub.hub.label}
-            </div>
-            <div className="text-[10px] opacity-80 mt-0.5 leading-snug line-clamp-2">
-              {hoveredCalloutHub.hub.summary}
-            </div>
-            <div
-              className={`mt-1.5 pt-1 border-t text-[9.5px] font-mono flex items-center justify-between ${
-                isLightHud ? 'border-[#E4DFD6] text-[#1C6E46]' : 'border-[#232B4A] text-[#6FCB9F]'
-              }`}
-            >
-              <span>Brushed Ti · Frosted Glass</span>
-              <span>Click to inspect</span>
-            </div>
+            Drag to orbit · Scroll to zoom · Click any orbiting hub to inspect
+          </div>
+        )}
+      </div>
+
+      {/* Projected Hub Callout Card (Solid RGBA surface, zero backdrop-filter) */}
+      {callout && callout.visible && activeHubMeta && (
+        <div
+          style={{ left: `${callout.x}px`, top: `${callout.y}px` }}
+          className={`pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full w-[228px] rounded-xl border px-3 py-2.5 shadow-xl ${
+            isLightMode
+              ? 'bg-[#FFFFFF]/96 border-[#D4CEC2] text-[#16213A]'
+              : 'bg-[#0C1329]/94 border-[#2C3E6B] text-[#E7EBF5]'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2 text-[10px] font-mono">
+            <span style={{ color: activeHubMeta.accent }} className="font-bold">
+              HUB {activeHubMeta.num} · {activeHubMeta.side === 'left' ? 'OPS' : 'EXP / IR4'}
+            </span>
+            <span className={isLightMode ? 'text-[#5F6576]' : 'text-[#8E9DC2]'}>
+              {activeHubMeta.keyLayers.join('/')}
+            </span>
+          </div>
+          <div className="text-xs font-bold mt-0.5 leading-snug">
+            {activeHubMeta.label}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {activeHubApps.map((app) => {
+              const active = selectedIds.includes(app.id);
+              return (
+                <span
+                  key={app.id}
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                    active
+                      ? 'bg-[#1C6E46]/18 border-[#1C6E46]/50 text-[#1C6E46] dark:bg-[#6FCB9F]/18 dark:border-[#6FCB9F]/45 dark:text-[#6FCB9F] font-semibold'
+                      : isLightMode
+                        ? 'bg-[#F2EFE9] border-[#E4DFD6] text-[#4A5163]'
+                        : 'bg-[#141D38] border-[#253359] text-[#A8B4D4]'
+                  }`}
+                >
+                  {appMap[app.id]?.shortName ?? app.shortName}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Unified Collapsible Bottom Control Dock (Zero backdrop-filter over WebGL) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[min(94%,780px)] flex flex-col items-center pointer-events-none">
-        <button
-          type="button"
-          onClick={() => setDockCollapsed((v) => !v)}
-          className={`pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-t-lg border border-b-0 text-[10px] font-mono cursor-pointer ${hudShell}`}
+      {/* WebGL Context Lost Notice */}
+      {contextLost && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0B1020]/92 text-[#E7EBF5] p-6 text-center">
+          <div className="max-w-sm space-y-2">
+            <div className="font-mono text-xs uppercase tracking-wider text-amber-400">
+              WebGL Context Interrupted
+            </div>
+            <p className="text-xs text-[#C3CCE4]">
+              Restoring GPU telemetry for the Spenta Spiral Galaxy. All 8 sovereign hubs remain selectable in the inspector.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Single Collapsible Bottom Cinema Control Dock (Zero backdrop-filter over WebGL) */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-24px)] max-w-[740px]">
+        <div
+          className={`rounded-xl border shadow-lg transition-colors ${
+            isLightMode
+              ? 'bg-[#FAF8F4]/95 border-[#D4CEC2] text-[#16213A]'
+              : 'bg-[#0B1124]/92 border-[#233157] text-[#E7EBF5]'
+          }`}
         >
-          {dockCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          <span>{dockCollapsed ? 'Show Controls (H)' : 'Hide Controls (H)'}</span>
-        </button>
-
-        {!dockCollapsed && (
-          <div className={`pointer-events-auto w-full border rounded-xl px-3.5 py-2.5 space-y-2 ${hudShell}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1">
-                {(['overview', 'operations', 'experience', 'top'] as const).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => applyCameraPreset(preset)}
-                    className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase font-semibold transition-colors cursor-pointer ${
-                      activePreset === preset
-                        ? isLightHud
-                          ? 'bg-[#1F3863] text-white'
-                          : 'bg-[#8FA6E8] text-[#0B1020]'
-                        : hudInactiveBtn
-                    }`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => applyCameraPreset('overview')}
-                  className={`p-1 rounded-md cursor-pointer ${hudInactiveBtn}`}
-                  title="Reset camera"
-                  aria-label="Reset camera"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Three-Way Tactile PBR Finish Switcher */}
-              <div className="flex flex-wrap items-center gap-1">
-                {(
-                  [
-                    { id: 'heritage-light', label: 'Stone Studio' },
-                    { id: 'heritage-dark', label: 'Nocturnal Navy' },
-                    { id: 'obsidian', label: 'Obsidian Ti' },
-                  ] as const
-                ).map((fin) => (
-                  <button
-                    key={fin.id}
-                    type="button"
-                    onClick={() => setMaterialFinish(fin.id)}
-                    className={`px-2 py-1 rounded-md font-mono text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                      materialFinish === fin.id
-                        ? fin.id === 'heritage-light'
-                          ? 'bg-[#1F3863] text-white'
-                          : fin.id === 'obsidian'
-                            ? 'bg-[#1EB56A] text-[#07130F]'
-                            : 'bg-[#8FA6E8] text-[#0B1020]'
-                        : hudInactiveBtn
-                    }`}
-                  >
-                    {fin.label}
-                  </button>
-                ))}
-              </div>
+          {/* Compact Dock Header / Toggle */}
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setDockOpen((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-[0.14em] cursor-pointer whitespace-nowrap"
+              >
+                {dockOpen ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                )}
+                <span>Observatory Controls</span>
+              </button>
+              <span className="hidden sm:inline text-[10px] font-mono opacity-55 truncate">
+                · 8 Hubs · 13 Satellites · {selectedIds.length} Active
+              </span>
             </div>
 
-            {/* Interactive 8-Hub 3D Node Selector Strip with Custom CSS Emissive Pulse on Active/Selected States */}
-            <div
-              className={`flex flex-wrap items-center gap-1.5 pt-1.5 border-t ${
-                isLightHud ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
-              }`}
-              role="group"
-              aria-label="3D Brain hub node quick selector"
-            >
-              {BRAIN_HUBS.map((hub) => {
-                const isActiveNode = activeHubIds.has(hub.id);
-                const isSelectedNode = selectedHubId === hub.id;
-                const pulseClass = isSelectedNode
-                  ? 'brain-node-emissive-pulse--selected'
-                  : isActiveNode
-                    ? 'brain-node-emissive-pulse'
-                    : '';
-                return (
-                  <button
-                    key={hub.id}
-                    type="button"
-                    onClick={() => {
-                      pendingPulseHubRef.current = hub.id;
-                      onSelectHub?.(hub.id);
-                    }}
-                    aria-pressed={isSelectedNode}
-                    style={
-                      isActiveNode || isSelectedNode
-                        ? getEmissiveCssVars(hub.accent, isLightHud)
-                        : undefined
-                    }
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono text-[10px] font-semibold border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${pulseClass} ${
-                      isSelectedNode
-                        ? isLightHud
-                          ? 'bg-[#EEF3FB] border-[#1F3863] text-[#16213A]'
-                          : 'bg-[#1B2547] border-[#8FA6E8] text-white'
-                        : isActiveNode
-                          ? isLightHud
-                            ? 'bg-[#EBF6F0] border-[#1C6E46]/70 text-[#16213A]'
-                            : 'bg-[#0F2A22] border-[#6FCB9F]/70 text-[#E7EBF5]'
-                          : hudInactiveBtn
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        isActiveNode || isSelectedNode ? 'brain-core-dot-pulse' : 'opacity-45'
-                      }`}
-                      style={{ backgroundColor: hub.accent }}
-                    />
-                    <span>H{hub.num}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPaused((p) => !p)}
+                aria-label={isPaused ? 'Resume orbital simulation' : 'Pause orbital simulation'}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
+                  isLightMode
+                    ? 'bg-white border-[#D4CEC2] text-[#16213A] hover:border-[#1F3863]'
+                    : 'bg-[#141D38] border-[#26355E] text-[#D9E3FA] hover:border-[#6FCB9F]'
+                }`}
+              >
+                {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                <span>{isPaused ? 'Play' : 'Pause'}</span>
+              </button>
 
-            <div
-              className={`flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t ${
-                isLightHud ? 'border-[#E4DFD6]' : 'border-[#232B4A]'
-              }`}
-            >
-              {inspectedHub ? (
-                <div
-                  className={`text-[11px] font-mono truncate ${
-                    isLightHud ? 'text-[#1F3863]' : 'text-[#8FA6E8]'
-                  }`}
-                >
-                  HUB {inspectedHub.num}:{' '}
-                  <strong className={isLightHud ? 'text-[#16213A]' : 'text-white'}>
-                    {inspectedHub.label}
-                  </strong>
-                </div>
-              ) : (
-                <div className="text-[10px] font-mono opacity-75">
-                  Hover node for 3D callout · Click hub to sync profile &amp; toggle apps
-                </div>
-              )}
-
-              {inspectedHub && inspectedApps.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {inspectedApps.map((app) => {
-                    const isSelected = selectedIds.includes(app.id);
-                    return (
-                      <button
-                        key={app.id}
-                        type="button"
-                        onClick={() => {
-                          pendingPulseHubRef.current = inspectedHub.id;
-                          toggleApp(app.id);
-                        }}
-                        className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer whitespace-nowrap ${
-                          isSelected
-                            ? isLightHud
-                              ? 'bg-[#1C6E46] text-white border-[#1C6E46] font-bold'
-                              : 'bg-[#6FCB9F] text-[#0B1020] border-[#6FCB9F] font-bold'
-                            : hudInactiveBtn
-                        }`}
-                      >
-                        {isSelected ? '✓ ' : '+ '}
-                        {app.shortName}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSpinSpeed(0.85);
+                  setOrbitalSpread(0.65);
+                  setIsPaused(false);
+                  applyCameraPreset('overview');
+                }}
+                aria-label="Reset observatory camera and orbital physics"
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors ${
+                  isLightMode
+                    ? 'bg-white border-[#D4CEC2] text-[#16213A] hover:border-[#1F3863]'
+                    : 'bg-[#141D38] border-[#26355E] text-[#D9E3FA] hover:border-[#6FCB9F]'
+                }`}
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span className="hidden sm:inline">Reset</span>
+              </button>
             </div>
           </div>
-        )}
+
+          {/* Expandable Controls Body */}
+          {dockOpen && (
+            <div
+              className={`px-3 pb-2.5 pt-2 border-t grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[10px] font-mono ${
+                isLightMode ? 'border-[#E4DFD6]' : 'border-[#1E2B4F]'
+              }`}
+            >
+              {/* Camera Presets */}
+              <div className="space-y-1">
+                <div className="uppercase tracking-wider opacity-65">Camera Angle</div>
+                <div className="grid grid-cols-2 gap-1">
+                  {(['overview', 'operations', 'experience', 'ecliptic'] as CameraPreset[]).map(
+                    (preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => applyCameraPreset(preset)}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold capitalize cursor-pointer transition-colors whitespace-nowrap ${
+                          cameraPreset === preset
+                            ? isLightMode
+                              ? 'bg-[#1F3863] text-white'
+                              : 'bg-[#6FCB9F] text-[#0B1020]'
+                            : isLightMode
+                              ? 'bg-[#EFECE4] text-[#4A5163] hover:text-[#16213A]'
+                              : 'bg-[#141D38] text-[#A8B4D4] hover:text-white'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              {/* Observatory Finish */}
+              <div className="space-y-1">
+                <div className="uppercase tracking-wider opacity-65">Observatory</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(
+                    [
+                      { id: 'cosmos', label: 'Cosmos' },
+                      { id: 'nocturnal', label: 'Navy' },
+                      { id: 'stone', label: 'Stone' },
+                    ] as { id: ObservatoryFinish; label: string }[]
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setFinish(opt.id)}
+                      className={`px-1.5 py-1 rounded text-[10px] font-semibold cursor-pointer transition-colors whitespace-nowrap ${
+                        finish === opt.id
+                          ? isLightMode
+                            ? 'bg-[#1F3863] text-white'
+                            : 'bg-[#8FA6E8] text-[#0B1020]'
+                          : isLightMode
+                            ? 'bg-[#EFECE4] text-[#4A5163] hover:text-[#16213A]'
+                            : 'bg-[#141D38] text-[#A8B4D4] hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Spin Velocity */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between uppercase tracking-wider opacity-75">
+                  <span>Spin Velocity</span>
+                  <span className="tabular-nums font-bold">{spinSpeed.toFixed(2)}×</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={2.4}
+                  step={0.05}
+                  value={spinSpeed}
+                  onChange={(e) => {
+                    setSpinSpeed(Number(e.target.value));
+                    if (isPaused) setIsPaused(false);
+                  }}
+                  aria-label="Galaxy spin velocity"
+                  className="w-full spenta-slider"
+                />
+              </div>
+
+              {/* Orbital Spread */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between uppercase tracking-wider opacity-75">
+                  <span>Orbital Spread</span>
+                  <span className="tabular-nums font-bold">{Math.round(orbitalSpread * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.25}
+                  max={1.1}
+                  step={0.05}
+                  value={orbitalSpread}
+                  onChange={(e) => setOrbitalSpread(Number(e.target.value))}
+                  aria-label="Hub orbital spread"
+                  className="w-full spenta-slider"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

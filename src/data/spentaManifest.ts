@@ -54,6 +54,7 @@ export interface SpentaApp {
   tagline: string;
   coreCapabilities: string[];
   setupUsd: number;
+  billingCadence?: 'one-time' | 'quarterly-retainer';
   setupLabel: string;
   recurringLabel: string;
   gmPct: number;
@@ -444,6 +445,7 @@ export const SPENTA_APPS: SpentaApp[] = [
       '24/7 Incident Response, Patching & Air-Gapped DR',
     ],
     setupUsd: 8600,
+    billingCadence: 'quarterly-retainer',
     setupLabel: '$8.6K/qtr SLA',
     recurringLabel: '$8.6K/qtr Managed Security SLA',
     gmPct: 32.6,
@@ -574,6 +576,7 @@ export const SPENTA_APPS: SpentaApp[] = [
       '365 Exchange Circular CRM & Reverse Logistics',
     ],
     setupUsd: 6900,
+    billingCadence: 'quarterly-retainer',
     setupLabel: '$6.9K/qtr retainer',
     recurringLabel: '$6.9K/qtr Growth & GEO Retainer',
     gmPct: 30.4,
@@ -740,15 +743,15 @@ export const SERVER_TIERS: Record<ServerTierId, ServerTierSpec> = {
   1: {
     id: 1,
     code: 'TIER 1',
-    name: '300B Real-Time Sovereign Flagship',
-    modelScale: '300B Real-Time Dense / MoE',
+    name: '300B MoE Real-Time Sovereign Flagship',
+    modelScale: '300B MoE (30–40B Active) / Dense Batch',
     hardware: 'Apple Mac Studio M3 Ultra (80-core GPU, 819 GB/s bandwidth)',
     vramRam: '512GB Unified Memory',
     storage: '8TB NVMe SSD + Encrypted NAS Backup',
     capex: '$14,100–$15,300',
     capexMidUsd: 14700,
-    speed: '18–35+ tok/s',
-    idealFor: 'Concurrent 300B multimodal ICR, hospital-wide Clinical AI, Voice & XR Guides on one silent desktop box.',
+    speed: '18–35 tok/s (MoE) · ~5 tok/s (Dense)',
+    idealFor: 'Concurrent 300B MoE multimodal ICR, hospital-wide Clinical AI, Voice & XR Guides on one silent desktop box.',
   },
   2: {
     id: 2,
@@ -758,8 +761,8 @@ export const SERVER_TIERS: Record<ServerTierId, ServerTierSpec> = {
     hardware: '4× RTX 3090 (96GB) or 2× RTX 5090 (64GB) + AMD EPYC 9004',
     vramRam: '384–512GB DDR5 ECC + 64–96GB VRAM',
     storage: '10TB NVMe + 50TB Enterprise Backup',
-    capex: '$11,500–$14,500',
-    capexMidUsd: 13000,
+    capex: '$12,500–$15,500',
+    capexMidUsd: 14000,
     speed: '12–22 tok/s',
     idealFor: 'High-volume Bank ICR clusters, Spatial XR rendering nodes & multi-branch enterprise inference.',
   },
@@ -768,21 +771,21 @@ export const SERVER_TIERS: Record<ServerTierId, ServerTierSpec> = {
     code: 'TIER 3',
     name: 'Spenta Budget Baseline (70B–120B RT)',
     modelScale: '70B–120B RT / 200B MoE',
-    hardware: '4× used RTX 3090 (96GB VRAM) + Workstation EPYC/Threadripper',
+    hardware: '4× RTX 3090 / RTX A5000 (96GB VRAM) + Workstation EPYC/Threadripper',
     vramRam: '96GB VRAM + 256GB DDR5',
     storage: '2TB 990 PRO + 8TB U.2 NVMe + 50TB HDD',
-    capex: '$7,500–$8,500',
-    capexMidUsd: 8000,
+    capex: '$8,500–$10,500',
+    capexMidUsd: 9500,
     speed: '20–38 tok/s (70B)',
     idealFor: 'Spenta default enterprise baseline for Healthcare ERP, Fintech Suite, Voice AI, GenAI BI & IoT Edge.',
-    note: 'Spenta Sovereign Benchmark Baseline — best CapEx-to-VRAM ratio for mid-market regulated deployments.',
+    note: 'Reconciled enterprise build budget including chassis, 2000W PSU & 50TB backup; enterprise-warranty GPU option available for Tier-1 banks.',
   },
   4: {
     id: 4,
     code: 'TIER 4',
     name: '33B–70B Efficient Production Node',
     modelScale: '33B–70B Quantized Production',
-    hardware: '2× used RTX 3090 (48GB VRAM) + 1200W Platinum PSU',
+    hardware: '2× RTX 3090 (48GB VRAM) + 1200W Platinum PSU',
     vramRam: '48GB VRAM + 128GB DDR5',
     storage: '4TB NVMe Enterprise SSD',
     capex: '$3,200–$4,200',
@@ -794,31 +797,31 @@ export const SERVER_TIERS: Record<ServerTierId, ServerTierSpec> = {
 
 export const DUAL_SHORE_COMPARISON = [
   {
-    role: 'Spenta Dhaka R&D Hub (20-FTE Pod)',
-    hourlyUsd: 11.5,
+    role: 'Spenta Dhaka R&D Hub (20 FTE)',
+    hourlyUsd: 12.98,
     annualTeamUsd: 540000,
-    edgeLabel: 'Base Sovereign Rate (64.8M BDT/yr)',
+    edgeLabel: '$11.50 base + $1.48 enclave overhead (64.8M BDT/yr)',
     color: '#1EB56A',
   },
   {
-    role: 'Eastern Europe / LatAm Nearshore',
+    role: 'Eastern Europe / LatAm (20 FTE)',
     hourlyUsd: 68,
-    annualTeamUsd: 1414000,
-    edgeLabel: '5.9× higher hourly rate',
+    annualTeamUsd: 2828800,
+    edgeLabel: '5.2× higher loaded cost (41,600 hrs/yr)',
     color: '#0D9488',
   },
   {
-    role: 'US / Australia Tier-2 AI Agency',
+    role: 'US / AU Tier-2 Agency (20 FTE)',
     hourlyUsd: 115,
-    annualTeamUsd: 2392000,
-    edgeLabel: '10× higher hourly rate',
+    annualTeamUsd: 4784000,
+    edgeLabel: '8.9× higher loaded cost (41,600 hrs/yr)',
     color: '#64748B',
   },
   {
-    role: 'Global Consulting / Big-4 AI Pod',
+    role: 'Global Big-4 AI Pod (20 FTE)',
     hourlyUsd: 150,
-    annualTeamUsd: 3120000,
-    edgeLabel: '13× higher hourly rate',
+    annualTeamUsd: 6240000,
+    edgeLabel: '11.6× higher loaded cost (41,600 hrs/yr)',
     color: '#E11D48',
   },
 ];
@@ -846,7 +849,7 @@ export const FINANCIAL_TRAJECTORY: FinancialYear[] = [
     upsideRevK: 2490,
     upsideEbitdaK: 920,
     upsideNetProfitK: 690,
-    milestone: 'Self-sustaining cashflow covering $585K escalated burn + Healthcare wedge',
+    milestone: 'Self-sustaining cashflow covering $1.06M total OpEx ($585K core Dhaka pod + delivery scaling)',
   },
   {
     year: 'FY2029',
@@ -870,7 +873,7 @@ export const FINANCIAL_TRAJECTORY: FinancialYear[] = [
     upsideRevK: 6950,
     upsideEbitdaK: 2790,
     upsideNetProfitK: 2092.5,
-    milestone: '3.57× cumulative net cash return on $500K SAFE · High-margin IP mix rises',
+    milestone: '3.57× capital efficiency (cum. net profit / $500K raised) · High-margin IP mix rises',
   },
   {
     year: 'FY2031',
@@ -882,7 +885,7 @@ export const FINANCIAL_TRAJECTORY: FinancialYear[] = [
     upsideRevK: 9600,
     upsideEbitdaK: 4120,
     upsideNetProfitK: 3090,
-    milestone: '$4.252M cum. EBITDA · $3.189M cum. Net Profit · 6.38× 5-yr net return',
+    milestone: '$4.252M cum. EBITDA · $3.189M cum. Net Profit · 6.38× capital efficiency · ~4.2×–6.2× SAFE exit ROI',
   },
 ];
 
@@ -1098,13 +1101,13 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     kpis: [
       { label: 'Capital Raise', value: '$500K SAFE', accent: 'crimson' },
       { label: 'Valuation Cap', value: '$4.5M · 20% Disc.', accent: 'emerald' },
-      { label: '5-Yr Net Return', value: '6.38×', accent: 'teal' },
-      { label: 'Target Y5 Rev', value: '$5.85M', accent: 'amber' },
+      { label: 'Capital Efficiency', value: '6.38×', accent: 'teal' },
+      { label: 'Modeled SAFE ROI', value: '4.2×–6.2×', accent: 'amber' },
     ],
     bullets: [
       '13 composable sovereign enterprise apps sharing one L1–L6 kernel (PostgreSQL, Kafka, OPA 0.88 HITL Gate).',
       'Proven across Samsung Biologics, Bank, Apollo JMI, LABAID, ISHO, Jotax Oy, BEST & X Ltd.',
-      '20-FTE Dhaka R&D Hub ($11.50/hr loaded) orchestrated from San Jose & Australia.',
+      '20-FTE Dhaka R&D Hub ($12.98/hr fully loaded · $11.50/hr base payroll) orchestrated from San Jose & Australia.',
     ],
     speakerNotes:
       'Open with positioning: Spenta is not another thin API wrapper. We deliver full-stack sovereign enterprise software that runs air-gapped on client-owned hardware at 40%–60% lower cost than Western agencies.',
@@ -1224,7 +1227,7 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
       'Unscaled Year 3 Healthcare ERP pipeline represents $4.80M upside (conservatively haircut by 0.5825× in base model).',
     ],
     speakerNotes:
-      'Stress that our base investor forecast applies a strict 0.5825× conservatism factor—even without full hospital upside, the business delivers 6.38× 5-year net return.',
+      'Stress that our base investor forecast applies a strict 0.5825× conservatism factor—even without full hospital upside, the business generates 6.38× capital efficiency ($3.189M cum. net profit) and 4.2×–6.2× modeled SAFE equity multiple at 10×–15× Y5 EBITDA.',
   },
   {
     num: 8,
@@ -1368,14 +1371,14 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     subtitle: '20-FTE Dhaka engineering engine delivering 40%–60% client savings while preserving healthy margins',
     theme: 'light',
     kpis: [
-      { label: 'Blended Loaded Rate', value: '$11.50/hr', accent: 'emerald' },
-      { label: 'Y1 Operating Budget', value: '$540K (64.8M BDT)', accent: 'teal' },
-      { label: 'Western Agency Rate', value: '$100–$150/hr', accent: 'crimson' },
+      { label: 'Fully Loaded Rate', value: '$12.98/hr', accent: 'emerald' },
+      { label: 'Y1 Dhaka Budget', value: '$540K (64.8M BDT)', accent: 'teal' },
+      { label: 'Western 20-FTE Pod', value: '$4.78M–$6.24M', accent: 'crimson' },
     ],
     bullets: [
       'San Jose & Australia client leadership handles architecture, executive closing, and regulatory alignment.',
-      '20-FTE Dhaka R&D Hub executes AI/ML, ERP, UE5 XR, and 24/7 SecOps at $11.50/hr fully loaded.',
-      'Structural cost discipline means Year 2 revenue ($1.45M) comfortably covers escalated $585K operating burn.',
+      '20-FTE Dhaka R&D Hub executes AI/ML, ERP, UE5 XR, and 24/7 SecOps at $12.98/hr fully loaded ($11.50/hr base + enclave overhead).',
+      'Year 2 revenue ($1.45M) self-funds $1.06M total operating OpEx ($585K core Dhaka pod + delivery scaling) with $390K EBITDA.',
     ],
     speakerNotes:
       'Unlike Silicon Valley startups burning $200K/mo before product-market fit, our entire 20-person R&D hub runs for $45K/mo.',
@@ -1394,11 +1397,11 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     ],
     bullets: [
       'Y1 $672K ($82K EBITDA) → Y2 $1.45M ($390K EBITDA) → Y3 $2.65M ($780K EBITDA).',
-      'Y4 $4.10M ($1.128M EBITDA, 3.57× cumulative cash return) → Y5 $5.85M ($1.872M EBITDA).',
-      'Cumulative 5-Year Net Profit reaches $3.189M at 25% corporate tax = 6.38× net cash return on $500K SAFE.',
+      'Y4 $4.10M ($1.128M EBITDA, 3.57× capital efficiency) → Y5 $5.85M ($1.872M EBITDA as high-GM IP mix scales).',
+      'Cumulative 5-Year Net Profit reaches $3.189M (6.38× capital efficiency); at 10×–15× Y5 EBITDA ($18.7M–$28.1M EV), ~11.1% SAFE equity models 4.2×–6.2× investor ROI.',
     ],
     speakerNotes:
-      'Invite investors to inspect the interactive Financials tab to stress-test BDT/USD FX (115–130) and tax rates (20%–30%) live.',
+      'Invite investors to inspect the interactive Financials tab to stress-test BDT/USD FX (115–130), tax rates (20%–30%), and Exit EBITDA multiples (8×–15×) live.',
   },
   {
     num: 17,
@@ -1428,8 +1431,8 @@ export const PITCH_DECK_SLIDES: PitchSlide[] = [
     kpis: [
       { label: 'Instrument', value: '$500K SAFE', accent: 'crimson' },
       { label: 'Terms', value: '$4.5M Cap · 20% Disc.', accent: 'emerald' },
-      { label: '12-Mo Target', value: '$60K MRR', accent: 'teal' },
-      { label: '5-Yr Net Return', value: '6.38×', accent: 'amber' },
+      { label: 'Capital Efficiency', value: '6.38×', accent: 'teal' },
+      { label: 'SAFE Exit ROI (10×–15×)', value: '4.2×–6.2×', accent: 'amber' },
     ],
     bullets: [
       '45% R&D & Sovereign Core Productization: Packaging Healthcare ERP, ICR & Voice AI into zero-friction on-prem installers.',

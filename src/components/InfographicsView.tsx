@@ -63,7 +63,7 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     title: 'L1–L6 Sovereign Fusion Stack & 4-Tier On-Prem Server Matrix',
     subtitle:
       'End-to-end hardware-enforced sovereignty from Wasm/MQTT IIoT gateways and AMD SEV-SNP/TDX enclaves up through local LLaMA 3.2 Vision, UE5 Digital Twins, OPA 0.88 Gate, and Omni-Channel UI.',
-    highlights: ['Tier 1–4 ($3.2K–$15.3K)', 'Tier 3 Baseline $7.5K–$8.5K', '<50ms Edge Inference'],
+    highlights: ['Tier 1–4 ($3.2K–$15.3K)', 'Tier 3 Baseline $8.5K–$10.5K', '<50ms Edge Inference'],
     imageUrl: l1L6Plate,
     filename: 'spenta-plate-02-l1-l6-sovereign-stack.jpg',
     svgFilename: 'spenta-plate-02-spentadhaka-l1-l6-stack.svg',
@@ -88,8 +88,8 @@ const INFOGRAPHIC_PLATES: InfographicPlate[] = [
     tag: 'INVESTOR ECONOMICS',
     title: 'Reconciled FY2027–FY2031 Trajectory & Dual-Shore Cost Edge',
     subtitle:
-      'Conservative 0.5825× scaling from $672K FY27 to $5.85M FY31 delivering 6.38× 5-year net cash return on the $500K SAFE raise, anchored by $11.50/hr Dhaka R&D economics and 76.3% XR IP gross margins.',
-    highlights: ['$500K SAFE · $4.5M Cap', '6.38× 5-Yr Net Return', '40%–60% Cost Advantage'],
+      'Conservative 0.5825× scaling from $672K FY27 to $5.85M FY31 delivering 6.38× 5-year Capital Efficiency and 4.16×–6.24× modeled SAFE Exit ROI (10×–15× EV), anchored by $12.98/hr loaded ($11.50/hr base) Dhaka R&D economics.',
+    highlights: ['$500K SAFE · $4.5M Cap', '4.16×–6.24× Exit ROI', '6.38× Capital Eff.'],
     imageUrl: financialsPlate,
     filename: 'spenta-plate-04-financial-trajectory-dual-shore.jpg',
     svgFilename: 'spenta-plate-04-spentadhaka-financial-edge.svg',
@@ -213,7 +213,7 @@ export function InfographicsView() {
             : 'bg-[#FAF8F4] border-[#E4DFD6] text-[#16213A]'
         }`}
       >
-        <div>
+        <div className="min-w-0">
           <div
             className={`text-[11px] font-mono font-semibold ${
               isDark ? 'text-[#8FA6E8]' : 'text-[#1F3863]'
@@ -233,12 +233,12 @@ export function InfographicsView() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0 no-print">
+        <div className="flex flex-wrap items-center gap-2 no-print">
           {/* View Mode Filter */}
           <div
             role="group"
             aria-label="Infographics display mode"
-            className={`inline-flex items-center gap-1 p-1 rounded-lg border ${
+            className={`inline-flex flex-wrap items-center gap-1 p-1 rounded-lg border ${
               isDark ? 'bg-[#0B1020] border-[#232B4A]' : 'bg-[#F2EFE9] border-[#E4DFD6]'
             }`}
           >
