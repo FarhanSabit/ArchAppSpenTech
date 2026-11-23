@@ -8,6 +8,7 @@ import {
   ExternalLink,
   HardDrive,
   Layers,
+  RotateCcw,
   X,
 } from 'lucide-react';
 
@@ -46,6 +47,13 @@ export const INITIAL_TELEMETRY_SNAPSHOT: NeuralCoreTelemetrySnapshot = {
   rendererMode: 'hardware',
 };
 
+export interface TelemetryHistorySample {
+  fps: number;
+  frameMs: number;
+  drawCalls: number;
+  ts: number;
+}
+
 export interface TelemetrySystemSwitcherConfig {
   activeSystem: 'spiral' | 'nebula' | 'solar';
   onSelectSystem: (system: 'spiral' | 'nebula' | 'solar') => void;
@@ -61,6 +69,8 @@ interface NeuralCoreTelemetryOverlayProps {
   positionClassName?: string;
   compact?: boolean;
   systemSwitcher?: TelemetrySystemSwitcherConfig;
+  historySamples?: TelemetryHistorySample[];
+  onResetMetrics?: () => void;
 }
 
 const GRAVITY_WELL_TOAST_DWELL_MS = 3600;
@@ -80,6 +90,8 @@ export default function NeuralCoreTelemetryOverlay({
   positionClassName,
   compact = false,
   systemSwitcher,
+  historySamples,
+  onResetMetrics,
 }: NeuralCoreTelemetryOverlayProps) {
   const [expanded, setExpanded] = useState<boolean>(() => {
     if (compact) return false;
@@ -241,7 +253,13 @@ export default function NeuralCoreTelemetryOverlay({
       <div
         style={containerStyle}
         data-qa="telemetry-dashboard"
-        className={`transition-all ${expanded || (isSolar && visibleAlert) ? 'w-[258px]' : 'w-auto'} ${containerClass}`}
+        className={`transition-all ${
+          expanded || (isSolar && visibleAlert)
+            ? onResetMetrics
+              ? 'w-[268px]'
+              : 'w-[258px]'
+            : 'w-auto'
+        } ${containerClass}`}
       >
         <button
           type="button"
@@ -429,6 +447,116 @@ export default function NeuralCoreTelemetryOverlay({
                 />
               </div>
             </div>
+
+            {onResetMetrics && (
+              <div
+                style={subCardStyle}
+                className={`${subCardClass} space-y-1.5`}
+                data-qa="telemetry-history-buffer"
+              >
+                <div className="flex items-center justify-between gap-2 text-[9px] uppercase">
+                  <span className={mutedTextClass}>
+                    Capture Buffer ({historySamples?.length ?? 0}/24)
+                  </span>
+                  <span className={`tabular-nums font-semibold ${brightTextClass}`}>
+                    {historySamples && historySamples.length > 0
+                      ? `Avg ${Math.round(
+                          historySamples.reduce((sum, s) => sum + s.fps, 0) /
+                            historySamples.length,
+                        )} FPS`
+                      : 'Capturing…'}
+                  </span>
+                </div>
+
+                {/* Compact Rolling FPS History Sparkline Bars */}
+                <div
+                  aria-hidden="true"
+                  className={`h-5 w-full rounded-[4px] px-1 py-0.5 flex items-end gap-[2px] ${
+                    isSolar
+                      ? 'bg-[#081226]'
+                      : isNebula
+                        ? 'bg-[#160B2E]'
+                        : isLightMode
+                          ? 'bg-[#EFECE4]'
+                          : 'bg-[#0B1124]'
+                  }`}
+                >
+                  {Array.from({ length: 24 }).map((_, slotIdx) => {
+                    const offset = 24 - (historySamples?.length ?? 0);
+                    const sample =
+                      slotIdx >= offset && historySamples
+                        ? historySamples[slotIdx - offset]
+                        : null;
+                    const heightPct = sample
+                      ? Math.max(16, Math.min(100, Math.round((sample.fps / 65) * 100)))
+                      : 12;
+                    const barColor = !sample
+                      ? isSolar
+                        ? 'rgba(130, 174, 240, 0.16)'
+                        : isNebula
+                          ? 'rgba(167, 139, 250, 0.16)'
+                          : isLightMode
+                            ? 'rgba(31, 56, 99, 0.14)'
+                            : 'rgba(143, 166, 232, 0.14)'
+                      : sample.fps >= 48
+                        ? isSolar
+                          ? '#68E4EF'
+                          : isNebula
+                            ? 'var(--nebula-accent-teal)'
+                            : isLightMode
+                              ? '#1C6E46'
+                              : '#6FCB9F'
+                        : sample.fps >= 24
+                          ? isSolar
+                            ? 'var(--solar-accent-amber)'
+                            : '#FBBF24'
+                          : '#FB7185';
+                    return (
+                      <div
+                        key={slotIdx}
+                        style={{
+                          height: `${heightPct}%`,
+                          backgroundColor: barColor,
+                        }}
+                        className="flex-1 rounded-[1px] transition-all duration-150"
+                      />
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onResetMetrics}
+                  data-qa="telemetry-reset-metrics-btn"
+                  aria-label="Reset Metrics for active 3D simulation system"
+                  style={
+                    isSolar
+                      ? {
+                          borderColor: 'var(--solar-border-mid)',
+                          color: 'var(--solar-accent-amber-fg)',
+                        }
+                      : isNebula
+                        ? {
+                            borderColor: 'var(--nebula-border-subtle)',
+                            color: 'var(--nebula-accent-teal)',
+                          }
+                        : undefined
+                  }
+                  className={`w-full inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-[5px] border text-[9.5px] font-bold uppercase tracking-[0.04em] cursor-pointer transition-colors ${
+                    isSolar
+                      ? 'bg-[#081226]/70 hover:bg-[#0D1C3A]'
+                      : isNebula
+                        ? 'bg-[#160B2E]/70 hover:bg-[#231246]'
+                        : isLightMode
+                          ? 'bg-[#FAF8F4] border-[#D4CEC2] text-[#1F3863] hover:bg-[#EFECE4]'
+                          : 'bg-[#0B1124] border-[#233157] text-[#97C4FF] hover:bg-[#141F3D]'
+                  }`}
+                >
+                  <RotateCcw className="w-2.5 h-2.5 shrink-0" strokeWidth={2.2} />
+                  <span>Reset Metrics</span>
+                </button>
+              </div>
+            )}
 
             {systemSwitcher && (
               <div

@@ -118,12 +118,22 @@ export function SovereignBrain3D({
   const [transitionOrigin, setTransitionOrigin] = useState<
     'initial' | 'from-spiral' | 'from-solar'
   >('initial');
+  const prevCoreRef = React.useRef(activeNeuralSystem);
 
   useEffect(() => {
     if (initialCore) {
       setActiveNeuralSystem(initialCore);
     }
   }, [initialCore, setActiveNeuralSystem]);
+
+  useEffect(() => {
+    if (prevCoreRef.current !== activeNeuralSystem) {
+      setTransitionOrigin(
+        activeNeuralSystem === 'solar-map' ? 'from-spiral' : 'from-solar',
+      );
+      prevCoreRef.current = activeNeuralSystem;
+    }
+  }, [activeNeuralSystem]);
 
   const activeCore = activeNeuralSystem;
   const isLight = props.polarity === 'light';

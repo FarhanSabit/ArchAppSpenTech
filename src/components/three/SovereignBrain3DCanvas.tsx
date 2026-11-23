@@ -1261,6 +1261,13 @@ export default function SovereignBrain3DCanvas({
     appendOrbitalHistoryEntry,
     clearOrbitalHistory,
     publishNeuralTelemetry,
+    activeSimulationSystem,
+    sequenceMode,
+    setSequenceMode,
+    toggleSequenceMode,
+    sequenceCountdownSec,
+    selectSequencePhase,
+    advanceSequencePhase,
   } = useStack();
   const { recordNumericTransition, recordImmediateEvent, flushAll } = useOrbitalHistoryRecorder(
     appendOrbitalHistoryEntry,
@@ -1303,6 +1310,10 @@ export default function SovereignBrain3DCanvas({
   const cinematicTourRef = useRef<boolean>(false);
   const tourTlRef = useRef<gsap.core.Timeline | null>(null);
   const tourReducedTimerRef = useRef<number>(0);
+  const tourTopBarFillRef = useRef<HTMLDivElement | null>(null);
+  const tourStepBarFillRef = useRef<HTMLDivElement | null>(null);
+  const tourPercentTextRef = useRef<HTMLSpanElement | null>(null);
+  const tourProgressBarElRef = useRef<HTMLDivElement | null>(null);
   const hubTrackerRef = useRef<Array<{ hubId: string; hubGroup: THREE.Group }>>([]);
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
@@ -1357,8 +1368,28 @@ export default function SovereignBrain3DCanvas({
     hitlRef.current = hitlConfidence;
   }, [hitlConfidence]);
 
+  const prevExternalGalaxyPresetRef = useRef<GalaxyPresetId>(galaxyPreset);
+
   useEffect(() => {
     galaxyPresetRef.current = galaxyPreset;
+    if (prevExternalGalaxyPresetRef.current !== galaxyPreset) {
+      prevExternalGalaxyPresetRef.current = galaxyPreset;
+      const presetObj =
+        GALAXY_TYPE_PRESETS.find((p) => p.id === galaxyPreset) ?? GALAXY_TYPE_PRESETS[0];
+      if (galaxyPreset === 'procedural-nebula') {
+        nebulaClusterSeedRef.current += 1;
+        nebulaRebuildNonceRef.current += 1;
+        setNebulaRebuildNonce((n) => n + 1);
+      }
+      morphPulseRef.current = 1.0;
+      if (!cinematicTourRef.current) {
+        presetCommandRef.current = {
+          pos: presetObj.cameraPos,
+          target: presetObj.cameraTarget,
+          nonce: presetCommandRef.current.nonce + 1,
+        };
+      }
+    }
   }, [galaxyPreset]);
 
   useEffect(() => {
@@ -1529,6 +1560,27 @@ export default function SovereignBrain3DCanvas({
     outCam.y += stop.standOff * stop.elevFrac;
   };
 
+  const syncGalaxyTourProgressDom = (stepIndex: number, stepFrac: number) => {
+    const clampedStepFrac = Math.max(0, Math.min(1, stepFrac));
+    const overallPct = Math.max(
+      0,
+      Math.min(100, ((stepIndex + clampedStepFrac) / GALAXY_CINEMATIC_TOUR_STOPS.length) * 100),
+    );
+    const pctRounded = Math.round(overallPct);
+    if (tourTopBarFillRef.current) {
+      tourTopBarFillRef.current.style.width = `${overallPct.toFixed(2)}%`;
+    }
+    if (tourStepBarFillRef.current) {
+      tourStepBarFillRef.current.style.width = `${(clampedStepFrac * 100).toFixed(2)}%`;
+    }
+    if (tourPercentTextRef.current) {
+      tourPercentTextRef.current.textContent = `${pctRounded}%`;
+    }
+    if (tourProgressBarElRef.current) {
+      tourProgressBarElRef.current.setAttribute('aria-valuenow', String(pctRounded));
+    }
+  };
+
   const runGalaxyTourStep = (stepIndex: number) => {
     if (!cinematicTourRef.current || isSwitchingOutRef.current) return;
     const idx =
@@ -1540,6 +1592,7 @@ export default function SovereignBrain3DCanvas({
     if (!cam || !ctrl) return;
 
     setCinematicTourStepIndex(idx);
+    syncGalaxyTourProgressDom(idx, 0);
 
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
@@ -1549,6 +1602,7 @@ export default function SovereignBrain3DCanvas({
       cam.position.copy(_galaxyTourEndCam);
       ctrl.target.copy(_galaxyTourEndTarget);
       ctrl.update();
+      syncGalaxyTourProgressDom(idx, 1);
       tourReducedTimerRef.current = window.setTimeout(() => {
         runGalaxyTourStep(idx + 1);
       }, 2800);
@@ -1566,8 +1620,13 @@ export default function SovereignBrain3DCanvas({
     const holdProxy = { h: 0 };
 
     const tl = gsap.timeline({
+      onUpdate: () => {
+        if (!cinematicTourRef.current) return;
+        syncGalaxyTourProgressDom(idx, tl.progress());
+      },
       onComplete: () => {
         if (cinematicTourRef.current && !isSwitchingOutRef.current) {
+          syncGalaxyTourProgressDom(idx, 1);
           runGalaxyTourStep(idx + 1);
         }
       },
@@ -4486,6 +4545,58 @@ export default function SovereignBrain3DCanvas({
         compact={compact}
       />
 
+      {/* Top-of-Viewport Cinematic Tour Sequence Progress Indicator Bar */}
+      {cinematicTour && (
+        <div
+          ref={tourProgressBarElRef}
+          role="progressbar"
+          aria-label="Cinematic Tour sequence progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(
+            (cinematicTourStepIndex / GALAXY_CINEMATIC_TOUR_STOPS.length) * 100,
+          )}
+          data-qa="cinematic-tour-progress-bar"
+          className={`pointer-events-none absolute top-0 left-0 right-0 z-30 h-[5px] overflow-hidden ${
+            isLightMode ? 'bg-[#D4CEC2]/90' : 'bg-[#070B1A]/90'
+          }`}
+        >
+          <div
+            ref={tourTopBarFillRef}
+            style={{
+              width: `${((cinematicTourStepIndex / GALAXY_CINEMATIC_TOUR_STOPS.length) * 100).toFixed(2)}%`,
+              backgroundImage:
+                isNebulaTheme && !isLightMode
+                  ? 'linear-gradient(90deg, var(--nebula-accent-magenta), var(--nebula-accent-teal))'
+                  : isLightMode
+                    ? 'linear-gradient(90deg, #1F3863, #1C6E46)'
+                    : 'linear-gradient(90deg, #6FCB9F, #97C4FF)',
+              boxShadow:
+                isNebulaTheme && !isLightMode
+                  ? '0 0 10px rgba(45, 212, 191, 0.7)'
+                  : isLightMode
+                    ? 'none'
+                    : '0 0 10px rgba(111, 203, 159, 0.65)',
+            }}
+            className="h-full"
+          />
+          <div className="absolute inset-0 grid grid-cols-6 pointer-events-none">
+            {GALAXY_CINEMATIC_TOUR_STOPS.map((stop, stopIdx) => (
+              <div
+                key={stop.id}
+                className={
+                  stopIdx > 0
+                    ? isLightMode
+                      ? 'border-l border-[#FAF8F4]/90'
+                      : 'border-l border-[#040712]/85'
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Active Cinematic Tour Waypoint Readout (Galaxy / Nebula modes) */}
       {cinematicTour && (
         <div
@@ -4500,7 +4611,7 @@ export default function SovereignBrain3DCanvas({
                 }
               : undefined
           }
-          className={`pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-lg border px-3 py-1.5 font-mono text-[10px] shadow-md max-w-[340px] ${
+          className={`pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-lg border px-3 py-1.5 font-mono text-[10px] shadow-md w-[272px] sm:w-[330px] ${
             isNebulaTheme && !isLightMode
               ? ''
               : isLightMode
@@ -4508,14 +4619,65 @@ export default function SovereignBrain3DCanvas({
                 : 'bg-[#0B1124]/94 border-[#6FCB9F]/45 text-[#E7EBF5]'
           }`}
         >
-          <div className="flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.06em] opacity-85">
+          <div className="flex items-center justify-between gap-2 text-[9px] uppercase tracking-[0.06em] opacity-90">
             <span>
               Cinematic Tour · {cinematicTourStepIndex + 1}/{GALAXY_CINEMATIC_TOUR_STOPS.length}
             </span>
-            <span>Drag camera to exit</span>
+            <span className="inline-flex items-center gap-2">
+              <span ref={tourPercentTextRef} className="font-bold tabular-nums">
+                {Math.round((cinematicTourStepIndex / GALAXY_CINEMATIC_TOUR_STOPS.length) * 100)}%
+              </span>
+              <span className="opacity-75">· Drag to exit</span>
+            </span>
           </div>
           <div className="font-bold truncate mt-0.5">
             {GALAXY_CINEMATIC_TOUR_STOPS[cinematicTourStepIndex]?.title}
+          </div>
+          <div
+            className="grid grid-cols-6 gap-1 mt-1.5"
+            aria-hidden="true"
+            data-qa="galaxy-tour-segments"
+          >
+            {GALAXY_CINEMATIC_TOUR_STOPS.map((stop, stopIdx) => {
+              const isDone = stopIdx < cinematicTourStepIndex;
+              const isCurrent = stopIdx === cinematicTourStepIndex;
+              return (
+                <div
+                  key={stop.id}
+                  className={`h-[3px] rounded-full overflow-hidden ${
+                    isNebulaTheme && !isLightMode
+                      ? 'bg-[#160B2E]'
+                      : isLightMode
+                        ? 'bg-[#E4DFD6]'
+                        : 'bg-[#172347]'
+                  }`}
+                >
+                  {isDone ? (
+                    <div
+                      className={`h-full w-full ${
+                        isNebulaTheme && !isLightMode
+                          ? 'bg-[var(--nebula-accent-teal)]'
+                          : isLightMode
+                            ? 'bg-[#1F3863]'
+                            : 'bg-[#6FCB9F]'
+                      }`}
+                    />
+                  ) : isCurrent ? (
+                    <div
+                      ref={tourStepBarFillRef}
+                      style={{ width: '0%' }}
+                      className={`h-full ${
+                        isNebulaTheme && !isLightMode
+                          ? 'bg-[var(--nebula-accent-magenta)]'
+                          : isLightMode
+                            ? 'bg-[#1C6E46]'
+                            : 'bg-[#97C4FF]'
+                      }`}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -4672,10 +4834,17 @@ export default function SovereignBrain3DCanvas({
         cinematicTourStepIndex={cinematicTourStepIndex}
         cinematicTourTotalStops={GALAXY_CINEMATIC_TOUR_STOPS.length}
         onToggleCinematicTour={handleToggleCinematicTour}
+        sequenceMode={sequenceMode}
+        sequenceActivePhase={activeSimulationSystem}
+        sequenceCountdownSec={sequenceCountdownSec}
+        onToggleSequenceMode={toggleSequenceMode}
+        onSelectSequencePhase={selectSequencePhase}
+        onAdvanceSequencePhase={advanceSequencePhase}
         orbitalHistory={orbitalHistory}
         onClearOrbitalHistory={clearOrbitalHistory}
         onReset={() => {
           stopCinematicTour();
+          setSequenceMode(false);
           flushAll();
           const baseline = GALAXY_TYPE_PRESETS[0];
           if (Math.abs(spinSpeed - baseline.spinSpeed) >= 0.01) {

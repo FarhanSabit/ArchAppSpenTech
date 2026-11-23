@@ -13,8 +13,10 @@ import {
   Play,
   Radio,
   RefreshCw,
+  Repeat,
   RotateCcw,
   Shuffle,
+  SkipForward,
   Sliders,
   Sparkles,
   Sun,
@@ -185,6 +187,12 @@ export interface GalaxyControlPanelProps {
   cinematicTourStepIndex?: number;
   cinematicTourTotalStops?: number;
   onToggleCinematicTour?: () => void;
+  sequenceMode?: boolean;
+  sequenceActivePhase?: 'spiral' | 'solar' | 'nebula';
+  sequenceCountdownSec?: number;
+  onToggleSequenceMode?: () => void;
+  onSelectSequencePhase?: (phase: 'spiral' | 'solar' | 'nebula') => void;
+  onAdvanceSequencePhase?: () => void;
   onReset: () => void;
   orbitalHistory?: OrbitalHistoryEntry[];
   onClearOrbitalHistory?: () => void;
@@ -433,6 +441,12 @@ export function GalaxyControlPanel({
   cinematicTourStepIndex = 0,
   cinematicTourTotalStops = 6,
   onToggleCinematicTour,
+  sequenceMode = false,
+  sequenceActivePhase = 'spiral',
+  sequenceCountdownSec = 30,
+  onToggleSequenceMode,
+  onSelectSequencePhase,
+  onAdvanceSequencePhase,
   onReset,
   orbitalHistory = [],
   onClearOrbitalHistory,
@@ -1021,6 +1035,37 @@ export function GalaxyControlPanel({
                     : 'Cinematic Tour'}
                 </span>
               </button>
+
+              {onToggleSequenceMode && (
+                <button
+                  type="button"
+                  onClick={onToggleSequenceMode}
+                  aria-pressed={sequenceMode}
+                  data-qa="solar-toggle-sequence-mode"
+                  aria-label="Sequence Mode: automatically iterate every 30 seconds through Spiral Galaxy, Solar System, and Procedural Nebula presets"
+                  title="Auto-cycle every 30s: Spiral Galaxy → Solar System → Procedural Nebula"
+                  style={
+                    sequenceMode
+                      ? {
+                          backgroundColor: 'rgba(104, 228, 239, 0.16)',
+                          borderColor: '#68E4EF',
+                          color: '#F7FBFF',
+                          boxShadow: 'var(--solar-shadow-glow)',
+                        }
+                      : {
+                          backgroundColor: 'var(--solar-bg-chip)',
+                          borderColor: 'var(--solar-border-subtle)',
+                          color: 'var(--solar-fg-blue)',
+                        }
+                  }
+                  className="inline-flex items-center gap-1.5 px-[9px] h-[30px] rounded-[6px] border text-[10px] font-mono font-semibold cursor-pointer transition-colors hover:text-white whitespace-nowrap"
+                >
+                  <Repeat className="w-3 h-3 shrink-0" strokeWidth={1.85} />
+                  <span className="tabular-nums">
+                    {sequenceMode ? `Sequence · ${sequenceCountdownSec}s` : 'Sequence Mode'}
+                  </span>
+                </button>
+              )}
             </div>
 
             <button
@@ -1165,6 +1210,84 @@ export function GalaxyControlPanel({
               </span>
             </button>
           </div>
+
+          {/* Active Sequence Mode Cycle Bar (30s Spiral Galaxy -> Solar System -> Procedural Nebula) */}
+          {sequenceMode && (
+            <div
+              data-qa="neural-sequence-mode-bar"
+              style={{
+                borderColor: 'var(--solar-border-subtle)',
+                backgroundColor: 'rgba(4, 10, 22, 0.65)',
+              }}
+              className="px-3 py-1.5 border-t flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono"
+            >
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.06em] text-[#68E4EF] font-bold">
+                  <Repeat className="w-3 h-3 shrink-0" strokeWidth={2} />
+                  <span>Sequence 30s</span>
+                </span>
+                {(
+                  [
+                    { id: 'spiral', label: '1. Spiral Galaxy' },
+                    { id: 'solar', label: '2. Solar System' },
+                    { id: 'nebula', label: '3. Proc. Nebula' },
+                  ] as const
+                ).map((step) => {
+                  const active = sequenceActivePhase === step.id;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => onSelectSequencePhase?.(step.id)}
+                      aria-pressed={active}
+                      style={
+                        active
+                          ? {
+                              backgroundColor: 'var(--solar-accent-amber-bg)',
+                              borderColor: 'var(--solar-accent-amber)',
+                              color: 'var(--solar-accent-amber-fg)',
+                            }
+                          : {
+                              backgroundColor: 'var(--solar-bg-chip)',
+                              borderColor: 'var(--solar-border-subtle)',
+                              color: 'var(--solar-fg-blue)',
+                            }
+                      }
+                      className="px-2 py-0.5 rounded-[5px] border text-[9.5px] font-semibold cursor-pointer transition-colors hover:text-white whitespace-nowrap"
+                    >
+                      {step.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="w-20 h-[4px] rounded-full bg-[#081226] overflow-hidden">
+                  <div
+                    style={{
+                      width: `${Math.max(4, Math.min(100, Math.round(((30 - sequenceCountdownSec) / 30) * 100)))}%`,
+                      backgroundImage: 'linear-gradient(90deg, var(--solar-accent-amber), #68E4EF)',
+                    }}
+                    className="h-full transition-all duration-300"
+                  />
+                </div>
+                <span className="tabular-nums text-[9.5px] text-[var(--solar-fg-bright)]">
+                  Next in {sequenceCountdownSec}s
+                </span>
+                {onAdvanceSequencePhase && (
+                  <button
+                    type="button"
+                    onClick={onAdvanceSequencePhase}
+                    title="Advance immediately to next system preset in sequence"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] border border-[var(--solar-border-subtle)] bg-[var(--solar-bg-chip)] text-[var(--solar-fg-blue)] hover:text-white text-[9px] font-semibold cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <SkipForward className="w-2.5 h-2.5" strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Collapsible Orbital History Log (Inclination & Velocity State Transitions) */}
           <OrbitalHistorySection
@@ -1355,6 +1478,25 @@ export function GalaxyControlPanel({
               </button>
             )}
 
+            {onToggleSequenceMode && (
+              <button
+                type="button"
+                onClick={onToggleSequenceMode}
+                aria-pressed={sequenceMode}
+                data-qa="galaxy-toggle-sequence-mode"
+                aria-label="Sequence Mode: automatically iterate every 30 seconds through Spiral Galaxy, Solar System, and Procedural Nebula presets"
+                title="Auto-cycle every 30s: Spiral Galaxy → Solar System → Procedural Nebula"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors whitespace-nowrap ${
+                  sequenceMode ? btnActive : btnNeutral
+                }`}
+              >
+                <Repeat className="w-3 h-3 shrink-0" strokeWidth={1.85} />
+                <span className="tabular-nums">
+                  {sequenceMode ? `Sequence · ${sequenceCountdownSec}s` : 'Sequence Mode'}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onToggleAutoRotate}
@@ -1512,37 +1654,30 @@ export function GalaxyControlPanel({
         {galaxyPreset === 'procedural-nebula' && (
           <div
             data-qa="nebula-mode-sliders"
-            style={
-              !isLightMode
-                ? {
-                    backgroundColor: 'var(--nebula-bg-strip)',
-                    borderColor: 'var(--nebula-border-teal)',
-                  }
-                : undefined
-            }
-            className={`px-3 py-2 border-t space-y-2 text-[10px] font-mono ${
-              isLightMode ? 'bg-[#F0FDFA] border-[#99F6E4]' : ''
-            }`}
+            style={{
+              backgroundColor: isLightMode ? 'var(--nebula-bg-void)' : 'var(--nebula-bg-strip)',
+              borderColor: 'var(--nebula-border-teal)',
+              boxShadow: 'var(--nebula-shadow-strip)',
+              color: 'var(--nebula-fg-bright)',
+            }}
+            className="nebula-core-scope px-3 py-2 border-t space-y-2 text-[10px] font-mono"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-teal)]'
-                  }`}
+                  style={{ color: 'var(--nebula-accent-teal)' }}
+                  className="w-3.5 h-3.5 shrink-0"
                   strokeWidth={1.85}
                 />
                 <span
-                  className={`font-semibold truncate ${
-                    isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-bright)]'
-                  }`}
+                  style={{ color: 'var(--nebula-fg-bright)' }}
+                  className="font-semibold truncate"
                 >
                   Procedural Nebula Clusters
                 </span>
                 <span
-                  className={`hidden sm:inline tabular-nums ${
-                    isLightMode ? 'text-[#0F766E]/80' : 'text-[var(--nebula-fg-violet)]'
-                  }`}
+                  style={{ color: 'var(--nebula-fg-violet)' }}
+                  className="hidden sm:inline tabular-nums"
                 >
                   · {renderedNebulaK}k Perlin cluster nodes
                 </span>
@@ -1554,7 +1689,12 @@ export function GalaxyControlPanel({
                   onClick={onRegenerateNebulaClusters}
                   data-qa="nebula-reseed-clusters"
                   title="Procedurally regenerate nebula particle cluster topology using .nebula-core-scope CSS tokens"
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-mono font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${btnNeutral}`}
+                  style={{
+                    backgroundColor: 'var(--nebula-bg-chip)',
+                    borderColor: 'var(--nebula-border-subtle)',
+                    color: 'var(--nebula-fg-violet)',
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-mono font-semibold cursor-pointer transition-colors hover:text-white whitespace-nowrap shrink-0"
                 >
                   <Shuffle className="w-3 h-3 shrink-0" strokeWidth={1.85} />
                   <span>Reseed Clusters</span>
@@ -1568,16 +1708,14 @@ export function GalaxyControlPanel({
                 <div className="flex items-center justify-between gap-2">
                   <label
                     htmlFor="spenta-nebula-density"
-                    className={`whitespace-nowrap ${
-                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-teal)]'
-                    }`}
+                    style={{ color: 'var(--nebula-fg-teal)' }}
+                    className="whitespace-nowrap"
                   >
                     Nebula Density
                   </label>
                   <span
-                    className={`tabular-nums font-bold ${
-                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-fg-bright)]'
-                    }`}
+                    style={{ color: 'var(--nebula-fg-bright)' }}
+                    className="tabular-nums font-bold"
                   >
                     {Math.round(nebulaDensity * 100)}% ({renderedNebulaK}k)
                   </span>
@@ -1601,16 +1739,14 @@ export function GalaxyControlPanel({
                 <div className="flex items-center justify-between gap-2">
                   <label
                     htmlFor="spenta-nebula-turbulence"
-                    className={`whitespace-nowrap ${
-                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-violet)]'
-                    }`}
+                    style={{ color: 'var(--nebula-fg-violet)' }}
+                    className="whitespace-nowrap"
                   >
                     Particle Turbulence
                   </label>
                   <span
-                    className={`tabular-nums font-bold ${
-                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-magenta-fg)]'
-                    }`}
+                    style={{ color: 'var(--nebula-accent-magenta-fg)' }}
+                    className="tabular-nums font-bold"
                   >
                     {particleTurbulence <= 0.02
                       ? '0% (Calm)'
@@ -1845,6 +1981,103 @@ export function GalaxyControlPanel({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Active Sequence Mode Cycle Bar (30s Spiral Galaxy -> Solar System -> Procedural Nebula) */}
+        {sequenceMode && (
+          <div
+            data-qa="neural-sequence-mode-bar"
+            style={
+              isNebulaTheme && !isLightMode
+                ? {
+                    backgroundColor: 'var(--nebula-bg-strip)',
+                    borderColor: 'var(--nebula-border-subtle)',
+                  }
+                : undefined
+            }
+            className={`px-3 py-1.5 border-t flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono ${dividerClass} ${
+              !isNebulaTheme
+                ? isLightMode
+                  ? 'bg-[#EFECE4]/85'
+                  : 'bg-[#081226]/75'
+                : ''
+            }`}
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.06em] font-bold ${
+                  isLightMode
+                    ? 'text-[#1F3863]'
+                    : isNebulaTheme
+                      ? 'text-[var(--nebula-accent-teal)]'
+                      : 'text-[#6FCB9F]'
+                }`}
+              >
+                <Repeat className="w-3 h-3 shrink-0" strokeWidth={2} />
+                <span>Sequence 30s</span>
+              </span>
+              {(
+                [
+                  { id: 'spiral', label: '1. Spiral Galaxy' },
+                  { id: 'solar', label: '2. Solar System' },
+                  { id: 'nebula', label: '3. Proc. Nebula' },
+                ] as const
+              ).map((step) => {
+                const active = sequenceActivePhase === step.id;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => onSelectSequencePhase?.(step.id)}
+                    aria-pressed={active}
+                    className={`px-2 py-0.5 rounded-md border text-[9.5px] font-semibold cursor-pointer transition-colors whitespace-nowrap ${
+                      active ? btnActive : btnNeutral
+                    }`}
+                  >
+                    {step.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div
+                className={`w-20 h-[4px] rounded-full overflow-hidden ${
+                  isLightMode
+                    ? 'bg-[#D4CEC2]'
+                    : isNebulaTheme
+                      ? 'bg-[#160B2E]'
+                      : 'bg-[#172347]'
+                }`}
+              >
+                <div
+                  style={{
+                    width: `${Math.max(4, Math.min(100, Math.round(((30 - sequenceCountdownSec) / 30) * 100)))}%`,
+                    backgroundColor: isLightMode
+                      ? '#1F3863'
+                      : isNebulaTheme
+                        ? 'var(--nebula-accent-teal)'
+                        : '#6FCB9F',
+                  }}
+                  className="h-full transition-all duration-300"
+                />
+              </div>
+              <span className="tabular-nums text-[9.5px] opacity-90">
+                Next in {sequenceCountdownSec}s
+              </span>
+              {onAdvanceSequencePhase && (
+                <button
+                  type="button"
+                  onClick={onAdvanceSequencePhase}
+                  title="Advance immediately to next system preset in sequence"
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-semibold cursor-pointer ${btnNeutral}`}
+                >
+                  <span>Next</span>
+                  <SkipForward className="w-2.5 h-2.5" strokeWidth={2} />
+                </button>
+              )}
+            </div>
           </div>
         )}
 

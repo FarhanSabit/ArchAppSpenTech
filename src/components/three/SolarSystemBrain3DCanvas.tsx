@@ -1542,6 +1542,12 @@ export default function SolarSystemBrain3DCanvas({
     appendOrbitalHistoryEntry,
     clearOrbitalHistory,
     publishNeuralTelemetry,
+    sequenceMode,
+    setSequenceMode,
+    toggleSequenceMode,
+    sequenceCountdownSec,
+    selectSequencePhase,
+    advanceSequencePhase,
   } = useStack();
   const { recordNumericTransition, recordImmediateEvent, flushAll } = useOrbitalHistoryRecorder(
     appendOrbitalHistoryEntry,
@@ -1649,6 +1655,10 @@ export default function SolarSystemBrain3DCanvas({
   const cinematicTourRef = useRef<boolean>(false);
   const tourTlRef = useRef<gsap.core.Timeline | null>(null);
   const tourReducedTimerRef = useRef<number>(0);
+  const tourTopBarFillRef = useRef<HTMLDivElement | null>(null);
+  const tourStepBarFillRef = useRef<HTMLDivElement | null>(null);
+  const tourPercentTextRef = useRef<HTMLSpanElement | null>(null);
+  const tourProgressBarElRef = useRef<HTMLDivElement | null>(null);
   const onSelectHubRef = useRef(onSelectHub);
   const publishTelemetryRef = useRef(publishNeuralTelemetry);
   const configurationPresetRef = useRef(configurationPreset);
@@ -1935,6 +1945,27 @@ export default function SolarSystemBrain3DCanvas({
     outCam.y += standOff * stop.elevFrac;
   };
 
+  const syncTourProgressDom = (stepIndex: number, stepFrac: number) => {
+    const clampedStepFrac = Math.max(0, Math.min(1, stepFrac));
+    const overallPct = Math.max(
+      0,
+      Math.min(100, ((stepIndex + clampedStepFrac) / CINEMATIC_TOUR_STOPS.length) * 100),
+    );
+    const pctRounded = Math.round(overallPct);
+    if (tourTopBarFillRef.current) {
+      tourTopBarFillRef.current.style.width = `${overallPct.toFixed(2)}%`;
+    }
+    if (tourStepBarFillRef.current) {
+      tourStepBarFillRef.current.style.width = `${(clampedStepFrac * 100).toFixed(2)}%`;
+    }
+    if (tourPercentTextRef.current) {
+      tourPercentTextRef.current.textContent = `${pctRounded}%`;
+    }
+    if (tourProgressBarElRef.current) {
+      tourProgressBarElRef.current.setAttribute('aria-valuenow', String(pctRounded));
+    }
+  };
+
   const runTourStep = (stepIndex: number) => {
     if (!cinematicTourRef.current || isSwitchingOutRef.current) return;
     const idx =
@@ -1946,6 +1977,7 @@ export default function SolarSystemBrain3DCanvas({
     if (!cam || !ctrl) return;
 
     setCinematicTourStepIndex(idx);
+    syncTourProgressDom(idx, 0);
     setFocusedBodyId(stop.focusBodyId);
     focusedBodyRef.current = stop.focusBodyId;
     if (stop.focusBodyId !== 'sun') {
@@ -1961,6 +1993,7 @@ export default function SolarSystemBrain3DCanvas({
       cam.position.copy(_tourEndCam);
       ctrl.target.copy(_tourEndTarget);
       ctrl.update();
+      syncTourProgressDom(idx, 1);
       tourReducedTimerRef.current = window.setTimeout(() => {
         runTourStep(idx + 1);
       }, 2800);
@@ -1979,8 +2012,13 @@ export default function SolarSystemBrain3DCanvas({
     const holdProxy = { h: 0 };
 
     const tl = gsap.timeline({
+      onUpdate: () => {
+        if (!cinematicTourRef.current) return;
+        syncTourProgressDom(idx, tl.progress());
+      },
       onComplete: () => {
         if (cinematicTourRef.current && !isSwitchingOutRef.current) {
+          syncTourProgressDom(idx, 1);
           runTourStep(idx + 1);
         }
       },
@@ -2192,6 +2230,7 @@ export default function SolarSystemBrain3DCanvas({
       });
     }
     stopCinematicTour();
+    setSequenceMode(false);
     setViewMode('overview');
     setFocusedBodyId('sun');
     setInspectedPlanetId(null);
@@ -4493,6 +4532,39 @@ export default function SolarSystemBrain3DCanvas({
         }}
       />
 
+      {/* Top-of-Viewport Cinematic Tour Sequence Progress Indicator Bar */}
+      {cinematicTour && (
+        <div
+          ref={tourProgressBarElRef}
+          role="progressbar"
+          aria-label="Cinematic Tour sequence progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((cinematicTourStepIndex / CINEMATIC_TOUR_STOPS.length) * 100)}
+          data-qa="cinematic-tour-progress-bar"
+          className="pointer-events-none absolute top-0 left-0 right-0 z-30 h-[5px] bg-[#040A16]/90 overflow-hidden"
+        >
+          <div
+            ref={tourTopBarFillRef}
+            style={{
+              width: `${((cinematicTourStepIndex / CINEMATIC_TOUR_STOPS.length) * 100).toFixed(2)}%`,
+              backgroundImage:
+                'linear-gradient(90deg, var(--solar-accent-amber), #68E4EF)',
+              boxShadow: '0 0 10px rgba(255, 181, 99, 0.72)',
+            }}
+            className="h-full"
+          />
+          <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+            {CINEMATIC_TOUR_STOPS.map((stop, stopIdx) => (
+              <div
+                key={stop.id}
+                className={stopIdx > 0 ? 'border-l border-[#040814]/85' : undefined}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Top-Left Distance & Orbital Telemetry Card (design.md: .solar-map-distance-card) */}
       <div
         data-qa="solar-map-distance-card"
@@ -4512,15 +4584,24 @@ export default function SolarSystemBrain3DCanvas({
                 ? `HUB ${activeHubMeta.num} · ${activeHubMeta.label}`
                 : 'SPENTA SOLAR SYSTEM MODEL'}
           </span>
-          <span
-            className={
-              opaPass
-                ? 'text-[#68E4EF] font-bold shrink-0'
-                : 'text-[#FFB563] font-bold shrink-0'
-            }
-          >
-            OPA {hitlConfidence.toFixed(2)}
-          </span>
+          {cinematicTour ? (
+            <span
+              ref={tourPercentTextRef}
+              className="text-[#68E4EF] font-bold shrink-0 tabular-nums"
+            >
+              {Math.round((cinematicTourStepIndex / CINEMATIC_TOUR_STOPS.length) * 100)}%
+            </span>
+          ) : (
+            <span
+              className={
+                opaPass
+                  ? 'text-[#68E4EF] font-bold shrink-0'
+                  : 'text-[#FFB563] font-bold shrink-0'
+              }
+            >
+              OPA {hitlConfidence.toFixed(2)}
+            </span>
+          )}
         </div>
 
         <div className="font-mono text-[12px] font-semibold tabular-nums text-[var(--solar-fg-bright)] truncate">
@@ -4534,6 +4615,35 @@ export default function SolarSystemBrain3DCanvas({
                 }`
               : `0.00 AU · ${(stressTestActive ? liveStressVelocity : orbitalVelocity).toFixed(2)}× vel · ${timeScale.toFixed(1)}× time · ${Math.round(orbitalInclinationDeg)}° incl`}
         </div>
+
+        {cinematicTour && (
+          <div
+            className="grid grid-cols-7 gap-1 pt-0.5"
+            aria-hidden="true"
+            data-qa="solar-tour-segments"
+          >
+            {CINEMATIC_TOUR_STOPS.map((stop, stopIdx) => {
+              const isDone = stopIdx < cinematicTourStepIndex;
+              const isCurrent = stopIdx === cinematicTourStepIndex;
+              return (
+                <div
+                  key={stop.id}
+                  className="h-[3px] rounded-full bg-[#0B1733] overflow-hidden"
+                >
+                  {isDone ? (
+                    <div className="h-full w-full bg-[var(--solar-accent-amber)]" />
+                  ) : isCurrent ? (
+                    <div
+                      ref={tourStepBarFillRef}
+                      style={{ width: '0%' }}
+                      className="h-full bg-[#68E4EF]"
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <span className="solar-map-scale-note font-mono text-[10px] font-medium leading-[12px] text-[var(--solar-fg-soft)]">
           {cinematicTour
@@ -4830,6 +4940,12 @@ export default function SolarSystemBrain3DCanvas({
           onBloomIntensityChange: setBloomIntensity,
           compact,
         }}
+        sequenceMode={sequenceMode}
+        sequenceActivePhase="solar"
+        sequenceCountdownSec={sequenceCountdownSec}
+        onToggleSequenceMode={toggleSequenceMode}
+        onSelectSequencePhase={selectSequencePhase}
+        onAdvanceSequencePhase={advanceSequencePhase}
         orbitalHistory={orbitalHistory}
         onClearOrbitalHistory={clearOrbitalHistory}
       />

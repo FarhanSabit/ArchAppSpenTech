@@ -58,6 +58,9 @@ export type SolarConfigurationPresetId =
   | 'young-chaotic';
 export type SolarViewModeId = 'overview' | 'ecliptic' | 'inner-core';
 
+export const SEQUENCE_CYCLE_SECONDS = 30;
+export const SEQUENCE_MODE_ORDER: NeuralSimulationSystem[] = ['spiral', 'solar', 'nebula'];
+
 export interface NeuralSystemTelemetryReport {
   system: NeuralSimulationSystem;
   subtitle: string;
@@ -376,6 +379,12 @@ interface StackContextValue {
   toggleNeuralSystem: () => void;
   activeSimulationSystem: NeuralSimulationSystem;
   setActiveSimulationSystem: (system: NeuralSimulationSystem) => void;
+  sequenceMode: boolean;
+  setSequenceMode: (enabled: boolean) => void;
+  toggleSequenceMode: () => void;
+  sequenceCountdownSec: number;
+  selectSequencePhase: (phase: NeuralSimulationSystem) => void;
+  advanceSequencePhase: () => void;
   solarTimeScale: number;
   setSolarTimeScale: (scale: number) => void;
   galaxyRotationSpeed: number;
@@ -430,6 +439,7 @@ interface StackContextValue {
   publishNeuralTelemetry: (report: NeuralSystemTelemetryReport) => void;
   getLatestNeuralTelemetry: (system: NeuralSimulationSystem) => NeuralSystemTelemetryReport | null;
   subscribeNeuralTelemetry: (listener: () => void) => () => void;
+  resetNeuralTelemetry: (system?: NeuralSimulationSystem) => void;
 }
 
 const StackContext = createContext<StackContextValue | null>(null);
@@ -765,6 +775,11 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     Partial<Record<NeuralSimulationSystem, NeuralSystemTelemetryReport>>
   >({});
   const telemetryListenersRef = useRef<Set<() => void>>(new Set());
+  const [sequenceMode, setSequenceModeState] = useState<boolean>(false);
+  const [sequenceCountdownSec, setSequenceCountdownSec] = useState<number>(SEQUENCE_CYCLE_SECONDS);
+  const sequenceModeRef = useRef<boolean>(false);
+  sequenceModeRef.current = sequenceMode;
+  const sequenceCountdownRef = useRef<number>(SEQUENCE_CYCLE_SECONDS);
 
   const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
 
@@ -911,6 +926,31 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         ? 'nebula'
         : 'spiral';
 
+  const activeSimulationSystemRef = useRef<NeuralSimulationSystem>(activeSimulationSystem);
+  activeSimulationSystemRef.current = activeSimulationSystem;
+
+  const applySequencePhase = useCallback((phase: NeuralSimulationSystem) => {
+    setNeuralCoreState((prev) => {
+      if (phase === 'solar') {
+        return prev.activeSystem === 'solar-map' ? prev : { ...prev, activeSystem: 'solar-map' };
+      }
+      if (phase === 'nebula') {
+        return {
+          ...prev,
+          activeSystem: 'spiral-galaxy',
+          nebulaMode: true,
+          galaxyPreset: 'procedural-nebula',
+        };
+      }
+      return {
+        ...prev,
+        activeSystem: 'spiral-galaxy',
+        nebulaMode: false,
+        galaxyPreset: 'andromeda-spiral',
+      };
+    });
+  }, []);
+
   const setActiveSimulationSystem = useCallback((system: NeuralSimulationSystem) => {
     setNeuralCoreState((prev) => {
       if (system === 'solar') {
@@ -941,7 +981,76 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
             galaxyPreset: nextPreset,
           };
     });
+    if (sequenceModeRef.current) {
+      sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+      setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+    }
   }, []);
+
+  const setSequenceMode = useCallback(
+    (enabled: boolean) => {
+      sequenceModeRef.current = enabled;
+      sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+      setSequenceModeState(enabled);
+      setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+      if (enabled) {
+        applySequencePhase(activeSimulationSystemRef.current);
+      }
+    },
+    [applySequencePhase],
+  );
+
+  const toggleSequenceMode = useCallback(() => {
+    const next = !sequenceModeRef.current;
+    sequenceModeRef.current = next;
+    sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+    setSequenceModeState(next);
+    setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+    if (next) {
+      applySequencePhase(activeSimulationSystemRef.current);
+    }
+  }, [applySequencePhase]);
+
+  const selectSequencePhase = useCallback(
+    (phase: NeuralSimulationSystem) => {
+      sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+      setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+      applySequencePhase(phase);
+    },
+    [applySequencePhase],
+  );
+
+  const advanceSequencePhase = useCallback(() => {
+    const idx = SEQUENCE_MODE_ORDER.indexOf(activeSimulationSystemRef.current);
+    const nextPhase =
+      SEQUENCE_MODE_ORDER[(idx === -1 ? 0 : idx + 1) % SEQUENCE_MODE_ORDER.length];
+    sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+    setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+    applySequencePhase(nextPhase);
+  }, [applySequencePhase]);
+
+  useEffect(() => {
+    if (!sequenceMode) return;
+    sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+    setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+    const timer = window.setInterval(() => {
+      const nextSec = sequenceCountdownRef.current - 1;
+      if (nextSec <= 0) {
+        const idx = SEQUENCE_MODE_ORDER.indexOf(activeSimulationSystemRef.current);
+        const nextPhase =
+          SEQUENCE_MODE_ORDER[(idx === -1 ? 0 : idx + 1) % SEQUENCE_MODE_ORDER.length];
+        sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+        setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+        applySequencePhase(nextPhase);
+      } else {
+        sequenceCountdownRef.current = nextSec;
+        setSequenceCountdownSec(nextSec);
+      }
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [sequenceMode, applySequencePhase]);
 
   const publishNeuralTelemetry = useCallback((report: NeuralSystemTelemetryReport) => {
     latestTelemetryBySystemRef.current[report.system] = report;
@@ -960,6 +1069,15 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     return () => {
       telemetryListenersRef.current.delete(listener);
     };
+  }, []);
+
+  const resetNeuralTelemetry = useCallback((system?: NeuralSimulationSystem) => {
+    if (system) {
+      delete latestTelemetryBySystemRef.current[system];
+    } else {
+      latestTelemetryBySystemRef.current = {};
+    }
+    telemetryListenersRef.current.forEach((listener) => listener());
   }, []);
 
   const setActiveNeuralSystem = useCallback((system: NeuralCoreSystem) => {
@@ -988,9 +1106,16 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setNeuralGalaxyPreset = useCallback((preset: NeuralGalaxyPresetId) => {
-    setNeuralCoreState((prev) =>
-      prev.galaxyPreset === preset ? prev : { ...prev, galaxyPreset: preset },
-    );
+    setNeuralCoreState((prev) => {
+      const nextNebulaMode = preset === 'procedural-nebula';
+      return prev.galaxyPreset === preset && prev.nebulaMode === nextNebulaMode
+        ? prev
+        : { ...prev, galaxyPreset: preset, nebulaMode: nextNebulaMode };
+    });
+    if (sequenceModeRef.current) {
+      sequenceCountdownRef.current = SEQUENCE_CYCLE_SECONDS;
+      setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
+    }
   }, []);
 
   const setNeuralObservatoryFinish = useCallback((finish: NeuralObservatoryFinish) => {
@@ -1127,6 +1252,8 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resetNeuralCoreState = useCallback(() => {
+    setSequenceModeState(false);
+    setSequenceCountdownSec(SEQUENCE_CYCLE_SECONDS);
     setNeuralCoreState(DEFAULT_NEURAL_CORE_STATE);
   }, []);
 
@@ -1618,6 +1745,12 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         toggleNeuralSystem,
         activeSimulationSystem,
         setActiveSimulationSystem,
+        sequenceMode,
+        setSequenceMode,
+        toggleSequenceMode,
+        sequenceCountdownSec,
+        selectSequencePhase,
+        advanceSequencePhase,
         solarTimeScale: neuralCoreState.solarTimeScale,
         setSolarTimeScale,
         galaxyRotationSpeed: neuralCoreState.galaxyRotationSpeed,
@@ -1672,6 +1805,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         publishNeuralTelemetry,
         getLatestNeuralTelemetry,
         subscribeNeuralTelemetry,
+        resetNeuralTelemetry,
       }}
     >
       {children}

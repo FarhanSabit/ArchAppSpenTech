@@ -49,6 +49,7 @@ import {
 } from '../store/StackContext';
 import NeuralCoreTelemetryOverlay, {
   NeuralCoreTelemetrySnapshot,
+  TelemetryHistorySample,
 } from './three/NeuralCoreTelemetryOverlay';
 import { GALAXY_TYPE_PRESETS } from './three/GalaxyPresetSelector';
 
@@ -200,6 +201,7 @@ export function SpentaCoreView() {
     navigateToItem,
     getLatestNeuralTelemetry,
     subscribeNeuralTelemetry,
+    resetNeuralTelemetry,
   } = useStack();
 
   const [activeCoreTab, setActiveCoreTab] = useState<CoreTab>('architecture');
@@ -214,6 +216,14 @@ export function SpentaCoreView() {
   const isDark = theme === 'dark';
 
   const [telemetryNonce, setTelemetryNonce] = useState<number>(0);
+  const [captureSessionNonce, setCaptureSessionNonce] = useState<number>(0);
+  const [historyBySystem, setHistoryBySystem] = useState<
+    Record<NeuralSimulationSystem, TelemetryHistorySample[]>
+  >({
+    spiral: [],
+    nebula: [],
+    solar: [],
+  });
   const [livePerfMetrics, setLivePerfMetrics] = useState<{
     fps: number;
     frameMs: number;
@@ -230,6 +240,16 @@ export function SpentaCoreView() {
         ? 'software'
         : 'hardware',
   }));
+
+  const fallbackStatsRef = React.useRef(
+    buildFallbackSimulationStats(activeSimulationSystem, neuralCoreState),
+  );
+  useEffect(() => {
+    fallbackStatsRef.current = buildFallbackSimulationStats(
+      activeSimulationSystem,
+      neuralCoreState,
+    );
+  }, [activeSimulationSystem, neuralCoreState]);
 
   useEffect(() => {
     return subscribeNeuralTelemetry(() => {
@@ -274,6 +294,23 @@ export function SpentaCoreView() {
           jsHeapMb,
           jsHeapLimitMb,
         }));
+
+        const published = getLatestNeuralTelemetry(activeSimulationSystem);
+        const activeDrawCalls =
+          published?.metrics.drawCalls ?? fallbackStatsRef.current.drawCalls;
+
+        setHistoryBySystem((prev) => ({
+          ...prev,
+          [activeSimulationSystem]: [
+            ...prev[activeSimulationSystem].slice(-23),
+            {
+              fps: measuredFps,
+              frameMs: smoothedFrameMs,
+              drawCalls: activeDrawCalls,
+              ts: Date.now(),
+            },
+          ],
+        }));
       }
     };
 
@@ -281,7 +318,21 @@ export function SpentaCoreView() {
     return () => {
       window.cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [activeSimulationSystem, captureSessionNonce, getLatestNeuralTelemetry]);
+
+  const handleResetTelemetryMetrics = () => {
+    setHistoryBySystem((prev) => ({
+      ...prev,
+      [activeSimulationSystem]: [],
+    }));
+    resetNeuralTelemetry(activeSimulationSystem);
+    setLivePerfMetrics((prev) => ({
+      ...prev,
+      fps: 60,
+      frameMs: 16.7,
+    }));
+    setCaptureSessionNonce((prev) => prev + 1);
+  };
 
   const latestPublishedTelemetry = useMemo(
     () => getLatestNeuralTelemetry(activeSimulationSystem),
@@ -1389,6 +1440,8 @@ export function SpentaCoreView() {
           isLightMode={!isDark}
           metrics={floatingTelemetryMetrics}
           positionClassName="fixed bottom-4 left-4 z-40 no-print"
+          historySamples={historyBySystem[activeSimulationSystem]}
+          onResetMetrics={handleResetTelemetryMetrics}
           systemSwitcher={{
             activeSystem: activeSimulationSystem,
             onSelectSystem: setActiveSimulationSystem,
