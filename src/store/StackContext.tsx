@@ -35,7 +35,40 @@ const CORE_CONFIG_STORAGE_KEY = 'spenta_core_layer_configs_v1';
 const CORE_AUDIT_STORAGE_KEY = 'spenta_core_audit_log_v1';
 const DEPLOYMENT_TARGET_STORAGE_KEY = 'spenta_deployment_target_v1';
 const MOBILE_GRID_STORAGE_KEY = 'spenta_mobile_grid_v1';
+const NEURAL_CORE_STORAGE_KEY = 'spenta_neural_core_v1';
 const DEFAULT_SELECTED_IDS = ['icr_ops', 'genai_bi', 'mis_erp', 'cyber_sla'];
+
+export type NeuralCoreSystem = 'spiral-galaxy' | 'solar-map';
+export type NeuralGalaxyPresetId =
+  | 'andromeda-spiral'
+  | 'elliptical-dense'
+  | 'active-starburst'
+  | 'procedural-nebula';
+export type NeuralObservatoryFinish = 'cosmos' | 'nocturnal' | 'nebula' | 'stone';
+
+export interface NeuralCoreState {
+  activeSystem: NeuralCoreSystem;
+  solarTimeScale: number;
+  galaxyRotationSpeed: number;
+  galaxyPreset: NeuralGalaxyPresetId;
+  observatoryFinish: NeuralObservatoryFinish | null;
+  bloomIntensity: number;
+  nebulaMode: boolean;
+  nebulaDensity: number;
+  particleTurbulence: number;
+}
+
+export const DEFAULT_NEURAL_CORE_STATE: NeuralCoreState = {
+  activeSystem: 'spiral-galaxy',
+  solarTimeScale: 1.0,
+  galaxyRotationSpeed: 0.85,
+  galaxyPreset: 'andromeda-spiral',
+  observatoryFinish: null,
+  bloomIntensity: 1.0,
+  nebulaMode: false,
+  nebulaDensity: 1.0,
+  particleTurbulence: 0.75,
+};
 
 export type { PaletteMode, ThemeMode };
 export type CoreLayerId = 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6';
@@ -288,6 +321,28 @@ interface StackContextValue {
     },
   ) => void;
   linkPathwayNodeToBrain: (options: LinkPathwayNodeOptions) => PathwayBrainLinkTarget;
+  neuralCoreState: NeuralCoreState;
+  activeNeuralSystem: NeuralCoreSystem;
+  setActiveNeuralSystem: (system: NeuralCoreSystem) => void;
+  toggleNeuralSystem: () => void;
+  solarTimeScale: number;
+  setSolarTimeScale: (scale: number) => void;
+  galaxyRotationSpeed: number;
+  setGalaxyRotationSpeed: (speed: number) => void;
+  neuralGalaxyPreset: NeuralGalaxyPresetId;
+  setNeuralGalaxyPreset: (preset: NeuralGalaxyPresetId) => void;
+  neuralObservatoryFinish: NeuralObservatoryFinish | null;
+  setNeuralObservatoryFinish: (finish: NeuralObservatoryFinish) => void;
+  neuralBloomIntensity: number;
+  setNeuralBloomIntensity: (intensity: number) => void;
+  nebulaMode: boolean;
+  setNebulaMode: (enabled: boolean) => void;
+  toggleNebulaMode: () => void;
+  nebulaDensity: number;
+  setNebulaDensity: (density: number) => void;
+  particleTurbulence: number;
+  setParticleTurbulence: (turbulence: number) => void;
+  resetNeuralCoreState: () => void;
 }
 
 const StackContext = createContext<StackContextValue | null>(null);
@@ -365,6 +420,67 @@ function loadStoredMobileGridVisible(): boolean {
     return window.localStorage.getItem(MOBILE_GRID_STORAGE_KEY) === 'true';
   } catch {
     return false;
+  }
+}
+
+function clampSolarTimeScale(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.solarTimeScale;
+  return Math.round(Math.max(0.1, Math.min(5.0, val)) * 10) / 10;
+}
+
+function clampGalaxyRotationSpeed(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.galaxyRotationSpeed;
+  return Math.round(Math.max(0, Math.min(2.5, val)) * 100) / 100;
+}
+
+function clampBloomIntensity(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.bloomIntensity;
+  return Math.round(Math.max(0, Math.min(2.0, val)) * 100) / 100;
+}
+
+function clampNebulaDensity(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.nebulaDensity;
+  return Math.round(Math.max(0.2, Math.min(2.0, val)) * 100) / 100;
+}
+
+function clampParticleTurbulence(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.particleTurbulence;
+  return Math.round(Math.max(0, Math.min(2.0, val)) * 100) / 100;
+}
+
+function loadStoredNeuralCoreState(): NeuralCoreState {
+  try {
+    const raw = window.localStorage.getItem(NEURAL_CORE_STORAGE_KEY);
+    if (!raw) return DEFAULT_NEURAL_CORE_STATE;
+    const parsed = JSON.parse(raw) as Partial<NeuralCoreState>;
+    const activeSystem: NeuralCoreSystem =
+      parsed.activeSystem === 'solar-map' ? 'solar-map' : 'spiral-galaxy';
+    const galaxyPreset: NeuralGalaxyPresetId =
+      parsed.galaxyPreset === 'elliptical-dense' ||
+      parsed.galaxyPreset === 'active-starburst' ||
+      parsed.galaxyPreset === 'procedural-nebula'
+        ? parsed.galaxyPreset
+        : 'andromeda-spiral';
+    const observatoryFinish: NeuralObservatoryFinish | null =
+      parsed.observatoryFinish === 'cosmos' ||
+      parsed.observatoryFinish === 'nocturnal' ||
+      parsed.observatoryFinish === 'nebula' ||
+      parsed.observatoryFinish === 'stone'
+        ? parsed.observatoryFinish
+        : null;
+    return {
+      activeSystem,
+      solarTimeScale: clampSolarTimeScale(parsed.solarTimeScale ?? 1.0),
+      galaxyRotationSpeed: clampGalaxyRotationSpeed(parsed.galaxyRotationSpeed ?? 0.85),
+      galaxyPreset,
+      observatoryFinish,
+      bloomIntensity: clampBloomIntensity(parsed.bloomIntensity ?? 1.0),
+      nebulaMode: Boolean(parsed.nebulaMode),
+      nebulaDensity: clampNebulaDensity(parsed.nebulaDensity ?? 1.0),
+      particleTurbulence: clampParticleTurbulence(parsed.particleTurbulence ?? 0.75),
+    };
+  } catch {
+    return DEFAULT_NEURAL_CORE_STATE;
   }
 }
 
@@ -452,6 +568,9 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     new Date().toISOString(),
   );
   const [coreAuditLog, setCoreAuditLog] = useState<CoreAuditEntry[]>(() => loadStoredAuditLog());
+  const [neuralCoreState, setNeuralCoreState] = useState<NeuralCoreState>(() =>
+    loadStoredNeuralCoreState(),
+  );
 
   const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
 
@@ -560,6 +679,89 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setTimeout(() => setAutoNotice(null), 5500);
     return () => window.clearTimeout(timer);
   }, [autoNotice]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(NEURAL_CORE_STORAGE_KEY, JSON.stringify(neuralCoreState));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [neuralCoreState]);
+
+  const setActiveNeuralSystem = useCallback((system: NeuralCoreSystem) => {
+    setNeuralCoreState((prev) =>
+      prev.activeSystem === system ? prev : { ...prev, activeSystem: system },
+    );
+  }, []);
+
+  const toggleNeuralSystem = useCallback(() => {
+    setNeuralCoreState((prev) => ({
+      ...prev,
+      activeSystem: prev.activeSystem === 'spiral-galaxy' ? 'solar-map' : 'spiral-galaxy',
+    }));
+  }, []);
+
+  const setSolarTimeScale = useCallback((scale: number) => {
+    const next = clampSolarTimeScale(scale);
+    setNeuralCoreState((prev) => (prev.solarTimeScale === next ? prev : { ...prev, solarTimeScale: next }));
+  }, []);
+
+  const setGalaxyRotationSpeed = useCallback((speed: number) => {
+    const next = clampGalaxyRotationSpeed(speed);
+    setNeuralCoreState((prev) =>
+      prev.galaxyRotationSpeed === next ? prev : { ...prev, galaxyRotationSpeed: next },
+    );
+  }, []);
+
+  const setNeuralGalaxyPreset = useCallback((preset: NeuralGalaxyPresetId) => {
+    setNeuralCoreState((prev) =>
+      prev.galaxyPreset === preset ? prev : { ...prev, galaxyPreset: preset },
+    );
+  }, []);
+
+  const setNeuralObservatoryFinish = useCallback((finish: NeuralObservatoryFinish) => {
+    setNeuralCoreState((prev) =>
+      prev.observatoryFinish === finish ? prev : { ...prev, observatoryFinish: finish },
+    );
+  }, []);
+
+  const setNeuralBloomIntensity = useCallback((intensity: number) => {
+    const next = clampBloomIntensity(intensity);
+    setNeuralCoreState((prev) =>
+      prev.bloomIntensity === next ? prev : { ...prev, bloomIntensity: next },
+    );
+  }, []);
+
+  const setNebulaMode = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.nebulaMode === enabled ? prev : { ...prev, nebulaMode: enabled },
+    );
+  }, []);
+
+  const toggleNebulaMode = useCallback(() => {
+    setNeuralCoreState((prev) => ({
+      ...prev,
+      nebulaMode: !prev.nebulaMode,
+    }));
+  }, []);
+
+  const setNebulaDensity = useCallback((density: number) => {
+    const next = clampNebulaDensity(density);
+    setNeuralCoreState((prev) =>
+      prev.nebulaDensity === next ? prev : { ...prev, nebulaDensity: next },
+    );
+  }, []);
+
+  const setParticleTurbulence = useCallback((turbulence: number) => {
+    const next = clampParticleTurbulence(turbulence);
+    setNeuralCoreState((prev) =>
+      prev.particleTurbulence === next ? prev : { ...prev, particleTurbulence: next },
+    );
+  }, []);
+
+  const resetNeuralCoreState = useCallback(() => {
+    setNeuralCoreState(DEFAULT_NEURAL_CORE_STATE);
+  }, []);
 
   const toggleApp = (id: string) => {
     setSelectedIds((prev) => {
@@ -951,6 +1153,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     }));
     setSharedSnapshotSummary(null);
     clearShareUrlParams();
+    setNeuralCoreState(DEFAULT_NEURAL_CORE_STATE);
     setAutoNotice('Restored default Spenta Sovereign OS baseline configuration');
   };
 
@@ -1026,6 +1229,28 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         activeBrainSelection,
         selectBrainHub,
         linkPathwayNodeToBrain,
+        neuralCoreState,
+        activeNeuralSystem: neuralCoreState.activeSystem,
+        setActiveNeuralSystem,
+        toggleNeuralSystem,
+        solarTimeScale: neuralCoreState.solarTimeScale,
+        setSolarTimeScale,
+        galaxyRotationSpeed: neuralCoreState.galaxyRotationSpeed,
+        setGalaxyRotationSpeed,
+        neuralGalaxyPreset: neuralCoreState.galaxyPreset,
+        setNeuralGalaxyPreset,
+        neuralObservatoryFinish: neuralCoreState.observatoryFinish,
+        setNeuralObservatoryFinish,
+        neuralBloomIntensity: neuralCoreState.bloomIntensity,
+        setNeuralBloomIntensity,
+        nebulaMode: neuralCoreState.nebulaMode,
+        setNebulaMode,
+        toggleNebulaMode,
+        nebulaDensity: neuralCoreState.nebulaDensity,
+        setNebulaDensity,
+        particleTurbulence: neuralCoreState.particleTurbulence,
+        setParticleTurbulence,
+        resetNeuralCoreState,
       }}
     >
       {children}

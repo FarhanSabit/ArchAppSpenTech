@@ -1,10 +1,11 @@
 import React from 'react';
-import { Disc3, Flame, Orbit } from 'lucide-react';
+import { Disc3, Flame, Orbit, Sparkles } from 'lucide-react';
 
 export type GalaxyPresetId =
   | 'andromeda-spiral'
   | 'elliptical-dense'
-  | 'active-starburst';
+  | 'active-starburst'
+  | 'procedural-nebula';
 
 export interface GalaxyTypePreset {
   id: GalaxyPresetId;
@@ -76,6 +77,23 @@ export const GALAXY_TYPE_PRESETS: GalaxyTypePreset[] = [
     cameraPos: [-6.2, 3.1, 13.5],
     cameraTarget: [0, 0.1, 0],
   },
+  {
+    id: 'procedural-nebula',
+    label: 'Procedural Nebula',
+    shortLabel: 'Proc. Nebula',
+    classification: 'EN · Perlin Molecular Cloud',
+    description: '3D Perlin noise-synthesized molecular clouds, luminous filaments, and newborn OB star nurseries',
+    gravityProfile: 'Multi-pocket Jeans instability · Turbulent cloud potential',
+    orbitalMechanics: 'Sub-sonic vortex shear · Perlin-clustered OB associations',
+    escapeDynamics: 'Diffuse radiation-driven filaments · Volumetric halo',
+    massScale: '8.4×10⁸ M☉ cloud',
+    spinSpeed: 0.55,
+    starDensity: 1.0,
+    orbitalDecay: 0.05,
+    orbitalSpread: 0.74,
+    cameraPos: [3.6, 4.4, 13.4],
+    cameraTarget: [0, 0.05, 0],
+  },
 ];
 
 function PresetIcon({ id }: { id: GalaxyPresetId }) {
@@ -84,6 +102,9 @@ function PresetIcon({ id }: { id: GalaxyPresetId }) {
   }
   if (id === 'elliptical-dense') {
     return <Disc3 className="w-3 h-3 shrink-0" strokeWidth={1.85} />;
+  }
+  if (id === 'procedural-nebula') {
+    return <Sparkles className="w-3 h-3 shrink-0" strokeWidth={1.85} />;
   }
   return <Flame className="w-3 h-3 shrink-0" strokeWidth={1.85} />;
 }
@@ -108,7 +129,7 @@ export function GalaxyPresetSelector({
 
   return (
     <div
-      className="grid grid-cols-3 gap-1 w-full"
+      className="grid grid-cols-2 sm:grid-cols-4 gap-1 w-full"
       role="radiogroup"
       aria-label="Galaxy Type Preset Selector"
     >
@@ -121,6 +142,7 @@ export function GalaxyPresetSelector({
             role="radio"
             aria-checked={active}
             onClick={() => onSelectPreset(preset)}
+            data-qa={`galaxy-preset-${preset.id}`}
             title={`${preset.label} (${preset.classification}) — ${preset.description}`}
             className={`relative overflow-hidden inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-mono font-semibold cursor-pointer transition-colors whitespace-nowrap border ${
               active

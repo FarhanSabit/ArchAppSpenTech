@@ -1,5 +1,6 @@
-import React, { Component, Suspense, useState } from 'react';
+import React, { Component, Suspense, useEffect, useState } from 'react';
 import { BRAIN_HUBS } from '../../data/spentaManifest';
+import { useStack } from '../../store/StackContext';
 
 const LazySovereignBrain3DCanvas = React.lazy(() => import('./SovereignBrain3DCanvas'));
 const LazySolarSystemBrain3DCanvas = React.lazy(() => import('./SolarSystemBrain3DCanvas'));
@@ -110,25 +111,32 @@ class ThreeErrorBoundary extends Component<
 }
 
 export function SovereignBrain3D({
-  initialCore = 'spiral-galaxy',
+  initialCore,
   ...props
 }: SovereignBrain3DProps) {
-  const [activeCore, setActiveCore] = useState<NeuralCoreArchitecture>(initialCore);
+  const { activeNeuralSystem, setActiveNeuralSystem } = useStack();
   const [transitionOrigin, setTransitionOrigin] = useState<
     'initial' | 'from-spiral' | 'from-solar'
   >('initial');
+
+  useEffect(() => {
+    if (initialCore) {
+      setActiveNeuralSystem(initialCore);
+    }
+  }, [initialCore, setActiveNeuralSystem]);
+
+  const activeCore = activeNeuralSystem;
   const isLight = props.polarity === 'light';
   const isSolar = activeCore === 'solar-map';
 
   const handleToggleAlternativeSystem = () => {
-    setActiveCore((prev) => {
-      if (prev === 'spiral-galaxy') {
-        setTransitionOrigin('from-spiral');
-        return 'solar-map';
-      }
+    if (activeCore === 'spiral-galaxy') {
+      setTransitionOrigin('from-spiral');
+      setActiveNeuralSystem('solar-map');
+    } else {
       setTransitionOrigin('from-solar');
-      return 'spiral-galaxy';
-    });
+      setActiveNeuralSystem('spiral-galaxy');
+    }
   };
 
   return (

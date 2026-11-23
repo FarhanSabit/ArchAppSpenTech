@@ -23,6 +23,7 @@
   --spenta-positive: #1c6e46;
   --spenta-caution: #8a5c10;
   --spenta-danger: #bf000f;
+  --neural-bloom-intensity: 1;
 }
 
 .dark {
@@ -287,12 +288,14 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
 
 .brain-node-emissive-pulse {
   animation: spenta-brain-emissive-pulse 2.6s ease-in-out infinite;
-  will-change: box-shadow, filter;
+  opacity: clamp(0.15, calc(0.45 + 0.55 * var(--neural-bloom-intensity, 1)), 1);
+  will-change: box-shadow, filter, opacity;
 }
 
 .brain-node-emissive-pulse--selected {
   animation: spenta-brain-emissive-pulse-selected 2.1s ease-in-out infinite;
-  will-change: box-shadow, filter;
+  opacity: clamp(0.2, calc(0.5 + 0.5 * var(--neural-bloom-intensity, 1)), 1);
+  will-change: box-shadow, filter, opacity;
 }
 
 .brain-node-ring-pulse {
@@ -302,6 +305,7 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
 
 .brain-core-dot-pulse {
   animation: spenta-brain-core-dot-pulse 2.2s ease-in-out infinite;
+  opacity: clamp(0.18, calc(0.4 + 0.6 * var(--neural-bloom-intensity, 1)), 1);
   will-change: transform, opacity, box-shadow;
 }
 
@@ -314,6 +318,7 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
     var(--brain-emissive-glow, rgba(111, 203, 159, 0.85)) 100%
   );
   animation: spenta-brain-core-dot-pulse 2.2s ease-in-out infinite;
+  opacity: clamp(0.18, calc(0.4 + 0.6 * var(--neural-bloom-intensity, 1)), 1);
   will-change: transform, opacity, box-shadow;
 }
 
@@ -352,12 +357,87 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   --solar-radius-tab: 5px;
   --solar-radius-chip: 6px;
   --solar-radius-panel: 8px;
+  /* Unique Per-Planet Orbital Path Tokens for 3D Inclination Clarity */
+  --solar-orbit-1: #4ADEB5;
+  --solar-orbit-2: #FFB563;
+  --solar-orbit-3: #488EFF;
+  --solar-orbit-4: #FF6B81;
+  --solar-orbit-5: #A78BFA;
+  --solar-orbit-6: #FDE08D;
+  --solar-orbit-7: #68E4EF;
+  --solar-orbit-8: #F472B6;
+  --neural-bloom-intensity: 1;
 }
 
 .solar-map-scope button:focus-visible,
 .solar-map-scope select:focus-visible,
 .solar-map-scope input[type="range"]:focus-visible {
   outline: 2px solid var(--solar-accent-blue);
+  outline-offset: 2px;
+}
+
+/* Semantic Design Tokens — Alternate Core 3: Nebula Galaxy Particle Theme (Parity with .solar-map-scope) */
+.nebula-core-scope {
+  --nebula-bg-void: #070414;
+  --nebula-bg-deep: #04020B;
+  --nebula-bg-panel: rgba(14, 7, 32, 0.82);
+  --nebula-bg-strip: rgba(12, 6, 28, 0.72);
+  --nebula-bg-chip: rgba(18, 9, 39, 0.78);
+  --nebula-bg-select: rgba(24, 11, 51, 0.78);
+  --nebula-fg-primary: #FFFFFF;
+  --nebula-fg-bright: #F7F5FF;
+  --nebula-fg-warm: #FCE7F3;
+  --nebula-fg-muted: rgba(229, 222, 248, 0.68);
+  --nebula-fg-soft: rgba(235, 228, 255, 0.74);
+  --nebula-fg-violet: #C4B5FD;
+  --nebula-fg-violet-muted: #A78BFA;
+  --nebula-fg-teal: #5EEAD4;
+  --nebula-accent-violet: rgba(139, 92, 246, 0.96);
+  --nebula-accent-indigo: #4C1D95;
+  --nebula-accent-magenta: rgba(232, 121, 249, 0.84);
+  --nebula-accent-magenta-bg: rgba(217, 70, 239, 0.16);
+  --nebula-accent-magenta-fg: #F5D0FE;
+  --nebula-accent-teal: #2DD4BF;
+  --nebula-accent-teal-bg: rgba(45, 212, 191, 0.14);
+  --nebula-border-strong: rgba(192, 132, 252, 0.38);
+  --nebula-border-mid: rgba(167, 139, 250, 0.28);
+  --nebula-border-subtle: rgba(167, 139, 250, 0.21);
+  --nebula-border-teal: rgba(45, 212, 191, 0.28);
+  --nebula-shadow-glow: 0 0 18px 0 rgba(139, 92, 246, 0.14) inset, 0 0 22px 0 rgba(217, 70, 239, 0.16);
+  --nebula-shadow-strip: 0 0 28px 0 rgba(45, 212, 191, 0.14);
+  --nebula-shadow-card: 0 0 30px 0 rgba(4, 2, 11, 0.38);
+  --nebula-radius-tab: 5px;
+  --nebula-radius-chip: 6px;
+  --nebula-radius-panel: 8px;
+  /* Deep Violet, Magenta & Teal Gradients for Galaxy Particle Systems */
+  --nebula-gradient-void: radial-gradient(ellipse at 26% 24%, rgba(109, 40, 217, 0.34) 0%, rgba(217, 70, 239, 0.18) 38%, rgba(20, 184, 166, 0.16) 72%, #070414 100%);
+  --nebula-gradient-filament: linear-gradient(135deg, #4C1D95 0%, #D946EF 50%, #2DD4BF 100%);
+  --nebula-gradient-violet: radial-gradient(circle, rgba(109, 40, 217, 0.68) 0%, rgba(76, 29, 149, 0.24) 55%, rgba(7, 4, 20, 0) 100%);
+  --nebula-gradient-magenta: radial-gradient(circle, rgba(232, 121, 249, 0.62) 0%, rgba(190, 24, 93, 0.22) 55%, rgba(7, 4, 20, 0) 100%);
+  --nebula-gradient-teal: radial-gradient(circle, rgba(45, 212, 191, 0.58) 0%, rgba(15, 118, 110, 0.20) 55%, rgba(7, 4, 20, 0) 100%);
+  /* Galaxy Particle System Spectrum Tokens */
+  --nebula-particle-1: #2DD4BF;
+  --nebula-particle-2: #E879F9;
+  --nebula-particle-3: #8B5CF6;
+  --nebula-particle-4: #EC4899;
+  --nebula-particle-5: #4C1D95;
+  --nebula-particle-6: #14B8A6;
+  --nebula-particle-7: #F5D0FE;
+  --nebula-particle-8: #5EEAD4;
+  --neural-bloom-intensity: 1;
+}
+
+.nebula-core-scope .nebula-atmosphere-glow {
+  background-image: var(--nebula-gradient-void);
+  mix-blend-mode: screen;
+  opacity: clamp(0.12, calc(0.24 + var(--neural-bloom-intensity, 1) * 0.28), 0.92);
+  filter: brightness(calc(0.75 + var(--neural-bloom-intensity, 1) * 0.42));
+}
+
+.nebula-core-scope button:focus-visible,
+.nebula-core-scope select:focus-visible,
+.nebula-core-scope input[type="range"]:focus-visible {
+  outline: 2px solid var(--nebula-accent-teal);
   outline-offset: 2px;
 }
 
@@ -452,6 +532,24 @@ input[type="range"].spenta-slider::-moz-range-thumb {
   background: var(--solar-accent-amber-fg);
   border: 2px solid var(--solar-bg-void);
   box-shadow: 0 0 0 1px var(--solar-accent-amber), 0 0 10px rgba(255, 181, 99, 0.35);
+}
+
+/* Nebula Galaxy Theme (.nebula-core-scope) Tokenized Range Slider Overrides */
+.nebula-core-scope input[type="range"].spenta-slider {
+  background: var(--nebula-border-mid);
+  height: 5px;
+}
+
+.nebula-core-scope input[type="range"].spenta-slider::-webkit-slider-thumb {
+  background: var(--nebula-accent-teal);
+  border: 2px solid var(--nebula-bg-void);
+  box-shadow: 0 0 0 1px var(--nebula-accent-magenta), 0 0 12px rgba(232, 121, 249, 0.45);
+}
+
+.nebula-core-scope input[type="range"].spenta-slider::-moz-range-thumb {
+  background: var(--nebula-accent-teal);
+  border: 2px solid var(--nebula-bg-void);
+  box-shadow: 0 0 0 1px var(--nebula-accent-magenta), 0 0 12px rgba(232, 121, 249, 0.45);
 }
 
 /* Print-only Pitch Deck container is hidden on screen */

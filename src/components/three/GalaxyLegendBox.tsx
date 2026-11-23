@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Disc3, Flame, Orbit } from 'lucide-react';
+import { ChevronDown, ChevronUp, Disc3, Flame, Orbit, Sparkles } from 'lucide-react';
 import { GalaxyPresetId, GalaxyTypePreset } from './GalaxyPresetSelector';
 import { formatEpochMyr } from './GalaxyTimelineScrub';
 
@@ -13,9 +13,13 @@ function LegendGlyph({ id, isLightMode }: { id: GalaxyPresetId; isLightMode: boo
         ? isLightMode
           ? 'text-[#9A6700]'
           : 'text-[#F6C86E]'
-        : isLightMode
-          ? 'text-[#B42318]'
-          : 'text-[#F87171]';
+        : id === 'procedural-nebula'
+          ? isLightMode
+            ? 'text-[#0F766E]'
+            : 'text-[#2DD4BF]'
+          : isLightMode
+            ? 'text-[#B42318]'
+            : 'text-[#F87171]';
 
   if (id === 'andromeda-spiral') {
     return <Orbit className={`w-3.5 h-3.5 shrink-0 ${accentClass}`} strokeWidth={1.85} />;
@@ -23,12 +27,19 @@ function LegendGlyph({ id, isLightMode }: { id: GalaxyPresetId; isLightMode: boo
   if (id === 'elliptical-dense') {
     return <Disc3 className={`w-3.5 h-3.5 shrink-0 ${accentClass}`} strokeWidth={1.85} />;
   }
+  if (id === 'procedural-nebula') {
+    return <Sparkles className={`w-3.5 h-3.5 shrink-0 ${accentClass}`} strokeWidth={1.85} />;
+  }
   return <Flame className={`w-3.5 h-3.5 shrink-0 ${accentClass}`} strokeWidth={1.85} />;
 }
 
 export interface GalaxyLegendBoxProps {
   activePreset: GalaxyTypePreset;
   isLightMode: boolean;
+  isNebulaTheme?: boolean;
+  nebulaMode?: boolean;
+  nebulaDensity?: number;
+  particleTurbulence?: number;
   simEpoch: number;
   spinSpeed: number;
   orbitalDecay: number;
@@ -40,6 +51,10 @@ export interface GalaxyLegendBoxProps {
 export function GalaxyLegendBox({
   activePreset,
   isLightMode,
+  isNebulaTheme = false,
+  nebulaMode = false,
+  nebulaDensity = 1.0,
+  particleTurbulence = 0.75,
   simEpoch,
   spinSpeed,
   orbitalDecay,
@@ -67,12 +82,31 @@ export function GalaxyLegendBox({
       aria-label="Active Galaxy Type and Gravitational Characteristics"
     >
       <div
-        className={`rounded-lg border shadow-md transition-colors ${
-          isLightMode
-            ? 'bg-[#FAF8F4]/94 border-[#D4CEC2] text-[#16213A]'
-            : 'bg-[#0A1024]/92 border-[#25345C] text-[#E7EBF5]'
+        style={
+          isNebulaTheme && !isLightMode
+            ? {
+                backgroundColor: 'var(--nebula-bg-panel)',
+                borderColor: 'var(--nebula-border-mid)',
+                boxShadow: 'var(--nebula-shadow-glow)',
+                color: 'var(--nebula-fg-bright)',
+              }
+            : undefined
+        }
+        className={`rounded-lg border shadow-md transition-colors overflow-hidden ${
+          isNebulaTheme && !isLightMode
+            ? ''
+            : isLightMode
+              ? 'bg-[#FAF8F4]/94 border-[#D4CEC2] text-[#16213A]'
+              : 'bg-[#0A1024]/92 border-[#25345C] text-[#E7EBF5]'
         }`}
       >
+        {isNebulaTheme && !isLightMode && (
+          <div
+            aria-hidden="true"
+            style={{ backgroundImage: 'var(--nebula-gradient-filament)' }}
+            className="h-[2px] w-full"
+          />
+        )}
         {/* Header Bar: Active Galaxy Type + Classification + OPA + Collapse Toggle */}
         <button
           type="button"
@@ -142,7 +176,7 @@ export function GalaxyLegendBox({
 
             {/* Live Tabular Physics Readout */}
             <div
-              className={`pt-1.5 border-t flex items-center justify-between gap-2 text-[9px] tabular-nums ${dividerClass} ${mutedTextClass}`}
+              className={`pt-1.5 border-t flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[9px] tabular-nums ${dividerClass} ${mutedTextClass}`}
             >
               <span>{formatEpochMyr(simEpoch)}</span>
               <span>{spinSpeed.toFixed(2)}× spin</span>
@@ -150,6 +184,11 @@ export function GalaxyLegendBox({
                 {orbitalDecay === 0 ? '0% decay' : `${Math.round(orbitalDecay * 100)}% decay`}
               </span>
               <span>{Math.round(starDensity * 100)}% stars</span>
+              {nebulaMode && (
+                <span className={isLightMode ? 'text-[#0F766E] font-semibold' : 'text-[#5EEAD4] font-semibold'}>
+                  {Math.round(nebulaDensity * 100)}% nebula · {Math.round(particleTurbulence * 100)}% turb
+                </span>
+              )}
             </div>
           </div>
         )}
