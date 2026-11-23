@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BRAIN_HUBS,
+  NAV_TABS,
   NavTab,
   SERVER_TIERS,
   SPENTA_APPS,
@@ -28,6 +29,8 @@ import {
   PathwayBrainLinkTarget,
   resolveBrainHubForPathwayNode,
 } from '../utils/pathwayBrainLink';
+import type { OrbitalHistoryEntry } from '../components/three/useOrbitalHistoryRecorder';
+import type { NeuralCoreTelemetrySnapshot } from '../components/three/NeuralCoreTelemetryOverlay';
 
 const STACK_STORAGE_KEY = 'spenta_sovereign_stack_v1';
 const PROPOSALS_STORAGE_KEY = 'spenta_saved_proposals_v1';
@@ -36,15 +39,31 @@ const CORE_AUDIT_STORAGE_KEY = 'spenta_core_audit_log_v1';
 const DEPLOYMENT_TARGET_STORAGE_KEY = 'spenta_deployment_target_v1';
 const MOBILE_GRID_STORAGE_KEY = 'spenta_mobile_grid_v1';
 const NEURAL_CORE_STORAGE_KEY = 'spenta_neural_core_v1';
+const ORBITAL_HISTORY_STORAGE_KEY = 'spenta_orbital_history_v1';
+const ACTIVE_TAB_STORAGE_KEY = 'spenta_active_tab_v1';
 const DEFAULT_SELECTED_IDS = ['icr_ops', 'genai_bi', 'mis_erp', 'cyber_sla'];
 
 export type NeuralCoreSystem = 'spiral-galaxy' | 'solar-map';
+export type NeuralSimulationSystem = 'spiral' | 'solar' | 'nebula';
 export type NeuralGalaxyPresetId =
   | 'andromeda-spiral'
   | 'elliptical-dense'
   | 'active-starburst'
   | 'procedural-nebula';
 export type NeuralObservatoryFinish = 'cosmos' | 'nocturnal' | 'nebula' | 'stone';
+export type NeuralCameraPreset = 'overview' | 'operations' | 'experience' | 'ecliptic';
+export type SolarConfigurationPresetId =
+  | 'stable-circular'
+  | 'highly-eccentric'
+  | 'young-chaotic';
+export type SolarViewModeId = 'overview' | 'ecliptic' | 'inner-core';
+
+export interface NeuralSystemTelemetryReport {
+  system: NeuralSimulationSystem;
+  subtitle: string;
+  metrics: NeuralCoreTelemetrySnapshot;
+  updatedAtMs: number;
+}
 
 export interface NeuralCoreState {
   activeSystem: NeuralCoreSystem;
@@ -56,6 +75,21 @@ export interface NeuralCoreState {
   nebulaMode: boolean;
   nebulaDensity: number;
   particleTurbulence: number;
+  starDensity: number;
+  orbitalDecay: number;
+  orbitalSpread: number;
+  galaxyCameraPreset: NeuralCameraPreset;
+  galaxyAutoRotate: boolean;
+  solarOrbitalVelocity: number;
+  solarOrbitalInclinationDeg: number;
+  solarConfigurationPreset: SolarConfigurationPresetId;
+  solarViewMode: SolarViewModeId;
+  solarShowOrbits: boolean;
+  solarAutoRotate: boolean;
+  solarDayNightCycle: boolean;
+  solarShowConstellations: boolean;
+  solarShowResonance: boolean;
+  solarFollowPlanet: boolean;
 }
 
 export const DEFAULT_NEURAL_CORE_STATE: NeuralCoreState = {
@@ -68,6 +102,21 @@ export const DEFAULT_NEURAL_CORE_STATE: NeuralCoreState = {
   nebulaMode: false,
   nebulaDensity: 1.0,
   particleTurbulence: 0.75,
+  starDensity: 1.0,
+  orbitalDecay: 0.0,
+  orbitalSpread: 0.65,
+  galaxyCameraPreset: 'overview',
+  galaxyAutoRotate: false,
+  solarOrbitalVelocity: 1.0,
+  solarOrbitalInclinationDeg: 6,
+  solarConfigurationPreset: 'stable-circular',
+  solarViewMode: 'overview',
+  solarShowOrbits: true,
+  solarAutoRotate: false,
+  solarDayNightCycle: false,
+  solarShowConstellations: false,
+  solarShowResonance: false,
+  solarFollowPlanet: false,
 };
 
 export type { PaletteMode, ThemeMode };
@@ -325,6 +374,8 @@ interface StackContextValue {
   activeNeuralSystem: NeuralCoreSystem;
   setActiveNeuralSystem: (system: NeuralCoreSystem) => void;
   toggleNeuralSystem: () => void;
+  activeSimulationSystem: NeuralSimulationSystem;
+  setActiveSimulationSystem: (system: NeuralSimulationSystem) => void;
   solarTimeScale: number;
   setSolarTimeScale: (scale: number) => void;
   galaxyRotationSpeed: number;
@@ -342,7 +393,43 @@ interface StackContextValue {
   setNebulaDensity: (density: number) => void;
   particleTurbulence: number;
   setParticleTurbulence: (turbulence: number) => void;
+  starDensity: number;
+  setStarDensity: (density: number) => void;
+  orbitalDecay: number;
+  setOrbitalDecay: (decay: number) => void;
+  orbitalSpread: number;
+  setOrbitalSpread: (spread: number) => void;
+  galaxyCameraPreset: NeuralCameraPreset;
+  setGalaxyCameraPreset: (preset: NeuralCameraPreset) => void;
+  galaxyAutoRotate: boolean;
+  setGalaxyAutoRotate: (enabled: boolean) => void;
+  solarOrbitalVelocity: number;
+  setSolarOrbitalVelocity: (vel: number) => void;
+  solarOrbitalInclinationDeg: number;
+  setSolarOrbitalInclinationDeg: (deg: number) => void;
+  solarConfigurationPreset: SolarConfigurationPresetId;
+  setSolarConfigurationPreset: (preset: SolarConfigurationPresetId) => void;
+  solarViewMode: SolarViewModeId;
+  setSolarViewMode: (mode: SolarViewModeId) => void;
+  solarShowOrbits: boolean;
+  setSolarShowOrbits: (show: boolean) => void;
+  solarAutoRotate: boolean;
+  setSolarAutoRotate: (enabled: boolean) => void;
+  solarDayNightCycle: boolean;
+  setSolarDayNightCycle: (enabled: boolean) => void;
+  solarShowConstellations: boolean;
+  setSolarShowConstellations: (enabled: boolean) => void;
+  solarShowResonance: boolean;
+  setSolarShowResonance: (enabled: boolean) => void;
+  solarFollowPlanet: boolean;
+  setSolarFollowPlanet: (enabled: boolean) => void;
   resetNeuralCoreState: () => void;
+  orbitalHistory: OrbitalHistoryEntry[];
+  appendOrbitalHistoryEntry: (entry: Omit<OrbitalHistoryEntry, 'id' | 'timestamp'>) => void;
+  clearOrbitalHistory: () => void;
+  publishNeuralTelemetry: (report: NeuralSystemTelemetryReport) => void;
+  getLatestNeuralTelemetry: (system: NeuralSimulationSystem) => NeuralSystemTelemetryReport | null;
+  subscribeNeuralTelemetry: (listener: () => void) => () => void;
 }
 
 const StackContext = createContext<StackContextValue | null>(null);
@@ -448,6 +535,43 @@ function clampParticleTurbulence(val: number): number {
   return Math.round(Math.max(0, Math.min(2.0, val)) * 100) / 100;
 }
 
+function clampStarDensity(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.starDensity;
+  return Math.round(Math.max(0.2, Math.min(1.0, val)) * 100) / 100;
+}
+
+function clampOrbitalDecay(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.orbitalDecay;
+  return Math.round(Math.max(0, Math.min(1.0, val)) * 100) / 100;
+}
+
+function clampOrbitalSpread(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.orbitalSpread;
+  return Math.round(Math.max(0.25, Math.min(1.5, val)) * 100) / 100;
+}
+
+function clampSolarOrbitalVelocity(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.solarOrbitalVelocity;
+  return Math.round(Math.max(0, Math.min(4.0, val)) * 100) / 100;
+}
+
+function clampSolarOrbitalInclinationDeg(val: number): number {
+  if (!Number.isFinite(val)) return DEFAULT_NEURAL_CORE_STATE.solarOrbitalInclinationDeg;
+  return Math.round(Math.max(0, Math.min(45, val)));
+}
+
+function loadStoredActiveTab(): NavTab {
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    if (raw && (NAV_TABS as string[]).includes(raw)) {
+      return raw as NavTab;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'App Vault';
+}
+
 function loadStoredNeuralCoreState(): NeuralCoreState {
   try {
     const raw = window.localStorage.getItem(NEURAL_CORE_STORAGE_KEY);
@@ -468,19 +592,82 @@ function loadStoredNeuralCoreState(): NeuralCoreState {
       parsed.observatoryFinish === 'stone'
         ? parsed.observatoryFinish
         : null;
+    const galaxyCameraPreset: NeuralCameraPreset =
+      parsed.galaxyCameraPreset === 'operations' ||
+      parsed.galaxyCameraPreset === 'experience' ||
+      parsed.galaxyCameraPreset === 'ecliptic'
+        ? parsed.galaxyCameraPreset
+        : 'overview';
+    const solarConfigurationPreset: SolarConfigurationPresetId =
+      parsed.solarConfigurationPreset === 'highly-eccentric' ||
+      parsed.solarConfigurationPreset === 'young-chaotic'
+        ? parsed.solarConfigurationPreset
+        : 'stable-circular';
+    const solarViewMode: SolarViewModeId =
+      parsed.solarViewMode === 'ecliptic' || parsed.solarViewMode === 'inner-core'
+        ? parsed.solarViewMode
+        : 'overview';
     return {
       activeSystem,
-      solarTimeScale: clampSolarTimeScale(parsed.solarTimeScale ?? 1.0),
-      galaxyRotationSpeed: clampGalaxyRotationSpeed(parsed.galaxyRotationSpeed ?? 0.85),
+      solarTimeScale: clampSolarTimeScale(parsed.solarTimeScale ?? DEFAULT_NEURAL_CORE_STATE.solarTimeScale),
+      galaxyRotationSpeed: clampGalaxyRotationSpeed(
+        parsed.galaxyRotationSpeed ?? DEFAULT_NEURAL_CORE_STATE.galaxyRotationSpeed,
+      ),
       galaxyPreset,
       observatoryFinish,
-      bloomIntensity: clampBloomIntensity(parsed.bloomIntensity ?? 1.0),
+      bloomIntensity: clampBloomIntensity(parsed.bloomIntensity ?? DEFAULT_NEURAL_CORE_STATE.bloomIntensity),
       nebulaMode: Boolean(parsed.nebulaMode),
-      nebulaDensity: clampNebulaDensity(parsed.nebulaDensity ?? 1.0),
-      particleTurbulence: clampParticleTurbulence(parsed.particleTurbulence ?? 0.75),
+      nebulaDensity: clampNebulaDensity(parsed.nebulaDensity ?? DEFAULT_NEURAL_CORE_STATE.nebulaDensity),
+      particleTurbulence: clampParticleTurbulence(
+        parsed.particleTurbulence ?? DEFAULT_NEURAL_CORE_STATE.particleTurbulence,
+      ),
+      starDensity: clampStarDensity(parsed.starDensity ?? DEFAULT_NEURAL_CORE_STATE.starDensity),
+      orbitalDecay: clampOrbitalDecay(parsed.orbitalDecay ?? DEFAULT_NEURAL_CORE_STATE.orbitalDecay),
+      orbitalSpread: clampOrbitalSpread(parsed.orbitalSpread ?? DEFAULT_NEURAL_CORE_STATE.orbitalSpread),
+      galaxyCameraPreset,
+      galaxyAutoRotate: Boolean(parsed.galaxyAutoRotate),
+      solarOrbitalVelocity: clampSolarOrbitalVelocity(
+        parsed.solarOrbitalVelocity ?? DEFAULT_NEURAL_CORE_STATE.solarOrbitalVelocity,
+      ),
+      solarOrbitalInclinationDeg: clampSolarOrbitalInclinationDeg(
+        parsed.solarOrbitalInclinationDeg ?? DEFAULT_NEURAL_CORE_STATE.solarOrbitalInclinationDeg,
+      ),
+      solarConfigurationPreset,
+      solarViewMode,
+      solarShowOrbits:
+        typeof parsed.solarShowOrbits === 'boolean'
+          ? parsed.solarShowOrbits
+          : DEFAULT_NEURAL_CORE_STATE.solarShowOrbits,
+      solarAutoRotate: Boolean(parsed.solarAutoRotate),
+      solarDayNightCycle: Boolean(parsed.solarDayNightCycle),
+      solarShowConstellations: Boolean(parsed.solarShowConstellations),
+      solarShowResonance: Boolean(parsed.solarShowResonance),
+      solarFollowPlanet: Boolean(parsed.solarFollowPlanet),
     };
   } catch {
     return DEFAULT_NEURAL_CORE_STATE;
+  }
+}
+
+function loadStoredOrbitalHistory(): OrbitalHistoryEntry[] {
+  try {
+    const raw = window.localStorage.getItem(ORBITAL_HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is OrbitalHistoryEntry =>
+          Boolean(item) &&
+          typeof item.id === 'string' &&
+          typeof item.timestamp === 'number' &&
+          typeof item.label === 'string' &&
+          typeof item.previousValue === 'string' &&
+          typeof item.newValue === 'string',
+      )
+      .slice(0, 24);
+  } catch {
+    return [];
   }
 }
 
@@ -506,7 +693,7 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   );
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<NavTab>(
-    () => initialShareSnapshot?.activeTab ?? 'App Vault',
+    () => initialShareSnapshot?.activeTab ?? loadStoredActiveTab(),
   );
   const [pendingNavFocus, setPendingNavFocus] = useState<PendingNavFocus | null>(() => {
     if (initialShareSnapshot?.hubId) {
@@ -571,6 +758,13 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
   const [neuralCoreState, setNeuralCoreState] = useState<NeuralCoreState>(() =>
     loadStoredNeuralCoreState(),
   );
+  const [orbitalHistory, setOrbitalHistory] = useState<OrbitalHistoryEntry[]>(() =>
+    loadStoredOrbitalHistory(),
+  );
+  const latestTelemetryBySystemRef = useRef<
+    Partial<Record<NeuralSimulationSystem, NeuralSystemTelemetryReport>>
+  >({});
+  const telemetryListenersRef = useRef<Set<() => void>>(new Set());
 
   const deploymentProfile = DEPLOYMENT_PROFILES[deploymentTarget];
 
@@ -682,11 +876,91 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    try {
       window.localStorage.setItem(NEURAL_CORE_STORAGE_KEY, JSON.stringify(neuralCoreState));
     } catch {
       // ignore storage quota errors
     }
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty(
+        '--neural-bloom-intensity',
+        neuralCoreState.bloomIntensity.toFixed(2),
+      );
+    }
   }, [neuralCoreState]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ORBITAL_HISTORY_STORAGE_KEY, JSON.stringify(orbitalHistory));
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [orbitalHistory]);
+
+  const activeSimulationSystem: NeuralSimulationSystem =
+    neuralCoreState.activeSystem === 'solar-map'
+      ? 'solar'
+      : neuralCoreState.nebulaMode || neuralCoreState.galaxyPreset === 'procedural-nebula'
+        ? 'nebula'
+        : 'spiral';
+
+  const setActiveSimulationSystem = useCallback((system: NeuralSimulationSystem) => {
+    setNeuralCoreState((prev) => {
+      if (system === 'solar') {
+        return prev.activeSystem === 'solar-map' ? prev : { ...prev, activeSystem: 'solar-map' };
+      }
+      if (system === 'nebula') {
+        return prev.activeSystem === 'spiral-galaxy' &&
+          prev.nebulaMode &&
+          prev.galaxyPreset === 'procedural-nebula'
+          ? prev
+          : {
+              ...prev,
+              activeSystem: 'spiral-galaxy',
+              nebulaMode: true,
+              galaxyPreset: 'procedural-nebula',
+            };
+      }
+      const nextPreset =
+        prev.galaxyPreset === 'procedural-nebula' ? 'andromeda-spiral' : prev.galaxyPreset;
+      return prev.activeSystem === 'spiral-galaxy' &&
+        !prev.nebulaMode &&
+        prev.galaxyPreset === nextPreset
+        ? prev
+        : {
+            ...prev,
+            activeSystem: 'spiral-galaxy',
+            nebulaMode: false,
+            galaxyPreset: nextPreset,
+          };
+    });
+  }, []);
+
+  const publishNeuralTelemetry = useCallback((report: NeuralSystemTelemetryReport) => {
+    latestTelemetryBySystemRef.current[report.system] = report;
+    telemetryListenersRef.current.forEach((listener) => listener());
+  }, []);
+
+  const getLatestNeuralTelemetry = useCallback(
+    (system: NeuralSimulationSystem): NeuralSystemTelemetryReport | null => {
+      return latestTelemetryBySystemRef.current[system] ?? null;
+    },
+    [],
+  );
+
+  const subscribeNeuralTelemetry = useCallback((listener: () => void) => {
+    telemetryListenersRef.current.add(listener);
+    return () => {
+      telemetryListenersRef.current.delete(listener);
+    };
+  }, []);
 
   const setActiveNeuralSystem = useCallback((system: NeuralCoreSystem) => {
     setNeuralCoreState((prev) =>
@@ -759,8 +1033,117 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const setStarDensity = useCallback((density: number) => {
+    const next = clampStarDensity(density);
+    setNeuralCoreState((prev) => (prev.starDensity === next ? prev : { ...prev, starDensity: next }));
+  }, []);
+
+  const setOrbitalDecay = useCallback((decay: number) => {
+    const next = clampOrbitalDecay(decay);
+    setNeuralCoreState((prev) => (prev.orbitalDecay === next ? prev : { ...prev, orbitalDecay: next }));
+  }, []);
+
+  const setOrbitalSpread = useCallback((spread: number) => {
+    const next = clampOrbitalSpread(spread);
+    setNeuralCoreState((prev) => (prev.orbitalSpread === next ? prev : { ...prev, orbitalSpread: next }));
+  }, []);
+
+  const setGalaxyCameraPreset = useCallback((preset: NeuralCameraPreset) => {
+    setNeuralCoreState((prev) =>
+      prev.galaxyCameraPreset === preset ? prev : { ...prev, galaxyCameraPreset: preset },
+    );
+  }, []);
+
+  const setGalaxyAutoRotate = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.galaxyAutoRotate === enabled ? prev : { ...prev, galaxyAutoRotate: enabled },
+    );
+  }, []);
+
+  const setSolarOrbitalVelocity = useCallback((vel: number) => {
+    const next = clampSolarOrbitalVelocity(vel);
+    setNeuralCoreState((prev) =>
+      prev.solarOrbitalVelocity === next ? prev : { ...prev, solarOrbitalVelocity: next },
+    );
+  }, []);
+
+  const setSolarOrbitalInclinationDeg = useCallback((deg: number) => {
+    const next = clampSolarOrbitalInclinationDeg(deg);
+    setNeuralCoreState((prev) =>
+      prev.solarOrbitalInclinationDeg === next ? prev : { ...prev, solarOrbitalInclinationDeg: next },
+    );
+  }, []);
+
+  const setSolarConfigurationPreset = useCallback((preset: SolarConfigurationPresetId) => {
+    setNeuralCoreState((prev) =>
+      prev.solarConfigurationPreset === preset
+        ? prev
+        : { ...prev, solarConfigurationPreset: preset },
+    );
+  }, []);
+
+  const setSolarViewMode = useCallback((mode: SolarViewModeId) => {
+    setNeuralCoreState((prev) =>
+      prev.solarViewMode === mode ? prev : { ...prev, solarViewMode: mode },
+    );
+  }, []);
+
+  const setSolarShowOrbits = useCallback((show: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarShowOrbits === show ? prev : { ...prev, solarShowOrbits: show },
+    );
+  }, []);
+
+  const setSolarAutoRotate = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarAutoRotate === enabled ? prev : { ...prev, solarAutoRotate: enabled },
+    );
+  }, []);
+
+  const setSolarDayNightCycle = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarDayNightCycle === enabled ? prev : { ...prev, solarDayNightCycle: enabled },
+    );
+  }, []);
+
+  const setSolarShowConstellations = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarShowConstellations === enabled
+        ? prev
+        : { ...prev, solarShowConstellations: enabled },
+    );
+  }, []);
+
+  const setSolarShowResonance = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarShowResonance === enabled ? prev : { ...prev, solarShowResonance: enabled },
+    );
+  }, []);
+
+  const setSolarFollowPlanet = useCallback((enabled: boolean) => {
+    setNeuralCoreState((prev) =>
+      prev.solarFollowPlanet === enabled ? prev : { ...prev, solarFollowPlanet: enabled },
+    );
+  }, []);
+
   const resetNeuralCoreState = useCallback(() => {
     setNeuralCoreState(DEFAULT_NEURAL_CORE_STATE);
+  }, []);
+
+  const appendOrbitalHistoryEntry = useCallback(
+    (entry: Omit<OrbitalHistoryEntry, 'id' | 'timestamp'>) => {
+      const nextItem: OrbitalHistoryEntry = {
+        ...entry,
+        id: `orb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        timestamp: Date.now(),
+      };
+      setOrbitalHistory((prev) => [nextItem, ...prev].slice(0, 24));
+    },
+    [],
+  );
+
+  const clearOrbitalHistory = useCallback(() => {
+    setOrbitalHistory([]);
   }, []);
 
   const toggleApp = (id: string) => {
@@ -1233,6 +1616,8 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         activeNeuralSystem: neuralCoreState.activeSystem,
         setActiveNeuralSystem,
         toggleNeuralSystem,
+        activeSimulationSystem,
+        setActiveSimulationSystem,
         solarTimeScale: neuralCoreState.solarTimeScale,
         setSolarTimeScale,
         galaxyRotationSpeed: neuralCoreState.galaxyRotationSpeed,
@@ -1250,7 +1635,43 @@ export function StackProvider({ children }: { children: React.ReactNode }) {
         setNebulaDensity,
         particleTurbulence: neuralCoreState.particleTurbulence,
         setParticleTurbulence,
+        starDensity: neuralCoreState.starDensity,
+        setStarDensity,
+        orbitalDecay: neuralCoreState.orbitalDecay,
+        setOrbitalDecay,
+        orbitalSpread: neuralCoreState.orbitalSpread,
+        setOrbitalSpread,
+        galaxyCameraPreset: neuralCoreState.galaxyCameraPreset,
+        setGalaxyCameraPreset,
+        galaxyAutoRotate: neuralCoreState.galaxyAutoRotate,
+        setGalaxyAutoRotate,
+        solarOrbitalVelocity: neuralCoreState.solarOrbitalVelocity,
+        setSolarOrbitalVelocity,
+        solarOrbitalInclinationDeg: neuralCoreState.solarOrbitalInclinationDeg,
+        setSolarOrbitalInclinationDeg,
+        solarConfigurationPreset: neuralCoreState.solarConfigurationPreset,
+        setSolarConfigurationPreset,
+        solarViewMode: neuralCoreState.solarViewMode,
+        setSolarViewMode,
+        solarShowOrbits: neuralCoreState.solarShowOrbits,
+        setSolarShowOrbits,
+        solarAutoRotate: neuralCoreState.solarAutoRotate,
+        setSolarAutoRotate,
+        solarDayNightCycle: neuralCoreState.solarDayNightCycle,
+        setSolarDayNightCycle,
+        solarShowConstellations: neuralCoreState.solarShowConstellations,
+        setSolarShowConstellations,
+        solarShowResonance: neuralCoreState.solarShowResonance,
+        setSolarShowResonance,
+        solarFollowPlanet: neuralCoreState.solarFollowPlanet,
+        setSolarFollowPlanet,
         resetNeuralCoreState,
+        orbitalHistory,
+        appendOrbitalHistoryEntry,
+        clearOrbitalHistory,
+        publishNeuralTelemetry,
+        getLatestNeuralTelemetry,
+        subscribeNeuralTelemetry,
       }}
     >
       {children}

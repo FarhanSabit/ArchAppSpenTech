@@ -43,8 +43,11 @@ export interface GravityWellFlashEvent {
 export interface CollisionMonitorSummary {
   intersectionCount: number;
   activeFlashCount: number;
+  latestFlashId: number;
   latestPairLabel: string | null;
   latestKind: GravityWellFlashKind | null;
+  latestIntersectionFlashId: number;
+  latestIntersectionPairLabel: string | null;
 }
 
 const MAX_INTERSECTIONS = 28;
@@ -78,8 +81,11 @@ export class SolarOrbitCollisionMonitor {
 
   private intersectionCount = 0;
   private nextFlashId = 1;
+  private latestFlashId = 0;
+  private latestIntersectionFlashId = 0;
   private lastTopologySig = '';
   private latestPairLabel: string | null = null;
+  private latestIntersectionPairLabel: string | null = null;
   private latestKind: GravityWellFlashKind | null = null;
 
   private readonly lastTriggerTime = new Map<string, number>();
@@ -124,8 +130,11 @@ export class SolarOrbitCollisionMonitor {
 
   reset() {
     this.intersectionCount = 0;
+    this.latestFlashId = 0;
+    this.latestIntersectionFlashId = 0;
     this.lastTopologySig = '';
     this.latestPairLabel = null;
+    this.latestIntersectionPairLabel = null;
     this.latestKind = null;
     this.lastTriggerTime.clear();
     this.activePairSet.clear();
@@ -210,8 +219,13 @@ export class SolarOrbitCollisionMonitor {
       kind === 'planetary-conjunction' ? GRAVITY_WELL_FLASH_DURATION_SEC * 1.15 : GRAVITY_WELL_FLASH_DURATION_SEC;
     slot.kind = kind;
 
+    this.latestFlashId = slot.id;
     this.latestPairLabel = `${bodyA.label} × ${bodyB.label}`;
     this.latestKind = kind;
+    if (kind === 'path-intersection') {
+      this.latestIntersectionFlashId = slot.id;
+      this.latestIntersectionPairLabel = `${bodyA.label} × ${bodyB.label}`;
+    }
   }
 
   evaluate(
@@ -493,8 +507,11 @@ export class SolarOrbitCollisionMonitor {
     return {
       intersectionCount: this.intersectionCount,
       activeFlashCount,
+      latestFlashId: this.latestFlashId,
       latestPairLabel: this.latestPairLabel,
       latestKind: this.latestKind,
+      latestIntersectionFlashId: this.latestIntersectionFlashId,
+      latestIntersectionPairLabel: this.latestIntersectionPairLabel,
     };
   }
 }

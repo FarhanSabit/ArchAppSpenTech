@@ -43,8 +43,14 @@ import {
   CoreLayerId,
   CorePolicyMode,
   DEFAULT_CORE_LAYER_CONFIGS,
+  NeuralCoreState,
+  NeuralSimulationSystem,
   useStack,
 } from '../store/StackContext';
+import NeuralCoreTelemetryOverlay, {
+  NeuralCoreTelemetrySnapshot,
+} from './three/NeuralCoreTelemetryOverlay';
+import { GALAXY_TYPE_PRESETS } from './three/GalaxyPresetSelector';
 
 type CoreTab = 'architecture' | 'audit';
 
@@ -109,6 +115,68 @@ function formatAuditTime(iso: string): string {
   }
 }
 
+function buildFallbackSimulationStats(
+  system: NeuralSimulationSystem,
+  state: NeuralCoreState,
+): Pick<
+  NeuralCoreTelemetrySnapshot,
+  'drawCalls' | 'triangles' | 'geometries' | 'textures' | 'programs' | 'gpuEstimateMb'
+> {
+  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+  const viewportH = typeof window !== 'undefined' ? window.innerHeight : 720;
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+  const rtMb = (viewportW * viewportH * dpr * dpr * 4 * 5) / (1024 * 1024);
+
+  if (system === 'solar') {
+    const drawCalls =
+      36 +
+      (state.solarShowOrbits ? 16 : 0) +
+      (state.solarShowConstellations ? 6 : 0) +
+      (state.solarShowResonance ? 8 : 0);
+    const triangles =
+      48_600 +
+      (state.solarShowOrbits ? 6_400 : 0) +
+      (state.solarShowConstellations ? 1_200 : 0) +
+      (state.solarShowResonance ? 3_800 : 0);
+    return {
+      drawCalls,
+      triangles,
+      geometries: 44,
+      textures: 14,
+      programs: 10,
+      gpuEstimateMb: Math.round((14.2 + rtMb) * 10) / 10,
+    };
+  }
+
+  if (system === 'nebula') {
+    const densityFactor = Math.max(0.2, state.nebulaDensity);
+    const starCountScale = Math.max(0.2, state.starDensity);
+    return {
+      drawCalls: 42 + Math.round(densityFactor * 6),
+      triangles: Math.round(52_400 * starCountScale + 18_500 * densityFactor),
+      geometries: 38,
+      textures: 9,
+      programs: 12,
+      gpuEstimateMb: Math.round((16.8 * Math.min(1.5, densityFactor) + rtMb) * 10) / 10,
+    };
+  }
+
+  const presetMul =
+    state.galaxyPreset === 'elliptical-dense'
+      ? 1.15
+      : state.galaxyPreset === 'active-starburst'
+        ? 1.22
+        : 1.0;
+  return {
+    drawCalls: Math.round(38 * presetMul),
+    triangles: Math.round(44_800 * Math.max(0.2, state.starDensity) * presetMul),
+    geometries: 34,
+    textures: 7,
+    programs: 9,
+    gpuEstimateMb: Math.round((12.6 * presetMul + rtMb) * 10) / 10,
+  };
+}
+
 export function SpentaCoreView() {
   const {
     theme,
@@ -126,6 +194,12 @@ export function SpentaCoreView() {
     resetCoreLayerConfig,
     logCoreAuditEvent,
     clearCoreAuditLog,
+    activeSimulationSystem,
+    setActiveSimulationSystem,
+    neuralCoreState,
+    navigateToItem,
+    getLatestNeuralTelemetry,
+    subscribeNeuralTelemetry,
   } = useStack();
 
   const [activeCoreTab, setActiveCoreTab] = useState<CoreTab>('architecture');
@@ -138,6 +212,130 @@ export function SpentaCoreView() {
   const [confirmClearLog, setConfirmClearLog] = useState<boolean>(false);
 
   const isDark = theme === 'dark';
+
+  const [telemetryNonce, setTelemetryNonce] = useState<number>(0);
+  const [livePerfMetrics, setLivePerfMetrics] = useState<{
+    fps: number;
+    frameMs: number;
+    jsHeapMb: number | null;
+    jsHeapLimitMb: number | null;
+    rendererMode: 'hardware' | 'software';
+  }>(() => ({
+    fps: 60,
+    frameMs: 16.7,
+    jsHeapMb: null,
+    jsHeapLimitMb: null,
+    rendererMode:
+      typeof navigator !== 'undefined' && navigator.hardwareConcurrency <= 2
+        ? 'software'
+        : 'hardware',
+  }));
+
+  useEffect(() => {
+    return subscribeNeuralTelemetry(() => {
+      setTelemetryNonce((prev) => prev + 1);
+    });
+  }, [subscribeNeuralTelemetry]);
+
+  useEffect(() => {
+    let rafId = 0;
+    let frameCount = 0;
+    let lastStamp = performance.now();
+    let windowStart = lastStamp;
+    let smoothedFrameMs = 16.7;
+
+    const sample = (now: number) => {
+      rafId = window.requestAnimationFrame(sample);
+      const dt = Math.max(1, now - lastStamp);
+      lastStamp = now;
+      smoothedFrameMs = smoothedFrameMs * 0.88 + Math.min(dt, 100) * 0.12;
+      frameCount += 1;
+
+      if (now - windowStart >= 250) {
+        const elapsedSec = Math.max(0.05, (now - windowStart) / 1000);
+        const measuredFps = Math.max(1, Math.round(frameCount / elapsedSec));
+        frameCount = 0;
+        windowStart = now;
+
+        const perfMem = (
+          performance as Performance & {
+            memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number };
+          }
+        ).memory;
+        const jsHeapMb = perfMem ? perfMem.usedJSHeapSize / (1024 * 1024) : null;
+        const jsHeapLimitMb = perfMem
+          ? Math.round(perfMem.jsHeapSizeLimit / (1024 * 1024))
+          : null;
+
+        setLivePerfMetrics((prev) => ({
+          ...prev,
+          fps: measuredFps,
+          frameMs: smoothedFrameMs,
+          jsHeapMb,
+          jsHeapLimitMb,
+        }));
+      }
+    };
+
+    rafId = window.requestAnimationFrame(sample);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  const latestPublishedTelemetry = useMemo(
+    () => getLatestNeuralTelemetry(activeSimulationSystem),
+    // telemetryNonce bumps on live WebGL telemetry publications
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getLatestNeuralTelemetry, activeSimulationSystem, telemetryNonce],
+  );
+
+  const floatingTelemetryMetrics: NeuralCoreTelemetrySnapshot = useMemo(() => {
+    const fallback = buildFallbackSimulationStats(activeSimulationSystem, neuralCoreState);
+    if (!latestPublishedTelemetry) {
+      return {
+        fps: livePerfMetrics.fps,
+        frameMs: livePerfMetrics.frameMs,
+        drawCalls: fallback.drawCalls,
+        triangles: fallback.triangles,
+        geometries: fallback.geometries,
+        textures: fallback.textures,
+        programs: fallback.programs,
+        jsHeapMb: livePerfMetrics.jsHeapMb,
+        jsHeapLimitMb: livePerfMetrics.jsHeapLimitMb,
+        gpuEstimateMb: fallback.gpuEstimateMb,
+        rendererMode: livePerfMetrics.rendererMode,
+      };
+    }
+    return {
+      ...latestPublishedTelemetry.metrics,
+      fps: livePerfMetrics.fps,
+      frameMs: livePerfMetrics.frameMs,
+      jsHeapMb: livePerfMetrics.jsHeapMb ?? latestPublishedTelemetry.metrics.jsHeapMb,
+      jsHeapLimitMb:
+        livePerfMetrics.jsHeapLimitMb ?? latestPublishedTelemetry.metrics.jsHeapLimitMb,
+    };
+  }, [activeSimulationSystem, neuralCoreState, latestPublishedTelemetry, livePerfMetrics]);
+
+  const floatingSystemSubtitle = useMemo(() => {
+    if (latestPublishedTelemetry?.subtitle) return latestPublishedTelemetry.subtitle;
+    if (activeSimulationSystem === 'solar') {
+      return neuralCoreState.solarConfigurationPreset === 'highly-eccentric'
+        ? 'Highly Eccentric'
+        : neuralCoreState.solarConfigurationPreset === 'young-chaotic'
+          ? 'Young Chaotic'
+          : 'Stable Circular';
+    }
+    const presetShort =
+      GALAXY_TYPE_PRESETS.find((p) => p.id === neuralCoreState.galaxyPreset)?.shortLabel ??
+      'Andromeda Spiral';
+    if (activeSimulationSystem === 'nebula') {
+      return neuralCoreState.galaxyPreset === 'procedural-nebula'
+        ? presetShort
+        : `${presetShort} · Nebula`;
+    }
+    return presetShort;
+  }, [activeSimulationSystem, neuralCoreState, latestPublishedTelemetry]);
 
   useEffect(() => {
     if (!pendingNavFocus) return;
@@ -1167,6 +1365,42 @@ export function SpentaCoreView() {
           </section>
         </div>
       )}
+
+      {/* Floating Real-Time Telemetry Dashboard Widget for Active 3D Simulation System */}
+      <div
+        data-qa="spenta-core-floating-telemetry"
+        className={
+          activeSimulationSystem === 'solar'
+            ? 'solar-map-scope'
+            : activeSimulationSystem === 'nebula' && isDark
+              ? 'nebula-core-scope'
+              : undefined
+        }
+      >
+        <NeuralCoreTelemetryOverlay
+          mode={
+            activeSimulationSystem === 'solar'
+              ? 'solar-map'
+              : activeSimulationSystem === 'nebula'
+                ? 'nebula'
+                : 'spiral-galaxy'
+          }
+          systemSubtitle={floatingSystemSubtitle}
+          isLightMode={!isDark}
+          metrics={floatingTelemetryMetrics}
+          positionClassName="fixed bottom-4 left-4 z-40 no-print"
+          systemSwitcher={{
+            activeSystem: activeSimulationSystem,
+            onSelectSystem: setActiveSimulationSystem,
+            onOpenNeuralCore: () =>
+              navigateToItem('The Brain', {
+                type: 'brain-hub',
+                id: 'fintech',
+                open3D: true,
+              }),
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -94,6 +94,20 @@ function EvidenceLabel({ app }: { app: SpentaApp }) {
   );
 }
 
+const VAULT_VIEW_MODE_STORAGE_KEY = 'spenta_vault_view_mode_v1';
+
+function loadStoredVaultViewMode(): VaultViewMode {
+  try {
+    const raw = window.localStorage.getItem(VAULT_VIEW_MODE_STORAGE_KEY);
+    if (raw === 'matrix' || raw === 'grid' || raw === 'brain3d') {
+      return raw;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'matrix';
+}
+
 export function SpentaBrainVault() {
   const {
     theme,
@@ -116,7 +130,15 @@ export function SpentaBrainVault() {
     toggleMobileGrid,
   } = useStack();
 
-  const [viewMode, setViewMode] = useState<VaultViewMode>('matrix');
+  const [viewMode, setViewMode] = useState<VaultViewMode>(loadStoredVaultViewMode);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VAULT_VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch {
+      // ignore storage errors
+    }
+  }, [viewMode]);
   const [searchQuery, setSearchQuery] = useState('');
   const [engineFilter, setEngineFilter] = useState<'all' | EngineType>('all');
   const [deployFilter, setDeployFilter] = useState<'all' | DeploymentMode>('all');

@@ -20,14 +20,17 @@ import {
   SolarPlanetInspectCard,
 } from './SolarPlanetInspectCard';
 import {
+  CollisionMonitorSummary,
   createGravityWellFlashTexture,
   OrbitSampleBody,
   SolarOrbitCollisionMonitor,
 } from './solarCollisionDetection';
 import NeuralCoreTelemetryOverlay, {
+  GravityWellInterferenceAlert,
   INITIAL_TELEMETRY_SNAPSHOT,
   NeuralCoreTelemetrySnapshot,
 } from './NeuralCoreTelemetryOverlay';
+import { useOrbitalHistoryRecorder } from './useOrbitalHistoryRecorder';
 
 export interface SolarSystemBrain3DCanvasProps {
   compact?: boolean;
@@ -964,8 +967,8 @@ const SOLAR_PHOTOSPHERE_FRAG = /* glsl */ `
 
     vec3 col = mix(colFlare, colAmber, smoothstep(0.24, 0.68, plasma));
     col = mix(col, colHot, smoothstep(0.62, 0.95, plasma));
-    col = mix(col, mix(colFlare, colRimStable, uOpaPass * 0.35), rim * (0.45 + 0.22 * uBloom));
-    col *= 0.68 + uBloom * 0.56;
+    col = mix(col, mix(colFlare, colRimStable, uOpaPass * 0.35), rim * (0.35 + 0.32 * uBloom));
+    col *= 0.58 + uBloom * 0.64;
 
     gl_FragColor = vec4(col, 1.0);
   }
@@ -995,8 +998,8 @@ const CORONA_HALO_FRAG = /* glsl */ `
     vec3 inner = vec3(1.0, 0.88, 0.73);
     vec3 outer = mix(vec3(1.0, 0.54, 0.31), vec3(0.28, 0.56, 1.0), uOpaPass * 0.45);
     vec3 col = mix(inner, outer, smoothstep(0.18, 0.82, d));
-    float bloomMul = 0.25 + uBloom * 0.95;
-    gl_FragColor = vec4(col * (0.72 + uBloom * 0.42), clamp(glow * bloomMul * (1.0 - d), 0.0, 0.96));
+    float bloomMul = 0.08 + uBloom * 1.05;
+    gl_FragColor = vec4(col * (0.64 + uBloom * 0.52), clamp(glow * bloomMul * (1.0 - d), 0.0, 0.98));
   }
 `;
 
@@ -1515,7 +1518,34 @@ export default function SolarSystemBrain3DCanvas({
     setSolarTimeScale: setTimeScale,
     neuralBloomIntensity: bloomIntensity,
     setNeuralBloomIntensity: setBloomIntensity,
+    solarOrbitalVelocity: orbitalVelocity,
+    setSolarOrbitalVelocity: setOrbitalVelocity,
+    solarOrbitalInclinationDeg: orbitalInclinationDeg,
+    setSolarOrbitalInclinationDeg: setOrbitalInclinationDeg,
+    solarConfigurationPreset: configurationPreset,
+    setSolarConfigurationPreset: setConfigurationPreset,
+    solarViewMode: viewMode,
+    setSolarViewMode: setViewMode,
+    solarShowOrbits: showOrbits,
+    setSolarShowOrbits: setShowOrbits,
+    solarAutoRotate: autoRotate,
+    setSolarAutoRotate: setAutoRotate,
+    solarDayNightCycle: dayNightCycle,
+    setSolarDayNightCycle: setDayNightCycle,
+    solarShowConstellations: showConstellations,
+    setSolarShowConstellations: setShowConstellations,
+    solarShowResonance: showResonance,
+    setSolarShowResonance: setShowResonance,
+    solarFollowPlanet: followPlanet,
+    setSolarFollowPlanet: setFollowPlanet,
+    orbitalHistory,
+    appendOrbitalHistoryEntry,
+    clearOrbitalHistory,
+    publishNeuralTelemetry,
   } = useStack();
+  const { recordNumericTransition, recordImmediateEvent, flushAll } = useOrbitalHistoryRecorder(
+    appendOrbitalHistoryEntry,
+  );
   const rootRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1529,9 +1559,13 @@ export default function SolarSystemBrain3DCanvas({
   const activeGsapTlRef = useRef<gsap.core.Timeline | null>(null);
   const transitionFromSpiralRef = useRef<boolean>(transitionFromSpiral);
 
-  const [viewMode, setViewMode] = useState<SolarViewMode>(
-    transitionFromSpiral ? 'ecliptic' : 'overview',
+  const initialRestoredLayout = useMemo(
+    () => generateConfigurationLayout(configurationPreset, 0),
+    // Computed strictly for initial mount layout reconstruction
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
+
   const [focusedBodyId, setFocusedBodyId] = useState<string>(selectedHubId ?? 'sun');
   const [lastSelectedPlanetId, setLastSelectedPlanetId] = useState<string>(
     selectedHubId && selectedHubId !== 'sun' ? selectedHubId : 'enterprise',
@@ -1539,23 +1573,13 @@ export default function SolarSystemBrain3DCanvas({
   const [inspectedPlanetId, setInspectedPlanetId] = useState<string | null>(null);
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [orbitalVelocity, setOrbitalVelocity] = useState<number>(DEFAULT_ORBITAL_VELOCITY);
-  const [orbitalInclinationDeg, setOrbitalInclinationDeg] = useState<number>(
-    DEFAULT_ORBITAL_INCLINATION_DEG,
+  const [orbitLayout, setOrbitLayout] = useState<OrbitLayoutEntry[]>(initialRestoredLayout);
+  const [orbitRadiusScales, setOrbitRadiusScales] = useState<number[]>(() =>
+    initialRestoredLayout.map((e) => e.radiusScale),
   );
-  const [showOrbits, setShowOrbits] = useState<boolean>(true);
-  const [configurationPreset, setConfigurationPreset] =
-    useState<SolarConfigurationPreset>('stable-circular');
-  const [orbitLayout, setOrbitLayout] = useState<OrbitLayoutEntry[]>(STABLE_CIRCULAR_LAYOUT);
-  const [orbitRadiusScales, setOrbitRadiusScales] = useState<number[]>(NOMINAL_ORBIT_SCALES);
   const [orbitJitterCount, setOrbitJitterCount] = useState<number>(0);
   const [presetSeedNonce, setPresetSeedNonce] = useState<number>(0);
-  const [autoRotate, setAutoRotate] = useState<boolean>(false);
-  const [dayNightCycle, setDayNightCycle] = useState<boolean>(false);
-  const [showConstellations, setShowConstellations] = useState<boolean>(false);
-  const [showResonance, setShowResonance] = useState<boolean>(false);
   const [activeResonanceCount, setActiveResonanceCount] = useState<number>(0);
-  const [followPlanet, setFollowPlanet] = useState<boolean>(false);
   const [stressTestActive, setStressTestActive] = useState<boolean>(false);
   const [liveStressVelocity, setLiveStressVelocity] = useState<number>(DEFAULT_ORBITAL_VELOCITY);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -1572,6 +1596,9 @@ export default function SolarSystemBrain3DCanvas({
     intersectionCount: number;
     latestPairLabel: string | null;
   }>({ intersectionCount: 0, latestPairLabel: null });
+  const [gravityWellAlert, setGravityWellAlert] = useState<GravityWellInterferenceAlert | null>(
+    null,
+  );
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
@@ -1584,6 +1611,8 @@ export default function SolarSystemBrain3DCanvas({
   const activeGasOverlayHubRef = useRef<string | null>(null);
   const activePrimaryGasSymbolRef = useRef<string | null>(null);
   const collisionMonitorRef = useRef<SolarOrbitCollisionMonitor | null>(null);
+  const lastSeenIntersectionFlashIdRef = useRef<number>(0);
+  const viewModeRef = useRef<SolarViewMode>(transitionFromSpiral ? 'ecliptic' : viewMode);
   const focusedBodyRef = useRef<string>(focusedBodyId);
   const inspectedPlanetRef = useRef<string | null>(inspectedPlanetId);
   const hoveredHubRef = useRef<string | null>(null);
@@ -1599,6 +1628,21 @@ export default function SolarSystemBrain3DCanvas({
   const showConstellationsRef = useRef<boolean>(showConstellations);
   const showResonanceRef = useRef<boolean>(showResonance);
   const followPlanetRef = useRef<boolean>(followPlanet);
+  const pathCssAnimRef = useRef<{
+    speed: number;
+    dashScale: number;
+    pulseAmp: number;
+    wakeSpan: number;
+    resonanceIntersectionHex: string;
+    resonanceSyzygyHex: string;
+  }>({
+    speed: 1,
+    dashScale: 1,
+    pulseAmp: 0.08,
+    wakeSpan: 0.55,
+    resonanceIntersectionHex: '#FFB563',
+    resonanceSyzygyHex: '#68E4EF',
+  });
   const stressActiveRef = useRef<boolean>(false);
   const stressElapsedRef = useRef<number>(0);
   const stressSurgeVelRef = useRef<number>(DEFAULT_ORBITAL_VELOCITY);
@@ -1606,17 +1650,31 @@ export default function SolarSystemBrain3DCanvas({
   const tourTlRef = useRef<gsap.core.Timeline | null>(null);
   const tourReducedTimerRef = useRef<number>(0);
   const onSelectHubRef = useRef(onSelectHub);
+  const publishTelemetryRef = useRef(publishNeuralTelemetry);
+  const configurationPresetRef = useRef(configurationPreset);
+  const initialCamSpec = transitionFromSpiral
+    ? SOLAR_VIEW_CAMERA.ecliptic
+    : SOLAR_VIEW_CAMERA[viewMode] ?? SOLAR_VIEW_CAMERA.overview;
   const cameraCmdRef = useRef<{
     pos: [number, number, number];
     target: [number, number, number];
     nonce: number;
   }>({
-    pos: transitionFromSpiral ? SOLAR_VIEW_CAMERA.ecliptic.pos : SOLAR_VIEW_CAMERA.overview.pos,
-    target: transitionFromSpiral
-      ? SOLAR_VIEW_CAMERA.ecliptic.target
-      : SOLAR_VIEW_CAMERA.overview.target,
+    pos: initialCamSpec.pos,
+    target: initialCamSpec.target,
     nonce: 0,
   });
+
+  useEffect(() => {
+    if (transitionFromSpiral) {
+      setViewMode('ecliptic');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -1679,9 +1737,40 @@ export default function SolarSystemBrain3DCanvas({
   useEffect(() => {
     followPlanetRef.current = followPlanet;
   }, [followPlanet]);
+
+  // Resolve .solar-map-scope CSS variables for Preset Layout path animations & Orbital Resonance tokens
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof window === 'undefined') return;
+    const cs = window.getComputedStyle(el);
+    const numOr = (prop: string, fallback: number) => {
+      const parsed = Number.parseFloat(cs.getPropertyValue(prop).trim());
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const strOr = (prop: string, fallback: string) => {
+      const val = cs.getPropertyValue(prop).trim();
+      return val || fallback;
+    };
+    pathCssAnimRef.current = {
+      speed: numOr('--solar-path-anim-speed', 1),
+      dashScale: numOr('--solar-path-dash-scale', 1),
+      pulseAmp: numOr('--solar-path-pulse-amp', 0.08),
+      wakeSpan: numOr('--solar-path-wake-span', 0.55),
+      resonanceIntersectionHex: strOr('--solar-resonance-intersection', '#FFB563'),
+      resonanceSyzygyHex: strOr('--solar-resonance-syzygy', '#68E4EF'),
+    };
+  }, [configurationPreset]);
   useEffect(() => {
     onSelectHubRef.current = onSelectHub;
   }, [onSelectHub]);
+
+  useEffect(() => {
+    publishTelemetryRef.current = publishNeuralTelemetry;
+  }, [publishNeuralTelemetry]);
+
+  useEffect(() => {
+    configurationPresetRef.current = configurationPreset;
+  }, [configurationPreset]);
 
   // Sync external hub selection (Pathway / Brain Architecture Profile -> Solar Map)
   useEffect(() => {
@@ -2028,6 +2117,15 @@ export default function SolarSystemBrain3DCanvas({
       isPausedRef.current = false;
       setIsPaused(false);
     }
+    if (!stressActiveRef.current) {
+      recordImmediateEvent({
+        system: 'solar',
+        metric: 'velocity',
+        label: 'Velocity Stress Surge',
+        previousValue: `${orbitalVelocityRef.current.toFixed(1)}×`,
+        newValue: `${STRESS_TEST_VELOCITY.toFixed(1)}×`,
+      });
+    }
     stressElapsedRef.current = stressActiveRef.current ? STRESS_RAMP_UP_SEC : 0;
     stressActiveRef.current = true;
     stressSurgeVelRef.current = orbitalVelocityRef.current;
@@ -2080,6 +2178,19 @@ export default function SolarSystemBrain3DCanvas({
   };
 
   const handleResetMap = () => {
+    flushAll();
+    if (
+      orbitalInclinationDeg !== DEFAULT_ORBITAL_INCLINATION_DEG ||
+      orbitalVelocity !== DEFAULT_ORBITAL_VELOCITY
+    ) {
+      recordImmediateEvent({
+        system: 'solar',
+        metric: 'reset',
+        label: 'Solar Orbits Reset',
+        previousValue: `${orbitalInclinationDeg}° · ${orbitalVelocity.toFixed(1)}×`,
+        newValue: `${DEFAULT_ORBITAL_INCLINATION_DEG}° · ${DEFAULT_ORBITAL_VELOCITY.toFixed(1)}×`,
+      });
+    }
     stopCinematicTour();
     setViewMode('overview');
     setFocusedBodyId('sun');
@@ -2109,7 +2220,9 @@ export default function SolarSystemBrain3DCanvas({
     setBloomIntensity(1.0);
     setAtmosphericScattering(false);
     collisionMonitorRef.current?.reset();
+    lastSeenIntersectionFlashIdRef.current = 0;
     setGravityWellHud({ intersectionCount: 0, latestPairLabel: null });
+    setGravityWellAlert(null);
     cameraCmdRef.current = {
       pos: SOLAR_VIEW_CAMERA.overview.pos,
       target: SOLAR_VIEW_CAMERA.overview.target,
@@ -2328,12 +2441,12 @@ export default function SolarSystemBrain3DCanvas({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#040814');
 
+    const mountCamSpec = transitionFromSpiralRef.current
+      ? SOLAR_VIEW_CAMERA.ecliptic
+      : SOLAR_VIEW_CAMERA[viewModeRef.current] ?? SOLAR_VIEW_CAMERA.overview;
+
     const camera = new THREE.PerspectiveCamera(44, currentWidth / currentHeight, 0.1, 220);
-    camera.position.set(
-      ...(transitionFromSpiralRef.current
-        ? SOLAR_VIEW_CAMERA.ecliptic.pos
-        : SOLAR_VIEW_CAMERA.overview.pos),
-    );
+    camera.position.set(...mountCamSpec.pos);
     cameraRef.current = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -2344,11 +2457,7 @@ export default function SolarSystemBrain3DCanvas({
     controls.maxDistance = 46.0;
     controls.maxPolarAngle = Math.PI * 0.86;
     controls.minPolarAngle = Math.PI * 0.08;
-    controls.target.set(
-      ...(transitionFromSpiralRef.current
-        ? SOLAR_VIEW_CAMERA.ecliptic.target
-        : SOLAR_VIEW_CAMERA.overview.target),
-    );
+    controls.target.set(...mountCamSpec.target);
     controlsRef.current = controls;
 
     // GPU-only Post-Processing (UnrealBloomPass skipped on Software WebGL)
@@ -3049,11 +3158,14 @@ export default function SolarSystemBrain3DCanvas({
         orbitSamples: orbitSamplePoints[idx],
       };
     });
-    let latestCollisionSummary = {
+    let latestCollisionSummary: CollisionMonitorSummary = {
       intersectionCount: 0,
       activeFlashCount: 0,
-      latestPairLabel: null as string | null,
-      latestKind: null as 'path-intersection' | 'planetary-conjunction' | null,
+      latestFlashId: 0,
+      latestPairLabel: null,
+      latestKind: null,
+      latestIntersectionFlashId: 0,
+      latestIntersectionPairLabel: null,
     };
     const activeNodesPos: THREE.Vector3[] = Array.from(
       { length: MAX_RESONANCE_NODES },
@@ -3288,8 +3400,10 @@ export default function SolarSystemBrain3DCanvas({
         : Math.max(baseOrbitalVel, stressActiveRef.current ? surgeVel : 0);
       elapsedSim += simDt * curVel;
 
-      // Read CSS-controlled --neural-bloom-intensity variable from root element
-      const cssBloomRaw = rootRef.current?.style.getPropertyValue('--neural-bloom-intensity');
+      // Read global/root CSS-controlled --neural-bloom-intensity variable
+      const cssBloomRaw =
+        rootRef.current?.style.getPropertyValue('--neural-bloom-intensity') ||
+        document.documentElement.style.getPropertyValue('--neural-bloom-intensity');
       const parsedCssBloom = cssBloomRaw ? Number.parseFloat(cssBloomRaw) : Number.NaN;
       const effectiveBloom = Number.isFinite(parsedCssBloom)
         ? Math.max(0, Math.min(2.0, parsedCssBloom))
@@ -3312,6 +3426,8 @@ export default function SolarSystemBrain3DCanvas({
       coronaMesh.scale.setScalar(0.75 + effectiveBloom * 0.35);
       coronaMesh.quaternion.copy(camera.quaternion);
 
+      const solarEmissiveGain = 0.35 + effectiveBloom * 0.65;
+
       // Smoothly fade glowing Celestial Constellations using .solar-map-scope tokens
       constellationBlend = THREE.MathUtils.damp(
         constellationBlend,
@@ -3322,9 +3438,9 @@ export default function SolarSystemBrain3DCanvas({
       constellationGroup.visible = constellationBlend > 0.004;
       if (constellationGroup.visible) {
         const shimmer = 0.92 + 0.08 * Math.sin(realTime * 1.15);
-        constLineMat.opacity = constellationBlend * 0.42 * shimmer;
-        constGlowMat.opacity = constellationBlend * 0.19 * shimmer;
-        constStarGlowMat.opacity = constellationBlend * 0.85 * shimmer;
+        constLineMat.opacity = constellationBlend * 0.42 * shimmer * Math.min(1.4, 0.5 + effectiveBloom * 0.5);
+        constGlowMat.opacity = constellationBlend * 0.19 * shimmer * solarEmissiveGain;
+        constStarGlowMat.opacity = constellationBlend * 0.85 * shimmer * solarEmissiveGain;
       }
 
       // Smoothly scale per-orbit 3D inclination (0° flat ecliptic -> 45° steep 3D tilt)
@@ -3385,6 +3501,7 @@ export default function SolarSystemBrain3DCanvas({
         rimFill.position.set(-18, 12, -16);
       }
 
+      const cssPathAnim = pathCssAnimRef.current;
       const selIds = selectedIdsRef.current;
       const focusedId = focusedBodyRef.current;
       const hoveredId = hoveredHubRef.current;
@@ -3479,6 +3596,10 @@ export default function SolarSystemBrain3DCanvas({
         pr.orbitLine.position.set(-c, 0, 0);
         pr.orbitLine.scale.set(pr.currentRadiusScale, 1, pr.currentRadiusScale * bScale);
         pr.orbitMat.scale = pr.currentRadiusScale;
+        const targetDash = (0.24 + pr.spec.orbitRadius * 0.022) * cssPathAnim.dashScale;
+        const targetGap = (0.18 + pr.spec.orbitRadius * 0.016) * cssPathAnim.dashScale;
+        pr.orbitMat.dashSize = THREE.MathUtils.damp(pr.orbitMat.dashSize, targetDash, 6.0, rawDt);
+        pr.orbitMat.gapSize = THREE.MathUtils.damp(pr.orbitMat.gapSize, targetGap, 6.0, rawDt);
         pr.orbitLine.visible = orbitsVisible;
 
         const wakeVisible = (orbitsVisible || stressActiveRef.current) && curVel > 0.01;
@@ -3487,8 +3608,9 @@ export default function SolarSystemBrain3DCanvas({
           const wakeAttr = pr.wakeGeo.attributes.position as THREE.BufferAttribute;
           const wakeArr = wakeAttr.array as Float32Array;
           const wakeSegsCount = 28;
+          const wakeArc = cssPathAnim.wakeSpan * (stressActiveRef.current ? 1.45 : 1.0);
           for (let w = 0; w <= wakeSegsCount; w++) {
-            const lagAngle = angle - (w / wakeSegsCount) * 0.55;
+            const lagAngle = angle - (w / wakeSegsCount) * wakeArc;
             wakeArr[w * 3] = -c + Math.cos(lagAngle) * a;
             wakeArr[w * 3 + 1] = 0;
             wakeArr[w * 3 + 2] = Math.sin(lagAngle) * b;
@@ -3501,8 +3623,11 @@ export default function SolarSystemBrain3DCanvas({
         const isHovered = hoveredId === pr.spec.hubId;
         const hasActiveMod = pr.moons.some((m) => selIds.includes(m.appId));
 
-        // Preserve each planet's unique Solar System CSS token color; brighten smoothly on focus/hover & 3D tilt
+        // Preserve each planet's unique Solar System CSS token color; pulse path opacity via .solar-map-scope preset vars
         const tiltClarityBoost = (orbitalInclinationRef.current / 45) * 0.1;
+        const pathPulseWave = prefersReducedMotionScene
+          ? 0
+          : Math.sin(realTime * (1.8 * cssPathAnim.speed) + i * 0.85) * cssPathAnim.pulseAmp;
         _orbitColorScratch.copy(pr.orbitBaseColor);
         if (isFocused) {
           _orbitColorScratch.lerp(_orbitWhite, 0.28);
@@ -3510,16 +3635,18 @@ export default function SolarSystemBrain3DCanvas({
           _orbitColorScratch.lerp(_orbitWhite, 0.16);
         }
         pr.orbitMat.color.copy(_orbitColorScratch);
-        pr.orbitMat.opacity = isFocused
+        const baseOrbitOpacity = isFocused
           ? 0.86
           : isHovered
             ? 0.68
             : hasActiveMod
               ? Math.min(0.58, 0.44 + tiltClarityBoost)
               : Math.min(0.48, 0.34 + tiltClarityBoost);
+        pr.orbitMat.opacity = THREE.MathUtils.clamp(baseOrbitOpacity + pathPulseWave, 0.18, 0.96);
         pr.selectRingMat.opacity = isFocused ? 0.85 : isHovered ? 0.55 : 0.0;
         pr.selectRing.rotation.z = realTime * 0.6;
-        pr.atmoMat.opacity = isFocused ? 0.28 : hasActiveMod ? 0.2 : 0.12;
+        pr.atmoMat.opacity =
+          (isFocused ? 0.28 : hasActiveMod ? 0.2 : 0.12) * solarEmissiveGain;
 
         for (let m = 0; m < pr.moons.length; m++) {
           const moon = pr.moons[m];
@@ -3532,7 +3659,7 @@ export default function SolarSystemBrain3DCanvas({
           );
           moon.mesh.scale.setScalar(active ? 1.35 : 0.85);
           moon.mat.emissive.set(active ? '#68E4EF' : '#488EFF');
-          moon.mat.emissiveIntensity = active ? 1.2 : 0.18;
+          moon.mat.emissiveIntensity = (active ? 1.2 : 0.18) * solarEmissiveGain;
         }
       }
 
@@ -3743,9 +3870,13 @@ export default function SolarSystemBrain3DCanvas({
             rn.sprite.scale.setScalar(baseScale * (1.1 + pulse * 0.85));
 
             if (isIntersection) {
-              _resColorScratch.set('#FF894F').lerp(_orbitWhite, pulse * 0.45);
+              _resColorScratch
+                .set(cssPathAnim.resonanceIntersectionHex)
+                .lerp(_orbitWhite, pulse * 0.45);
             } else {
-              _resColorScratch.set('#68E4EF').lerp(_orbitWhite, pulse * 0.35);
+              _resColorScratch
+                .set(cssPathAnim.resonanceSyzygyHex)
+                .lerp(_orbitWhite, pulse * 0.35);
             }
 
             rn.coreMat.color.copy(_resColorScratch);
@@ -3948,7 +4079,7 @@ export default function SolarSystemBrain3DCanvas({
         const texBytes = renderer.info.memory.textures * 256 * 128 * 4;
         const gpuEstimateMb = (staticGeoVramBytes + rtBytes + texBytes) / (1024 * 1024);
 
-        setTelemetryMetrics({
+        const telemetrySnapshot: NeuralCoreTelemetrySnapshot = {
           fps: measuredFps,
           frameMs: smoothedFrameMs,
           drawCalls: frameDrawCalls,
@@ -3960,6 +4091,20 @@ export default function SolarSystemBrain3DCanvas({
           jsHeapLimitMb,
           gpuEstimateMb,
           rendererMode: isSoftwareWebGL ? 'software' : 'hardware',
+        };
+        setTelemetryMetrics(telemetrySnapshot);
+        const cfgPreset = configurationPresetRef.current;
+        const presetLabel =
+          cfgPreset === 'highly-eccentric'
+            ? 'Highly Eccentric'
+            : cfgPreset === 'young-chaotic'
+              ? 'Young Chaotic'
+              : 'Stable Circular';
+        publishTelemetryRef.current({
+          system: 'solar',
+          subtitle: presetLabel,
+          metrics: telemetrySnapshot,
+          updatedAtMs: Date.now(),
         });
       }
 
@@ -4106,6 +4251,22 @@ export default function SolarSystemBrain3DCanvas({
                 latestPairLabel: latestCollisionSummary.latestPairLabel,
               },
         );
+        if (
+          latestCollisionSummary.latestIntersectionFlashId >
+            lastSeenIntersectionFlashIdRef.current &&
+          latestCollisionSummary.intersectionCount > 0
+        ) {
+          lastSeenIntersectionFlashIdRef.current = latestCollisionSummary.latestIntersectionFlashId;
+          setGravityWellAlert({
+            id: latestCollisionSummary.latestIntersectionFlashId,
+            pairLabel:
+              latestCollisionSummary.latestIntersectionPairLabel ??
+              latestCollisionSummary.latestPairLabel ??
+              'Orbital Trajectory Crossing',
+            intersectionCount: latestCollisionSummary.intersectionCount,
+            activeFlashCount: latestCollisionSummary.activeFlashCount,
+          });
+        }
         const inspectedId = inspectedPlanetRef.current;
         const candidateHub = hoveredId ?? (focusedId !== 'sun' ? focusedId : null);
         // Hide compact hover tooltip when the same planet is already open in Inspect Planet card
@@ -4226,6 +4387,7 @@ export default function SolarSystemBrain3DCanvas({
     <div
       ref={rootRef}
       data-qa="solar-system-3d-neural-core"
+      data-orbital-preset={configurationPreset}
       style={{ '--neural-bloom-intensity': bloomIntensity.toFixed(2) } as React.CSSProperties}
       className={`solar-map-scope relative w-full h-full min-h-[380px] overflow-hidden select-none bg-[var(--solar-bg-void)] text-[var(--solar-fg-primary)] ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'rounded-[10px]'
@@ -4484,7 +4646,15 @@ export default function SolarSystemBrain3DCanvas({
       {/* Real-Time Performance Telemetry Overlay positioned cleanly below Solar View Controls */}
       <NeuralCoreTelemetryOverlay
         mode="solar-map"
+        systemSubtitle={
+          configurationPreset === 'highly-eccentric'
+            ? 'Highly Eccentric'
+            : configurationPreset === 'young-chaotic'
+              ? 'Young Chaotic'
+              : 'Stable Circular'
+        }
         metrics={telemetryMetrics}
+        gravityWellAlert={gravityWellAlert}
         positionClassName="top-[60px] right-3"
         compact={compact}
       />
@@ -4581,7 +4751,7 @@ export default function SolarSystemBrain3DCanvas({
         }
         isLightMode={false}
         autoRotate={autoRotate}
-        onToggleAutoRotate={() => setAutoRotate((v) => !v)}
+        onToggleAutoRotate={() => setAutoRotate(!autoRotate)}
         onReset={handleResetMap}
         solarControls={{
           focusedBodyId,
@@ -4597,25 +4767,45 @@ export default function SolarSystemBrain3DCanvas({
           isPaused,
           onTogglePause: () => setIsPaused((p) => !p),
           showOrbits,
-          onToggleOrbits: () => setShowOrbits((v) => !v),
+          onToggleOrbits: () => setShowOrbits(!showOrbits),
           onRandomizeOrbits: handleRandomizeOrbits,
           orbitJitterCount,
           orbitalVelocity,
           onOrbitalVelocityChange: (val) => {
+            recordNumericTransition({
+              key: 'solar-velocity',
+              system: 'solar',
+              metric: 'velocity',
+              label: 'Orbital Velocity',
+              previousRaw: orbitalVelocity,
+              nextRaw: val,
+              formatValue: (v) => `${v.toFixed(1)}×`,
+            });
             setOrbitalVelocity(val);
             if (isPaused && val > 0) setIsPaused(false);
           },
           orbitalInclinationDeg,
-          onOrbitalInclinationChange: setOrbitalInclinationDeg,
+          onOrbitalInclinationChange: (deg) => {
+            recordNumericTransition({
+              key: 'solar-inclination',
+              system: 'solar',
+              metric: 'inclination',
+              label: 'Orbital Inclination',
+              previousRaw: orbitalInclinationDeg,
+              nextRaw: deg,
+              formatValue: (v) => `${Math.round(v)}°`,
+            });
+            setOrbitalInclinationDeg(deg);
+          },
           timeScale,
           onTimeScaleChange: (val) => {
             setTimeScale(val);
             if (isPaused && val > 0) setIsPaused(false);
           },
           dayNightCycle,
-          onToggleDayNightCycle: () => setDayNightCycle((v) => !v),
+          onToggleDayNightCycle: () => setDayNightCycle(!dayNightCycle),
           showConstellations,
-          onToggleConstellations: () => setShowConstellations((v) => !v),
+          onToggleConstellations: () => setShowConstellations(!showConstellations),
           followPlanet,
           followPlanetLabel: (() => {
             const targetId = focusedBodyId !== 'sun' ? focusedBodyId : lastSelectedPlanetId;
@@ -4630,7 +4820,7 @@ export default function SolarSystemBrain3DCanvas({
           onSelectConfigurationPreset: handleSelectConfigurationPreset,
           showResonance,
           activeResonanceCount,
-          onToggleResonance: () => setShowResonance((v) => !v),
+          onToggleResonance: () => setShowResonance(!showResonance),
           cinematicTour,
           cinematicTourStopLabel: CINEMATIC_TOUR_STOPS[cinematicTourStepIndex]?.title,
           cinematicTourStepIndex,
@@ -4640,6 +4830,8 @@ export default function SolarSystemBrain3DCanvas({
           onBloomIntensityChange: setBloomIntensity,
           compact,
         }}
+        orbitalHistory={orbitalHistory}
+        onClearOrbitalHistory={clearOrbitalHistory}
       />
     </div>
   );

@@ -139,6 +139,18 @@ function polarCoords(angleDeg: number, radius: number): { cx: number; cy: number
   };
 }
 
+const BRAIN_VISUAL_MODE_STORAGE_KEY = 'spenta_brain_visual_mode_v1';
+
+function loadStoredBrainVisualMode(): 'radar' | '3d' {
+  try {
+    const raw = window.localStorage.getItem(BRAIN_VISUAL_MODE_STORAGE_KEY);
+    if (raw === 'radar' || raw === '3d') return raw;
+  } catch {
+    // ignore storage errors
+  }
+  return '3d';
+}
+
 export function TheBrainView() {
   const { theme: brainPolarity, setTheme: setBrainPolarity } = useTheme();
   const {
@@ -161,7 +173,15 @@ export function TheBrainView() {
     selectBrainNode,
   } = usePathwayBrainSync();
 
-  const [visualMode, setVisualMode] = useState<'radar' | '3d'>('3d');
+  const [visualMode, setVisualMode] = useState<'radar' | '3d'>(loadStoredBrainVisualMode);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(BRAIN_VISUAL_MODE_STORAGE_KEY, visualMode);
+    } catch {
+      // ignore storage errors
+    }
+  }, [visualMode]);
   const [backdropVariant, setBackdropVariant] = useState<BrainBackdropVariantId>('auto');
   const [quadrantFilter, setQuadrantFilter] = useState<RadarQuadrant>('All');
   const [returnContext, setReturnContext] = useState<{ tab: NavTab; label: string } | null>(null);

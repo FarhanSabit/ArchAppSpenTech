@@ -300,6 +300,7 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
 
 .brain-node-ring-pulse {
   animation: spenta-brain-ring-pulse 2.3s ease-in-out infinite;
+  opacity: clamp(0.15, calc(0.35 + 0.65 * var(--neural-bloom-intensity, 1)), 1);
   will-change: transform, opacity, box-shadow;
 }
 
@@ -324,7 +325,8 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
 
 .brain-svg-emissive-pulse {
   animation: spenta-svg-emissive-pulse 2.4s ease-in-out infinite;
-  will-change: filter;
+  opacity: clamp(0.25, calc(0.5 + 0.5 * var(--neural-bloom-intensity, 1)), 1);
+  will-change: filter, opacity;
 }
 
 /* Semantic Design Tokens — Alternate Core 2: Solar System 3D Map (SolarUniverSite-DESIGN) */
@@ -351,8 +353,8 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   --solar-border-mid: rgba(151, 196, 255, 0.26);
   --solar-border-subtle: rgba(151, 196, 255, 0.21);
   --solar-border-cyan: rgba(104, 228, 239, 0.2);
-  --solar-shadow-glow: 0 0 18px 0 rgba(77, 157, 255, 0.1) inset, 0 0 18px 0 rgba(77, 157, 255, 0.14);
-  --solar-shadow-strip: 0 0 28px 0 rgba(77, 157, 255, 0.12);
+  --solar-shadow-glow: 0 0 calc(10px + 12px * var(--neural-bloom-intensity, 1)) 0 rgba(77, 157, 255, 0.12) inset, 0 0 calc(10px + 14px * var(--neural-bloom-intensity, 1)) 0 rgba(77, 157, 255, 0.18);
+  --solar-shadow-strip: 0 0 calc(14px + 14px * var(--neural-bloom-intensity, 1)) 0 rgba(77, 157, 255, 0.14);
   --solar-shadow-card: 0 0 30px 0 rgba(0, 0, 0, 0.22);
   --solar-radius-tab: 5px;
   --solar-radius-chip: 6px;
@@ -366,7 +368,27 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   --solar-orbit-6: #FDE08D;
   --solar-orbit-7: #68E4EF;
   --solar-orbit-8: #F472B6;
-  --neural-bloom-intensity: 1;
+  /* Orbital Path Animation & Resonance Light Node Tokens */
+  --solar-path-anim-speed: 1;
+  --solar-path-dash-scale: 1;
+  --solar-path-pulse-amp: 0.08;
+  --solar-path-wake-span: 0.55;
+  --solar-resonance-intersection: #FFB563;
+  --solar-resonance-syzygy: #68E4EF;
+}
+
+.solar-map-scope[data-orbital-preset="highly-eccentric"] {
+  --solar-path-anim-speed: 1.65;
+  --solar-path-dash-scale: 1.45;
+  --solar-path-pulse-amp: 0.16;
+  --solar-path-wake-span: 0.85;
+}
+
+.solar-map-scope[data-orbital-preset="young-chaotic"] {
+  --solar-path-anim-speed: 2.35;
+  --solar-path-dash-scale: 0.72;
+  --solar-path-pulse-amp: 0.24;
+  --solar-path-wake-span: 1.05;
 }
 
 .solar-map-scope button:focus-visible,
@@ -403,8 +425,8 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   --nebula-border-mid: rgba(167, 139, 250, 0.28);
   --nebula-border-subtle: rgba(167, 139, 250, 0.21);
   --nebula-border-teal: rgba(45, 212, 191, 0.28);
-  --nebula-shadow-glow: 0 0 18px 0 rgba(139, 92, 246, 0.14) inset, 0 0 22px 0 rgba(217, 70, 239, 0.16);
-  --nebula-shadow-strip: 0 0 28px 0 rgba(45, 212, 191, 0.14);
+  --nebula-shadow-glow: 0 0 calc(8px + 10px * var(--neural-bloom-intensity, 1)) 0 rgba(139, 92, 246, 0.14) inset, 0 0 calc(10px + 12px * var(--neural-bloom-intensity, 1)) 0 rgba(217, 70, 239, 0.16);
+  --nebula-shadow-strip: 0 0 calc(14px + 14px * var(--neural-bloom-intensity, 1)) 0 rgba(45, 212, 191, 0.14);
   --nebula-shadow-card: 0 0 30px 0 rgba(4, 2, 11, 0.38);
   --nebula-radius-tab: 5px;
   --nebula-radius-chip: 6px;
@@ -424,7 +446,6 @@ html.dark.spenta-mobile-grid-on .bg-obsidian-grid {
   --nebula-particle-6: #14B8A6;
   --nebula-particle-7: #F5D0FE;
   --nebula-particle-8: #5EEAD4;
-  --neural-bloom-intensity: 1;
 }
 
 .nebula-core-scope .nebula-atmosphere-glow {

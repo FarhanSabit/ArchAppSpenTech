@@ -23,6 +23,7 @@ import NeuralCoreTelemetryOverlay, {
   INITIAL_TELEMETRY_SNAPSHOT,
   NeuralCoreTelemetrySnapshot,
 } from './NeuralCoreTelemetryOverlay';
+import { useOrbitalHistoryRecorder } from './useOrbitalHistoryRecorder';
 
 interface SovereignBrain3DCanvasProps {
   compact?: boolean;
@@ -132,6 +133,11 @@ const _haloInCol = new THREE.Color();
 const _haloOutCol = new THREE.Color();
 const _accInCol = new THREE.Color();
 const _accOutCol = new THREE.Color();
+const _galaxyTourStartCam = new THREE.Vector3();
+const _galaxyTourStartTarget = new THREE.Vector3();
+const _galaxyTourEndCam = new THREE.Vector3();
+const _galaxyTourEndTarget = new THREE.Vector3();
+const _galaxyTourRadial = new THREE.Vector3();
 
 // Palette constants
 const BG_COLORS: Record<ObservatoryFinish, THREE.Color> = {
@@ -327,6 +333,96 @@ const CAMERA_PRESETS: Record<
   experience: { pos: [7.6, 5.1, 10.2], target: [1.4, 0, 0] },
   ecliptic: { pos: [0.0, 1.8, 15.2], target: [0, 0, 0] },
 };
+
+type GalaxyTourStop =
+  | {
+      id: string;
+      title: string;
+      subtitle: string;
+      hubId: null;
+      cameraPos: [number, number, number];
+      targetPos: [number, number, number];
+      duration: number;
+      hold: number;
+    }
+  | {
+      id: string;
+      title: string;
+      subtitle: string;
+      hubId: string;
+      standOff: number;
+      elevFrac: number;
+      azimuthLead: number;
+      duration: number;
+      hold: number;
+    };
+
+const GALAXY_CINEMATIC_TOUR_STOPS: GalaxyTourStop[] = [
+  {
+    id: 'sun-core',
+    title: 'Sun Core · Spenta Galactic Reactor',
+    subtitle: '0.00 AU · Thermal Singularity & OPA Gyroscope',
+    hubId: null,
+    cameraPos: [2.7, 2.0, 4.6],
+    targetPos: [0, 0, 0],
+    duration: 2.2,
+    hold: 1.6,
+  },
+  {
+    id: 'inner-healthcare',
+    title: 'Inner Arm · HUB 01 Clinical Core',
+    subtitle: 'Operations Sector · High-Frequency Conduit',
+    hubId: 'healthcare',
+    standOff: 4.1,
+    elevFrac: 0.42,
+    azimuthLead: 0.55,
+    duration: 2.3,
+    hold: 1.5,
+  },
+  {
+    id: 'inner-enterprise',
+    title: 'Sovereign Core · HUB 03 Enterprise',
+    subtitle: 'Central Governance · Module Satellite Array',
+    hubId: 'enterprise',
+    standOff: 4.3,
+    elevFrac: 0.38,
+    azimuthLead: -0.55,
+    duration: 2.4,
+    hold: 1.5,
+  },
+  {
+    id: 'outer-multimodal',
+    title: 'Experience Frontier · HUB 06 Multimodal AI',
+    subtitle: 'Mid-Outer Spiral Rim · Spatial & Voice Telemetry',
+    hubId: 'voice',
+    standOff: 4.6,
+    elevFrac: 0.44,
+    azimuthLead: 0.65,
+    duration: 2.6,
+    hold: 1.6,
+  },
+  {
+    id: 'outer-fringes',
+    title: 'Outer Orbital Fringes · HUB 08 Edge AI',
+    subtitle: 'Deep Rim Star Nurseries & Nebula Clusters',
+    hubId: 'energy',
+    standOff: 4.9,
+    elevFrac: 0.48,
+    azimuthLead: -0.7,
+    duration: 2.8,
+    hold: 1.7,
+  },
+  {
+    id: 'galactic-panorama',
+    title: 'Galactic Ecliptic Panorama',
+    subtitle: 'Full 8-Hub Sovereign Neural Architecture',
+    hubId: null,
+    cameraPos: [0.0, 5.4, 16.4],
+    targetPos: [0, -0.1, 0],
+    duration: 2.7,
+    hold: 1.4,
+  },
+];
 
 function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
@@ -606,19 +702,19 @@ const GALAXY_FRAGMENT_SHADER = /* glsl */ `
     if (dist > 0.5) discard;
 
     float bloomMul = clamp(uBloomIntensity, 0.0, 2.0);
-    // Airy disk bright core + CSS-variable controlled optical corona
-    float core = exp(-dist * dist * 38.0);
-    float halo = exp(-dist * dist * (11.2 - bloomMul * 1.8)) * (0.35 + bloomMul * 0.42);
+    // Airy disk bright core + CSS-variable controlled optical corona halo
+    float core = exp(-dist * dist * 40.0);
+    float halo = exp(-dist * dist * (12.0 - bloomMul * 2.2)) * (0.12 + bloomMul * 0.56);
 
     // Subtle 4-point optical diffraction cross spikes on brightest supergiant stars
     float spikeMask = smoothstep(2.15, 3.1, vScale) * (1.0 - uIsLight * 0.65);
     float spikeH = exp(-abs(uv.y) * 32.0) * exp(-abs(uv.x) * 6.5);
     float spikeV = exp(-abs(uv.x) * 32.0) * exp(-abs(uv.y) * 6.5);
-    float spikes = (spikeH + spikeV) * (0.28 + bloomMul * 0.28) * spikeMask;
+    float spikes = (spikeH + spikeV) * (0.08 + bloomMul * 0.36) * spikeMask;
 
     float alpha = clamp((core + halo + spikes) * vTwinkle, 0.0, 1.0);
     vec3 col = mix(vColor, vec3(1.0), clamp(core + spikes * 0.5, 0.0, 1.0) * (1.0 - uIsLight * 0.72));
-    float finalAlpha = uIsLight > 0.5 ? alpha * 0.74 : alpha * clamp(0.84 + bloomMul * 0.12, 0.72, 0.98);
+    float finalAlpha = uIsLight > 0.5 ? alpha * 0.74 : alpha * clamp(0.76 + bloomMul * 0.16, 0.68, 0.98);
     gl_FragColor = vec4(col, finalAlpha);
   }
 `;
@@ -1151,7 +1247,24 @@ export default function SovereignBrain3DCanvas({
     setNebulaDensity,
     particleTurbulence,
     setParticleTurbulence,
+    starDensity,
+    setStarDensity,
+    orbitalDecay,
+    setOrbitalDecay,
+    orbitalSpread,
+    setOrbitalSpread,
+    galaxyCameraPreset: cameraPreset,
+    setGalaxyCameraPreset: setCameraPreset,
+    galaxyAutoRotate: autoRotate,
+    setGalaxyAutoRotate: setAutoRotate,
+    orbitalHistory,
+    appendOrbitalHistoryEntry,
+    clearOrbitalHistory,
+    publishNeuralTelemetry,
   } = useStack();
+  const { recordNumericTransition, recordImmediateEvent, flushAll } = useOrbitalHistoryRecorder(
+    appendOrbitalHistoryEntry,
+  );
   const stageRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1175,12 +1288,7 @@ export default function SovereignBrain3DCanvas({
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
   const [simEpoch, setSimEpoch] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
-  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('overview');
-  const [starDensity, setStarDensity] = useState<number>(1.0);
-  const [orbitalDecay, setOrbitalDecay] = useState<number>(0.0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [autoRotate, setAutoRotate] = useState<boolean>(false);
-  const [orbitalSpread, setOrbitalSpread] = useState<number>(0.65);
   const [morphProgress, setMorphProgress] = useState<number>(1);
   const [dockOpen, setDockOpen] = useState<boolean>(false);
   const [contextLost, setContextLost] = useState<boolean>(false);
@@ -1190,10 +1298,17 @@ export default function SovereignBrain3DCanvas({
   const [telemetryMetrics, setTelemetryMetrics] = useState<NeuralCoreTelemetrySnapshot>(
     INITIAL_TELEMETRY_SNAPSHOT,
   );
+  const [cinematicTour, setCinematicTour] = useState<boolean>(false);
+  const [cinematicTourStepIndex, setCinematicTourStepIndex] = useState<number>(0);
+  const cinematicTourRef = useRef<boolean>(false);
+  const tourTlRef = useRef<gsap.core.Timeline | null>(null);
+  const tourReducedTimerRef = useRef<number>(0);
+  const hubTrackerRef = useRef<Array<{ hubId: string; hubGroup: THREE.Group }>>([]);
 
   const selectedIdsRef = useRef<string[]>(selectedIds);
   const hitlRef = useRef<number>(hitlConfidence);
   const galaxyPresetRef = useRef<GalaxyPresetId>(galaxyPreset);
+  const cameraPresetRef = useRef<CameraPreset>(cameraPreset);
   const simEpochRef = useRef<number>(simEpoch);
   const playbackRateRef = useRef<number>(playbackRate);
   const isScrubbingRef = useRef<boolean>(false);
@@ -1214,6 +1329,7 @@ export default function SovereignBrain3DCanvas({
   const hoveredHubRef = useRef<string | null>(null);
   const selectedHubRef = useRef<string | null>(selectedHubId);
   const onSelectHubRef = useRef(onSelectHub);
+  const publishTelemetryRef = useRef(publishNeuralTelemetry);
   const focusTriggerRef = useRef<{ hubId: string | null; nonce: number }>({
     hubId: selectedHubId,
     nonce: hubFocusNonce,
@@ -1223,11 +1339,15 @@ export default function SovereignBrain3DCanvas({
     target: [number, number, number];
     nonce: number;
   }>({
-    pos: CAMERA_PRESETS.overview.pos,
-    target: CAMERA_PRESETS.overview.target,
+    pos: CAMERA_PRESETS[cameraPreset].pos,
+    target: CAMERA_PRESETS[cameraPreset].target,
     nonce: 0,
   });
   const morphPulseRef = useRef<number>(0);
+
+  useEffect(() => {
+    cameraPresetRef.current = cameraPreset;
+  }, [cameraPreset]);
 
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
@@ -1300,6 +1420,10 @@ export default function SovereignBrain3DCanvas({
   }, [onSelectHub]);
 
   useEffect(() => {
+    publishTelemetryRef.current = publishNeuralTelemetry;
+  }, [publishNeuralTelemetry]);
+
+  useEffect(() => {
     selectedHubRef.current = selectedHubId;
     focusTriggerRef.current = { hubId: selectedHubId, nonce: hubFocusNonce };
   }, [selectedHubId, hubFocusNonce]);
@@ -1349,7 +1473,153 @@ export default function SovereignBrain3DCanvas({
     [activeHubId],
   );
 
+  const stopCinematicTour = () => {
+    const wasActive = cinematicTourRef.current;
+    cinematicTourRef.current = false;
+    setCinematicTour(false);
+    tourTlRef.current?.kill();
+    tourTlRef.current = null;
+    if (tourReducedTimerRef.current) {
+      window.clearTimeout(tourReducedTimerRef.current);
+      tourReducedTimerRef.current = 0;
+    }
+    if (wasActive && !isSwitchingOutRef.current) {
+      gsapActiveRef.current = false;
+      activeGsapTlRef.current = null;
+    }
+  };
+
+  const computeGalaxyTourPose = (
+    stop: GalaxyTourStop,
+    orbitDriftRad: number,
+    outCam: THREE.Vector3,
+    outTarget: THREE.Vector3,
+  ) => {
+    if (stop.hubId === null) {
+      outTarget.set(...stop.targetPos);
+      const ca = Math.cos(orbitDriftRad);
+      const sa = Math.sin(orbitDriftRad);
+      const sx = stop.cameraPos[0];
+      const sy = stop.cameraPos[1];
+      const sz = stop.cameraPos[2];
+      outCam.set(sx * ca - sz * sa, sy, sx * sa + sz * ca);
+      return;
+    }
+    const tracker = hubTrackerRef.current.find((t) => t.hubId === stop.hubId);
+    if (!tracker) {
+      outTarget.set(0, 0, 0);
+      outCam.set(0, 7.6, 13.8);
+      return;
+    }
+    tracker.hubGroup.parent?.updateMatrixWorld(true);
+    tracker.hubGroup.getWorldPosition(outTarget);
+    _galaxyTourRadial.set(outTarget.x, 0, outTarget.z);
+    if (_galaxyTourRadial.lengthSq() < 1e-4) {
+      _galaxyTourRadial.set(0, 0, 1);
+    } else {
+      _galaxyTourRadial.normalize();
+    }
+    const rotAng = stop.azimuthLead + orbitDriftRad;
+    const ca = Math.cos(rotAng);
+    const sa = Math.sin(rotAng);
+    const rx = _galaxyTourRadial.x * ca - _galaxyTourRadial.z * sa;
+    const rz = _galaxyTourRadial.x * sa + _galaxyTourRadial.z * ca;
+    _galaxyTourRadial.set(rx, 0, rz);
+    outCam.copy(outTarget).addScaledVector(_galaxyTourRadial, stop.standOff);
+    outCam.y += stop.standOff * stop.elevFrac;
+  };
+
+  const runGalaxyTourStep = (stepIndex: number) => {
+    if (!cinematicTourRef.current || isSwitchingOutRef.current) return;
+    const idx =
+      ((stepIndex % GALAXY_CINEMATIC_TOUR_STOPS.length) + GALAXY_CINEMATIC_TOUR_STOPS.length) %
+      GALAXY_CINEMATIC_TOUR_STOPS.length;
+    const stop = GALAXY_CINEMATIC_TOUR_STOPS[idx];
+    const cam = cameraRef.current;
+    const ctrl = controlsRef.current;
+    if (!cam || !ctrl) return;
+
+    setCinematicTourStepIndex(idx);
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      computeGalaxyTourPose(stop, 0, _galaxyTourEndCam, _galaxyTourEndTarget);
+      cam.position.copy(_galaxyTourEndCam);
+      ctrl.target.copy(_galaxyTourEndTarget);
+      ctrl.update();
+      tourReducedTimerRef.current = window.setTimeout(() => {
+        runGalaxyTourStep(idx + 1);
+      }, 2800);
+      return;
+    }
+
+    activeGsapTlRef.current?.kill();
+    tourTlRef.current?.kill();
+    gsapActiveRef.current = true;
+
+    _galaxyTourStartCam.copy(cam.position);
+    _galaxyTourStartTarget.copy(ctrl.target);
+
+    const flightProxy = { t: 0 };
+    const holdProxy = { h: 0 };
+
+    const tl = gsap.timeline({
+      onComplete: () => {
+        if (cinematicTourRef.current && !isSwitchingOutRef.current) {
+          runGalaxyTourStep(idx + 1);
+        }
+      },
+    });
+
+    tl.to(flightProxy, {
+      t: 1,
+      duration: stop.duration,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        if (!cinematicTourRef.current) return;
+        const p = flightProxy.t;
+        computeGalaxyTourPose(stop, 0, _galaxyTourEndCam, _galaxyTourEndTarget);
+        const arcLift = Math.sin(p * Math.PI) * (stop.hubId === null ? 1.3 : 1.55);
+        cam.position.lerpVectors(_galaxyTourStartCam, _galaxyTourEndCam, p);
+        cam.position.y += arcLift;
+        ctrl.target.lerpVectors(_galaxyTourStartTarget, _galaxyTourEndTarget, p);
+        ctrl.update();
+      },
+    });
+
+    tl.to(holdProxy, {
+      h: 1,
+      duration: stop.hold,
+      ease: 'none',
+      onUpdate: () => {
+        if (!cinematicTourRef.current) return;
+        computeGalaxyTourPose(stop, holdProxy.h * 0.24, _galaxyTourEndCam, _galaxyTourEndTarget);
+        cam.position.copy(_galaxyTourEndCam);
+        ctrl.target.copy(_galaxyTourEndTarget);
+        ctrl.update();
+      },
+    });
+
+    tourTlRef.current = tl;
+    activeGsapTlRef.current = tl;
+  };
+
+  const handleToggleCinematicTour = () => {
+    if (cinematicTourRef.current) {
+      stopCinematicTour();
+      return;
+    }
+    setAutoRotate(false);
+    autoRotateRef.current = false;
+    cinematicTourRef.current = true;
+    setCinematicTour(true);
+    runGalaxyTourStep(0);
+  };
+
   const applyCameraPreset = (preset: CameraPreset) => {
+    stopCinematicTour();
     setCameraPreset(preset);
     const p = CAMERA_PRESETS[preset];
     presetCommandRef.current = {
@@ -1361,6 +1631,13 @@ export default function SovereignBrain3DCanvas({
 
   const applyGalaxyTypePreset = (preset: GalaxyTypePreset) => {
     setGalaxyPreset(preset.id);
+    const nextNebula = preset.id === 'procedural-nebula';
+    setNebulaMode(nextNebula);
+    if (nextNebula) {
+      nebulaClusterSeedRef.current += 1;
+      nebulaRebuildNonceRef.current += 1;
+      setNebulaRebuildNonce((n) => n + 1);
+    }
     setSpinSpeed(preset.spinSpeed);
     setStarDensity(preset.starDensity);
     setOrbitalDecay(preset.orbitalDecay);
@@ -1480,8 +1757,9 @@ export default function SovereignBrain3DCanvas({
     scene.background = BG_COLORS[finishRef.current].clone();
     scene.fog = new THREE.FogExp2(BG_COLORS[finishRef.current].getHex(), 0.012);
 
+    const initialCamPreset = CAMERA_PRESETS[cameraPresetRef.current] ?? CAMERA_PRESETS.overview;
     const camera = new THREE.PerspectiveCamera(44, width / height, 0.1, 140);
-    camera.position.set(...CAMERA_PRESETS.overview.pos);
+    camera.position.set(...initialCamPreset.pos);
     cameraRef.current = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -1492,7 +1770,7 @@ export default function SovereignBrain3DCanvas({
     controls.maxDistance = 28.0;
     controls.maxPolarAngle = Math.PI * 0.82;
     controls.minPolarAngle = Math.PI * 0.12;
-    controls.target.set(...CAMERA_PRESETS.overview.target);
+    controls.target.set(...initialCamPreset.target);
     controlsRef.current = controls;
 
     // GSAP entry morph when returning from Solar System ecliptic plane -> Spiral Galaxy perspective
@@ -1532,12 +1810,12 @@ export default function SovereignBrain3DCanvas({
       tl.to(
         proxy,
         {
-          x: CAMERA_PRESETS.overview.pos[0],
-          y: CAMERA_PRESETS.overview.pos[1],
-          z: CAMERA_PRESETS.overview.pos[2],
-          tx: CAMERA_PRESETS.overview.target[0],
-          ty: CAMERA_PRESETS.overview.target[1],
-          tz: CAMERA_PRESETS.overview.target[2],
+          x: initialCamPreset.pos[0],
+          y: initialCamPreset.pos[1],
+          z: initialCamPreset.pos[2],
+          tx: initialCamPreset.target[0],
+          ty: initialCamPreset.target[1],
+          tz: initialCamPreset.target[2],
           fov: 44,
           duration: 1.15,
           ease: 'power3.inOut',
@@ -2034,6 +2312,7 @@ export default function SovereignBrain3DCanvas({
     galaxyGeo.setAttribute('aPhase', new THREE.BufferAttribute(starPhases, 1));
     galaxyGeo.setAttribute('aTwinkle', new THREE.BufferAttribute(starTwinkles, 1));
     applyStarPalette(finishRef.current);
+    _morphWeights.set(...MORPH_TARGET_BY_PRESET[galaxyPresetRef.current]);
 
     const galaxyUniforms = {
       uRealTime: { value: 0 },
@@ -2912,6 +3191,11 @@ export default function SovereignBrain3DCanvas({
     packetInst.frustumCulled = false;
     scene.add(packetInst);
 
+    hubTrackerRef.current = hubMetas.map((m) => ({
+      hubId: m.hubId,
+      hubGroup: m.hubGroup,
+    }));
+
     // Pre-compile shaders on hardware GPU (skipped on Software WebGL to avoid stall)
     if (!isSoftwareGl) {
       renderer.compile(scene, camera);
@@ -2933,6 +3217,9 @@ export default function SovereignBrain3DCanvas({
     const handleControlStart = () => {
       cameraFlyActive = false;
       trackedHubId = null;
+      if (cinematicTourRef.current) {
+        stopCinematicTour();
+      }
       if (gsapActiveRef.current && !isSwitchingOutRef.current) {
         activeGsapTlRef.current?.kill();
         activeGsapTlRef.current = null;
@@ -3160,8 +3447,10 @@ export default function SovereignBrain3DCanvas({
         _morphWeights.divideScalar(wSum);
       }
 
-      // Read CSS-controlled --neural-bloom-intensity variable from stage element
-      const cssBloomRaw = stageRef.current?.style.getPropertyValue('--neural-bloom-intensity');
+      // Read global/stage CSS-controlled --neural-bloom-intensity variable
+      const cssBloomRaw =
+        stageRef.current?.style.getPropertyValue('--neural-bloom-intensity') ||
+        document.documentElement.style.getPropertyValue('--neural-bloom-intensity');
       const parsedCssBloom = cssBloomRaw ? Number.parseFloat(cssBloomRaw) : Number.NaN;
       const effectiveBloom = Number.isFinite(parsedCssBloom)
         ? Math.max(0, Math.min(2.0, parsedCssBloom))
@@ -3242,9 +3531,14 @@ export default function SovereignBrain3DCanvas({
         generateProceduralNebulaClusters(nebulaClusterSeedRef.current);
       }
 
+      const targetNebulaMix = nebulaModeRef.current
+        ? 1.0
+        : galaxyPresetRef.current === 'procedural-nebula'
+          ? 0.9
+          : 0.0;
       nebulaMixSmooth = THREE.MathUtils.damp(
         nebulaMixSmooth,
-        nebulaModeRef.current ? 1.0 : 0.0,
+        targetNebulaMix,
         4.2,
         rawDt,
       );
@@ -3411,8 +3705,8 @@ export default function SovereignBrain3DCanvas({
         .lerp(_tmpColor2, _morphWeights.z)
         .lerp(_tmpColor3, _morphWeights.w);
       coronaUniforms.uIntensity.value =
-        (isStone ? 0.25 : 0.68) *
-        (0.5 + effectiveBloom * 0.5) *
+        (isStone ? 0.22 : 0.72) *
+        (0.24 + effectiveBloom * 0.68) *
         (1.0 + _morphWeights.z * 0.28 + _morphWeights.w * 0.22 + morphPulseRef.current * 0.25);
 
       photonHaloUniforms.uTime.value = coreTime;
@@ -3438,8 +3732,8 @@ export default function SovereignBrain3DCanvas({
         .lerp(_tmpColor2, _morphWeights.z)
         .lerp(_tmpColor3, _morphWeights.w);
       photonHaloUniforms.uIntensity.value =
-        (isStone ? 0.24 : 0.72) *
-        (0.45 + effectiveBloom * 0.55) *
+        (isStone ? 0.22 : 0.76) *
+        (0.22 + effectiveBloom * 0.72) *
         (1.0 + _morphWeights.y * 0.18 + _morphWeights.z * 0.24 + _morphWeights.w * 0.22);
       photonHaloMesh.quaternion.copy(camera.quaternion);
 
@@ -3470,10 +3764,12 @@ export default function SovereignBrain3DCanvas({
         (1.0 - _morphWeights.y * 0.38 + _morphWeights.z * 0.2 - _morphWeights.w * 0.18);
 
       // Deterministic core & OPA gyroscope rotations anchored to simEpoch
+      const bloomEmissiveGain = 0.25 + effectiveBloom * 0.75;
       solarMesh.rotation.y = curEpoch * 0.048 + realTime * 0.04;
       opaRingGroup.rotation.y = -curEpoch * 0.092 - realTime * 0.05;
       opaRingMat.color.set(opaPass ? (isStone ? '#1C6E46' : '#6FCB9F') : '#D97706');
       opaRingMat.emissive.set(opaPass ? '#1C6E46' : '#B45309');
+      opaRingMat.emissiveIntensity = (opaPass ? 0.85 : 0.45) * bloomEmissiveGain;
 
       // Check Camera / Galaxy Preset Fly-To triggers
       if (presetCommandRef.current.nonce !== lastHandledPresetNonce) {
@@ -3488,6 +3784,9 @@ export default function SovereignBrain3DCanvas({
       if (focusTriggerRef.current.nonce !== lastHandledFocusNonce) {
         lastHandledFocusNonce = focusTriggerRef.current.nonce;
         if (focusTriggerRef.current.hubId) {
+          if (cinematicTourRef.current) {
+            stopCinematicTour();
+          }
           trackedHubId = focusTriggerRef.current.hubId;
           cameraFlyActive = true;
           const m = hubMetas.find((h) => h.hubId === focusTriggerRef.current.hubId);
@@ -3577,14 +3876,16 @@ export default function SovereignBrain3DCanvas({
           ),
         );
 
-        // Emissive intensity pulse for active/selected hubs
+        // Emissive intensity pulse for active/selected hubs scaled by --neural-bloom-intensity
         const pulseWave = 0.5 + 0.5 * Math.sin(realTime * 3.1 + h * 0.8);
-        meta.coreMat.emissiveIntensity = isSelected
-          ? 1.15 + pulseWave * 0.75
-          : isActiveHub
-            ? 0.72 + pulseWave * 0.35
-            : 0.25;
-        meta.shellMat.opacity = isSelected ? 0.56 : isActiveHub ? 0.44 : 0.26;
+        meta.coreMat.emissiveIntensity =
+          (isSelected
+            ? 1.15 + pulseWave * 0.75
+            : isActiveHub
+              ? 0.72 + pulseWave * 0.35
+              : 0.25) * bloomEmissiveGain;
+        meta.shellMat.opacity =
+          (isSelected ? 0.56 : isActiveHub ? 0.44 : 0.26) * (0.55 + effectiveBloom * 0.25);
         meta.orbitRingMat.opacity = isSelected
           ? 0.72
           : isHovered
@@ -3617,7 +3918,7 @@ export default function SovereignBrain3DCanvas({
             Math.sin(satAng) * sat.orbitRadius * Math.cos(sat.inclination),
           );
           sat.mesh.scale.setScalar(satActive ? 1.28 : 0.75);
-          sat.mat.emissiveIntensity = satActive ? 1.25 : 0.18;
+          sat.mat.emissiveIntensity = (satActive ? 1.25 : 0.18) * bloomEmissiveGain;
           sat.mat.color.set(satActive ? '#FFFFFF' : isStone ? '#64748B' : '#94A3B8');
         }
 
@@ -3722,7 +4023,7 @@ export default function SovereignBrain3DCanvas({
         const texBytes = renderer.info.memory.textures * 512 * 512 * 4;
         const gpuEstimateMb = (staticGeoVramBytes + rtBytes + texBytes) / (1024 * 1024);
 
-        setTelemetryMetrics({
+        const telemetrySnapshot: NeuralCoreTelemetrySnapshot = {
           fps: measuredFps,
           frameMs: smoothedFrameMs,
           drawCalls: frameDrawCalls,
@@ -3734,6 +4035,20 @@ export default function SovereignBrain3DCanvas({
           jsHeapLimitMb,
           gpuEstimateMb,
           rendererMode: isSoftwareGl ? 'software' : 'hardware',
+        };
+        setTelemetryMetrics(telemetrySnapshot);
+        const activeGp = galaxyPresetRef.current;
+        const isNebulaNow = activeGp === 'procedural-nebula' || nebulaModeRef.current;
+        const presetShort =
+          GALAXY_TYPE_PRESETS.find((p) => p.id === activeGp)?.shortLabel ?? 'Andromeda Spiral';
+        publishTelemetryRef.current({
+          system: isNebulaNow ? 'nebula' : 'spiral',
+          subtitle:
+            isNebulaNow && activeGp !== 'procedural-nebula'
+              ? `${presetShort} · Nebula`
+              : presetShort,
+          metrics: telemetrySnapshot,
+          updatedAtMs: Date.now(),
         });
       }
 
@@ -3903,6 +4218,14 @@ export default function SovereignBrain3DCanvas({
 
     return () => {
       disposed = true;
+      tourTlRef.current?.kill();
+      tourTlRef.current = null;
+      if (tourReducedTimerRef.current) {
+        window.clearTimeout(tourReducedTimerRef.current);
+        tourReducedTimerRef.current = 0;
+      }
+      cinematicTourRef.current = false;
+      hubTrackerRef.current = [];
       activeGsapTlRef.current?.kill();
       activeGsapTlRef.current = null;
       gsapActiveRef.current = false;
@@ -3990,14 +4313,15 @@ export default function SovereignBrain3DCanvas({
     GALAXY_TYPE_PRESETS.find((p) => p.id === galaxyPreset) ?? GALAXY_TYPE_PRESETS[0];
 
   const handleToggleNebulaMode = () => {
-    if (!nebulaMode) {
-      nebulaClusterSeedRef.current += 1;
-      nebulaRebuildNonceRef.current += 1;
-      setNebulaRebuildNonce((n) => n + 1);
-      setNebulaMode(true);
-      setDockOpen(true);
+    if (galaxyPreset !== 'procedural-nebula') {
+      const nebPreset =
+        GALAXY_TYPE_PRESETS.find((p) => p.id === 'procedural-nebula') ?? GALAXY_TYPE_PRESETS[0];
+      setMorphProgress(0.05);
+      applyGalaxyTypePreset(nebPreset);
     } else {
-      setNebulaMode(false);
+      const spiralPreset = GALAXY_TYPE_PRESETS[0];
+      setMorphProgress(0.05);
+      applyGalaxyTypePreset(spiralPreset);
     }
   };
 
@@ -4010,6 +4334,7 @@ export default function SovereignBrain3DCanvas({
   // Phase A of GSAP morph: sweep Spiral Galaxy into top-down vantage before handing off to Solar System ecliptic
   const handleRequestAlternativeSystem = () => {
     if (!onToggleAlternativeSystem || isSwitchingOutRef.current) return;
+    stopCinematicTour();
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4161,9 +4486,44 @@ export default function SovereignBrain3DCanvas({
         compact={compact}
       />
 
-      {/* Top-Right Real-Time Performance Telemetry Overlay */}
+      {/* Active Cinematic Tour Waypoint Readout (Galaxy / Nebula modes) */}
+      {cinematicTour && (
+        <div
+          data-qa="galaxy-cinematic-tour-banner"
+          style={
+            isNebulaTheme && !isLightMode
+              ? {
+                  backgroundColor: 'var(--nebula-bg-panel)',
+                  borderColor: 'var(--nebula-accent-teal)',
+                  boxShadow: 'var(--nebula-shadow-card)',
+                  color: 'var(--nebula-fg-bright)',
+                }
+              : undefined
+          }
+          className={`pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 rounded-lg border px-3 py-1.5 font-mono text-[10px] shadow-md max-w-[340px] ${
+            isNebulaTheme && !isLightMode
+              ? ''
+              : isLightMode
+                ? 'bg-[#FAF8F4]/95 border-[#1F3863]/40 text-[#16213A]'
+                : 'bg-[#0B1124]/94 border-[#6FCB9F]/45 text-[#E7EBF5]'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3 text-[9px] uppercase tracking-[0.06em] opacity-85">
+            <span>
+              Cinematic Tour · {cinematicTourStepIndex + 1}/{GALAXY_CINEMATIC_TOUR_STOPS.length}
+            </span>
+            <span>Drag camera to exit</span>
+          </div>
+          <div className="font-bold truncate mt-0.5">
+            {GALAXY_CINEMATIC_TOUR_STOPS[cinematicTourStepIndex]?.title}
+          </div>
+        </div>
+      )}
+
+      {/* Top-Right Real-Time Performance Telemetry Dashboard Overlay */}
       <NeuralCoreTelemetryOverlay
-        mode="spiral-galaxy"
+        mode={galaxyPreset === 'procedural-nebula' || nebulaMode ? 'nebula' : 'spiral-galaxy'}
+        systemSubtitle={activePresetMeta.shortLabel}
         isLightMode={isLightMode}
         metrics={telemetryMetrics}
         positionClassName="top-3 right-3"
@@ -4239,6 +4599,15 @@ export default function SovereignBrain3DCanvas({
         galaxyPreset={galaxyPreset}
         onSelectGalaxyPreset={(preset) => {
           setMorphProgress(0.05);
+          if (Math.abs(preset.spinSpeed - spinSpeed) >= 0.01) {
+            recordImmediateEvent({
+              system: nebulaMode || preset.id === 'procedural-nebula' ? 'nebula' : 'spiral',
+              metric: 'velocity',
+              label: `${preset.shortLabel} Spin`,
+              previousValue: `${spinSpeed.toFixed(2)}×`,
+              newValue: `${preset.spinSpeed.toFixed(2)}×`,
+            });
+          }
           applyGalaxyTypePreset(preset);
         }}
         morphProgress={morphProgress}
@@ -4263,6 +4632,15 @@ export default function SovereignBrain3DCanvas({
         onSelectFinish={setFinish}
         spinSpeed={spinSpeed}
         onSpinSpeedChange={(val) => {
+          recordNumericTransition({
+            key: 'galaxy-spin-velocity',
+            system: isNebulaTheme ? 'nebula' : 'spiral',
+            metric: 'velocity',
+            label: 'Spin Velocity',
+            previousRaw: spinSpeed,
+            nextRaw: val,
+            formatValue: (v) => `${v.toFixed(2)}×`,
+          });
           setSpinSpeed(val);
           if (isPaused) setIsPaused(false);
         }}
@@ -4285,9 +4663,30 @@ export default function SovereignBrain3DCanvas({
         totalStarCapacity={28000}
         activeHubCount={BRAIN_HUBS.length}
         autoRotate={autoRotate}
-        onToggleAutoRotate={() => setAutoRotate((v) => !v)}
+        onToggleAutoRotate={() => {
+          if (cinematicTourRef.current) stopCinematicTour();
+          setAutoRotate(!autoRotate);
+        }}
+        cinematicTour={cinematicTour}
+        cinematicTourStopLabel={GALAXY_CINEMATIC_TOUR_STOPS[cinematicTourStepIndex]?.title}
+        cinematicTourStepIndex={cinematicTourStepIndex}
+        cinematicTourTotalStops={GALAXY_CINEMATIC_TOUR_STOPS.length}
+        onToggleCinematicTour={handleToggleCinematicTour}
+        orbitalHistory={orbitalHistory}
+        onClearOrbitalHistory={clearOrbitalHistory}
         onReset={() => {
+          stopCinematicTour();
+          flushAll();
           const baseline = GALAXY_TYPE_PRESETS[0];
+          if (Math.abs(spinSpeed - baseline.spinSpeed) >= 0.01) {
+            recordImmediateEvent({
+              system: isNebulaTheme ? 'nebula' : 'spiral',
+              metric: 'reset',
+              label: 'Galaxy Spin Reset',
+              previousValue: `${spinSpeed.toFixed(2)}×`,
+              newValue: `${baseline.spinSpeed.toFixed(2)}×`,
+            });
+          }
           if (galaxyPreset !== baseline.id) {
             setMorphProgress(0.05);
           }

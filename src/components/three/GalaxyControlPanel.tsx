@@ -6,6 +6,7 @@ import {
   Clapperboard,
   Compass,
   Crosshair,
+  History,
   LocateFixed,
   Orbit,
   Pause,
@@ -18,9 +19,14 @@ import {
   Sparkles,
   Sun,
   SunMoon,
+  Trash2,
   Waypoints,
   Zap,
 } from 'lucide-react';
+import {
+  OrbitalHistoryEntry,
+  formatOrbitalTimestamp,
+} from './useOrbitalHistoryRecorder';
 import {
   GALAXY_TYPE_PRESETS,
   GalaxyPresetId,
@@ -47,6 +53,7 @@ export {
   getEpochPhaseLabel,
 };
 export type { GalaxyPresetId, GalaxyTypePreset };
+export type { OrbitalHistoryEntry };
 
 export type CameraPreset = 'overview' | 'operations' | 'experience' | 'ecliptic';
 export type ObservatoryFinish = 'cosmos' | 'nocturnal' | 'nebula' | 'stone';
@@ -173,8 +180,207 @@ export interface GalaxyControlPanelProps {
   activeHubCount?: number;
   autoRotate: boolean;
   onToggleAutoRotate: () => void;
+  cinematicTour?: boolean;
+  cinematicTourStopLabel?: string;
+  cinematicTourStepIndex?: number;
+  cinematicTourTotalStops?: number;
+  onToggleCinematicTour?: () => void;
   onReset: () => void;
+  orbitalHistory?: OrbitalHistoryEntry[];
+  onClearOrbitalHistory?: () => void;
   solarControls?: SolarSystemControlConfig;
+}
+
+interface OrbitalHistorySectionProps {
+  entries: OrbitalHistoryEntry[];
+  onClear?: () => void;
+  variant: 'solar' | 'nebula' | 'dark' | 'light';
+}
+
+function OrbitalHistorySection({ entries, onClear, variant }: OrbitalHistorySectionProps) {
+  const [expanded, setExpanded] = useState(false);
+  const latest = entries[0] ?? null;
+
+  const isSolar = variant === 'solar';
+  const isNebula = variant === 'nebula';
+  const isLight = variant === 'light';
+
+  const borderStyle = isSolar
+    ? { borderColor: 'var(--solar-border-subtle)' }
+    : isNebula
+      ? { borderColor: 'var(--nebula-border-subtle)' }
+      : undefined;
+
+  const stripStyle = isSolar
+    ? { backgroundColor: 'rgba(4, 10, 22, 0.52)', borderColor: 'var(--solar-border-subtle)' }
+    : isNebula
+      ? { backgroundColor: 'var(--nebula-bg-strip)', borderColor: 'var(--nebula-border-subtle)' }
+      : undefined;
+
+  const dividerClass =
+    isSolar || isNebula ? '' : isLight ? 'border-[#E4DFD6]' : 'border-[#1E2B4F]';
+
+  const textMutedClass = isSolar
+    ? 'text-[var(--solar-fg-muted)]'
+    : isNebula
+      ? 'text-[var(--nebula-fg-muted)]'
+      : isLight
+        ? 'text-[#5A6275]'
+        : 'text-[#8E9DC2]';
+
+  const textTitleClass = isSolar
+    ? 'text-[var(--solar-fg-blue)]'
+    : isNebula
+      ? 'text-[var(--nebula-fg-violet)]'
+      : isLight
+        ? 'text-[#16213A]'
+        : 'text-[#D6E0F5]';
+
+  const getMetricBadgeStyle = (metric: OrbitalHistoryEntry['metric']) => {
+    if (metric === 'inclination') {
+      return isLight
+        ? 'bg-[#E6F4F1] text-[#0F766E] border-[#99F6E4]'
+        : 'bg-[#68E4EF]/14 text-[#68E4EF] border-[#68E4EF]/35';
+    }
+    if (metric === 'velocity') {
+      return isLight
+        ? 'bg-[#FEF3C7] text-[#9A6700] border-[#FCD34D]'
+        : 'bg-[#FFB563]/14 text-[#FFE0BB] border-[#FFB563]/35';
+    }
+    return isLight
+      ? 'bg-[#EEF3FB] text-[#1F3863] border-[#C7D4EC]'
+      : 'bg-[#8FA6E8]/14 text-[#C4D6F0] border-[#8FA6E8]/35';
+  };
+
+  return (
+    <div
+      data-qa="orbital-history-section"
+      style={stripStyle}
+      className={`border-t text-[10px] font-mono ${dividerClass} ${
+        isLight ? 'bg-[#F5F2EA]/80' : !isSolar && !isNebula ? 'bg-[#081022]/80' : ''
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2 px-3 py-1">
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+          aria-controls="spenta-orbital-history-list"
+          data-qa="orbital-history-toggle"
+          className={`flex-1 min-w-0 flex items-center justify-between gap-2 py-0.5 text-left cursor-pointer transition-opacity hover:opacity-100 ${textTitleClass}`}
+        >
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <History className="w-3 h-3 shrink-0 opacity-85" strokeWidth={1.85} />
+            <span className="font-semibold tracking-[0.02em] whitespace-nowrap">
+              Orbital History
+            </span>
+            <span
+              className={`tabular-nums text-[9px] px-1.5 py-0 rounded border ${
+                isLight
+                  ? 'bg-white border-[#D4CEC2] text-[#4A5163]'
+                  : 'bg-white/5 border-white/12 text-current opacity-85'
+              }`}
+            >
+              {entries.length}
+            </span>
+          </span>
+
+          <span className="inline-flex items-center gap-2 min-w-0">
+            {!expanded && latest && (
+              <span className={`hidden sm:inline truncate text-[9px] tabular-nums ${textMutedClass}`}>
+                {latest.label}: {latest.previousValue} → {latest.newValue} ·{' '}
+                {formatOrbitalTimestamp(latest.timestamp)}
+              </span>
+            )}
+            {!expanded && !latest && (
+              <span className={`hidden sm:inline truncate text-[9px] ${textMutedClass}`}>
+                No inclination / velocity changes
+              </span>
+            )}
+            {expanded ? (
+              <ChevronDown className={`w-3.5 h-3.5 shrink-0 ${textMutedClass}`} />
+            ) : (
+              <ChevronUp className={`w-3.5 h-3.5 shrink-0 ${textMutedClass}`} />
+            )}
+          </span>
+        </button>
+
+        {expanded && entries.length > 0 && onClear && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            data-qa="orbital-history-clear"
+            aria-label="Clear Orbital History log"
+            title="Clear Orbital History log"
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-mono cursor-pointer transition-colors shrink-0 ${
+              isLight
+                ? 'bg-white border-[#D4CEC2] text-[#5A6275] hover:text-[#16213A]'
+                : 'bg-white/5 border-white/15 text-current opacity-80 hover:opacity-100'
+            }`}
+          >
+            <Trash2 className="w-2.5 h-2.5" strokeWidth={1.85} />
+            <span>Clear</span>
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+        <div
+          id="spenta-orbital-history-list"
+          role="log"
+          aria-live="polite"
+          data-qa="orbital-history-list"
+          style={borderStyle}
+          className={`border-t px-3 py-1.5 max-h-[96px] overflow-y-auto ${dividerClass}`}
+        >
+          {entries.length === 0 ? (
+            <div className={`text-[9px] py-0.5 ${textMutedClass}`}>
+              Adjust inclination or velocity sliders above to record state transitions.
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {entries.map((entry) => (
+                <li
+                  key={entry.id}
+                  data-qa="orbital-history-item"
+                  className="flex items-center justify-between gap-2 leading-tight"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
+                      className={`inline-block shrink-0 px-1 py-0 rounded border text-[8px] font-bold uppercase tracking-[0.05em] ${getMetricBadgeStyle(
+                        entry.metric,
+                      )}`}
+                    >
+                      {entry.metric === 'inclination'
+                        ? 'INC'
+                        : entry.metric === 'velocity'
+                          ? 'VEL'
+                          : 'RST'}
+                    </span>
+                    <span className={`truncate text-[9px] ${textTitleClass}`}>{entry.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 tabular-nums text-[9px]">
+                    <span className="font-semibold">
+                      <span className={textMutedClass}>{entry.previousValue}</span>
+                      <span className={`mx-1 ${textMutedClass}`}>→</span>
+                      <span>{entry.newValue}</span>
+                    </span>
+                    <span className={`${textMutedClass} text-[8.5px]`}>
+                      {formatOrbitalTimestamp(entry.timestamp)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function GalaxyControlPanel({
@@ -222,7 +428,14 @@ export function GalaxyControlPanel({
   totalStarCapacity = 28000,
   autoRotate,
   onToggleAutoRotate,
+  cinematicTour = false,
+  cinematicTourStopLabel,
+  cinematicTourStepIndex = 0,
+  cinematicTourTotalStops = 6,
+  onToggleCinematicTour,
   onReset,
+  orbitalHistory = [],
+  onClearOrbitalHistory,
   solarControls,
 }: GalaxyControlPanelProps) {
   const isSolarMode = systemMode === 'solar-map' && Boolean(solarControls);
@@ -277,6 +490,7 @@ export function GalaxyControlPanel({
     return (
       <div
         className="solar-map-scope absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-20px)] max-w-[940px]"
+        style={{ '--neural-bloom-intensity': solarControls.bloomIntensity.toFixed(2) } as React.CSSProperties}
         role="region"
         aria-label="3D Neural Core Solar System Control Panel"
         data-qa="solar-map-control-strip"
@@ -614,7 +828,8 @@ export function GalaxyControlPanel({
                 step={0.05}
                 value={solarControls.bloomIntensity}
                 onChange={(e) => solarControls.onBloomIntensityChange(Number(e.target.value))}
-                aria-label="Solar System post-processing bloom intensity for the Sun and corona halo"
+                title="Global bloom intensity linked to --neural-bloom-intensity CSS variable"
+                aria-label="Global post-processing bloom intensity using --neural-bloom-intensity CSS variable"
                 className="w-full spenta-slider"
               />
             </div>
@@ -840,69 +1055,77 @@ export function GalaxyControlPanel({
             </button>
           </div>
 
-          {/* Row 4: Procedural Orbital Configuration Preset Selector & Orbit Jitter */}
+          {/* Row 4: Preset Layouts Dropdown & Orbit Jitter */}
           <div
             style={{ borderColor: 'var(--solar-border-subtle)' }}
             className="px-3 py-1.5 border-t flex flex-wrap items-center justify-between gap-[8px] text-[10px] font-mono"
           >
             <div
               className="flex flex-wrap items-center gap-[8px]"
-              role="group"
-              aria-label="Configuration Preset orbital layout selector"
               data-qa="solar-configuration-preset-group"
             >
-              <span className="text-[var(--solar-fg-blue)] font-semibold whitespace-nowrap">
-                Configuration Preset
-              </span>
+              <label
+                htmlFor="spenta-solar-preset-layouts"
+                className="text-[var(--solar-fg-blue)] font-semibold whitespace-nowrap"
+              >
+                Preset Layouts
+              </label>
               <div
                 style={{
                   backgroundColor: 'var(--solar-bg-select)',
-                  borderColor: 'var(--solar-border-mid)',
+                  borderColor:
+                    solarControls.configurationPreset === 'young-chaotic'
+                      ? '#FF894F'
+                      : solarControls.configurationPreset === 'highly-eccentric'
+                        ? 'var(--solar-accent-amber)'
+                        : 'var(--solar-border-mid)',
+                  boxShadow: 'var(--solar-shadow-glow)',
                 }}
-                className="inline-flex items-center gap-[3px] p-[3px] rounded-[6px] border"
+                className="inline-flex items-center gap-[6px] px-[9px] h-[30px] rounded-[6px] border transition-colors"
               >
-                {SOLAR_CONFIGURATION_PRESETS.map((preset) => {
-                  const active = solarControls.configurationPreset === preset.id;
-                  return (
-                    <button
+                <Orbit
+                  className="w-3 h-3 shrink-0"
+                  style={{
+                    color:
+                      solarControls.configurationPreset === 'young-chaotic'
+                        ? '#FF894F'
+                        : solarControls.configurationPreset === 'highly-eccentric'
+                          ? 'var(--solar-accent-amber-fg)'
+                          : 'var(--solar-accent-blue)',
+                  }}
+                  strokeWidth={1.85}
+                />
+                <select
+                  id="spenta-solar-preset-layouts"
+                  data-qa="solar-preset-layouts-select"
+                  value={solarControls.configurationPreset}
+                  onChange={(e) =>
+                    solarControls.onSelectConfigurationPreset(
+                      e.target.value as SolarConfigurationPreset,
+                    )
+                  }
+                  aria-label="Preset Layouts: select orbital mode between Stable Circular, Highly Eccentric, and Young Chaotic"
+                  className="bg-transparent text-[10px] font-mono font-semibold text-[var(--solar-fg-bright)] cursor-pointer focus:outline-none pr-1"
+                >
+                  {SOLAR_CONFIGURATION_PRESETS.map((preset) => (
+                    <option
                       key={preset.id}
-                      type="button"
-                      onClick={() => solarControls.onSelectConfigurationPreset(preset.id)}
-                      aria-pressed={active}
+                      value={preset.id}
                       title={preset.title}
-                      data-qa={`solar-config-preset-${preset.id}`}
-                      style={
-                        active
-                          ? preset.id === 'young-chaotic'
-                            ? {
-                                backgroundColor: 'rgba(255, 137, 79, 0.24)',
-                                borderColor: '#FF894F',
-                                color: '#FFFFFF',
-                              }
-                            : preset.id === 'highly-eccentric'
-                              ? {
-                                  backgroundColor: 'var(--solar-accent-amber-bg)',
-                                  borderColor: 'var(--solar-accent-amber)',
-                                  color: 'var(--solar-accent-amber-fg)',
-                                }
-                              : {
-                                  backgroundColor: 'rgba(72, 142, 255, 0.24)',
-                                  borderColor: 'var(--solar-accent-blue)',
-                                  color: '#FFFFFF',
-                                }
-                          : {
-                              backgroundColor: 'transparent',
-                              borderColor: 'transparent',
-                              color: 'var(--solar-fg-blue)',
-                            }
-                      }
-                      className="px-[8px] h-[24px] rounded-[4px] border text-[10px] font-mono font-semibold cursor-pointer transition-colors hover:text-white whitespace-nowrap"
+                      className="bg-[#081226] text-white"
                     >
                       {preset.label}
-                    </button>
-                  );
-                })}
+                    </option>
+                  ))}
+                </select>
               </div>
+              <span className="hidden md:inline text-[9px] text-[var(--solar-fg-muted)] truncate max-w-[260px]">
+                {
+                  SOLAR_CONFIGURATION_PRESETS.find(
+                    (p) => p.id === solarControls.configurationPreset,
+                  )?.title
+                }
+              </span>
             </div>
 
             <button
@@ -942,6 +1165,13 @@ export function GalaxyControlPanel({
               </span>
             </button>
           </div>
+
+          {/* Collapsible Orbital History Log (Inclination & Velocity State Transitions) */}
+          <OrbitalHistorySection
+            entries={orbitalHistory}
+            onClear={onClearOrbitalHistory}
+            variant="solar"
+          />
         </div>
       </div>
     );
@@ -1096,6 +1326,35 @@ export function GalaxyControlPanel({
               </div>
             )}
 
+            {onToggleCinematicTour && (
+              <button
+                type="button"
+                onClick={onToggleCinematicTour}
+                aria-pressed={cinematicTour}
+                data-qa="galaxy-toggle-cinematic-tour"
+                aria-label={
+                  cinematicTour
+                    ? `Stop Cinematic Tour: currently visiting ${cinematicTourStopLabel ?? 'galactic waypoint'}`
+                    : 'Cinematic Tour: automatically cycle the camera through Solar Core, inner hub arms, and outer orbital fringes using GSAP interpolation'
+                }
+                title={
+                  cinematicTour
+                    ? `Active Tour (${cinematicTourStepIndex + 1}/${cinematicTourTotalStops}): ${cinematicTourStopLabel ?? ''} · Click to stop`
+                    : 'Cycle camera smoothly across Solar Core, inner arms & outer orbital fringes'
+                }
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-mono font-semibold border cursor-pointer transition-colors whitespace-nowrap ${
+                  cinematicTour ? btnActive : btnNeutral
+                }`}
+              >
+                <Clapperboard className="w-3 h-3 shrink-0" strokeWidth={1.85} />
+                <span>
+                  {cinematicTour
+                    ? `Cinematic Tour (${cinematicTourStepIndex + 1}/${cinematicTourTotalStops})`
+                    : 'Cinematic Tour'}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onToggleAutoRotate}
@@ -1190,13 +1449,198 @@ export function GalaxyControlPanel({
             </div>
           )}
 
+        {/* Always-Visible Global Bloom Intensity Bar (--neural-bloom-intensity across Spiral & Nebula modes) */}
+        <div
+          className={`px-3 py-1.5 border-t flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono ${dividerClass}`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Sparkles
+              className={`w-3 h-3 shrink-0 ${
+                isLightMode
+                  ? 'text-[#B45309]'
+                  : isNebulaTheme
+                    ? 'text-[var(--nebula-accent-magenta-fg)]'
+                    : 'text-[#6FCB9F]'
+              }`}
+              strokeWidth={1.85}
+            />
+            <label
+              htmlFor="spenta-galaxy-bloom-intensity"
+              className="font-semibold whitespace-nowrap"
+            >
+              Bloom Intensity
+            </label>
+            <span className="hidden md:inline text-[9px] opacity-65 whitespace-nowrap">
+              --neural-bloom-intensity
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-1 min-w-[180px] max-w-[360px]">
+            <input
+              id="spenta-galaxy-bloom-intensity"
+              data-qa="galaxy-bloom-intensity-slider"
+              type="range"
+              min={0}
+              max={2.0}
+              step={0.05}
+              value={bloomIntensity}
+              onChange={(e) => onBloomIntensityChange?.(Number(e.target.value))}
+              aria-label="Global post-processing bloom intensity using --neural-bloom-intensity CSS variable"
+              className="w-full spenta-slider"
+            />
+            <span
+              className={`tabular-nums font-bold shrink-0 w-[68px] text-right ${
+                bloomIntensity <= 0.05
+                  ? 'opacity-65'
+                  : bloomIntensity >= 1.4
+                    ? isLightMode
+                      ? 'text-[#B45309]'
+                      : isNebulaTheme
+                        ? 'text-[var(--nebula-accent-magenta-fg)]'
+                        : 'text-[#6FCB9F]'
+                    : ''
+              }`}
+            >
+              {bloomIntensity <= 0.02
+                ? '0% (Off)'
+                : `${Math.round(bloomIntensity * 100)}% Glow`}
+            </span>
+          </div>
+        </div>
+
+        {/* Dynamic Procedural Nebula Controls: visible ONLY when 'Procedural Nebula' preset is selected (.nebula-core-scope CSS variables) */}
+        {galaxyPreset === 'procedural-nebula' && (
+          <div
+            data-qa="nebula-mode-sliders"
+            style={
+              !isLightMode
+                ? {
+                    backgroundColor: 'var(--nebula-bg-strip)',
+                    borderColor: 'var(--nebula-border-teal)',
+                  }
+                : undefined
+            }
+            className={`px-3 py-2 border-t space-y-2 text-[10px] font-mono ${
+              isLightMode ? 'bg-[#F0FDFA] border-[#99F6E4]' : ''
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles
+                  className={`w-3.5 h-3.5 shrink-0 ${
+                    isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-teal)]'
+                  }`}
+                  strokeWidth={1.85}
+                />
+                <span
+                  className={`font-semibold truncate ${
+                    isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-bright)]'
+                  }`}
+                >
+                  Procedural Nebula Clusters
+                </span>
+                <span
+                  className={`hidden sm:inline tabular-nums ${
+                    isLightMode ? 'text-[#0F766E]/80' : 'text-[var(--nebula-fg-violet)]'
+                  }`}
+                >
+                  · {renderedNebulaK}k Perlin cluster nodes
+                </span>
+              </div>
+
+              {onRegenerateNebulaClusters && (
+                <button
+                  type="button"
+                  onClick={onRegenerateNebulaClusters}
+                  data-qa="nebula-reseed-clusters"
+                  title="Procedurally regenerate nebula particle cluster topology using .nebula-core-scope CSS tokens"
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-mono font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${btnNeutral}`}
+                >
+                  <Shuffle className="w-3 h-3 shrink-0" strokeWidth={1.85} />
+                  <span>Reseed Clusters</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Dynamic Nebula Density Slider (20% .. 200%) */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="spenta-nebula-density"
+                    className={`whitespace-nowrap ${
+                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-teal)]'
+                    }`}
+                  >
+                    Nebula Density
+                  </label>
+                  <span
+                    className={`tabular-nums font-bold ${
+                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-fg-bright)]'
+                    }`}
+                  >
+                    {Math.round(nebulaDensity * 100)}% ({renderedNebulaK}k)
+                  </span>
+                </div>
+                <input
+                  id="spenta-nebula-density"
+                  data-qa="nebula-density-slider"
+                  type="range"
+                  min={0.2}
+                  max={2.0}
+                  step={0.05}
+                  value={nebulaDensity}
+                  onChange={(e) => onNebulaDensityChange?.(Number(e.target.value))}
+                  aria-label="Nebula cluster particle density from 20 percent to 200 percent"
+                  className="w-full spenta-slider"
+                />
+              </div>
+
+              {/* Dynamic Particle Turbulence Slider (0% .. 200%) */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <label
+                    htmlFor="spenta-nebula-turbulence"
+                    className={`whitespace-nowrap ${
+                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-violet)]'
+                    }`}
+                  >
+                    Particle Turbulence
+                  </label>
+                  <span
+                    className={`tabular-nums font-bold ${
+                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-magenta-fg)]'
+                    }`}
+                  >
+                    {particleTurbulence <= 0.02
+                      ? '0% (Calm)'
+                      : `${Math.round(particleTurbulence * 100)}% Curl`}
+                  </span>
+                </div>
+                <input
+                  id="spenta-nebula-turbulence"
+                  data-qa="nebula-turbulence-slider"
+                  type="range"
+                  min={0}
+                  max={2.0}
+                  step={0.05}
+                  value={particleTurbulence}
+                  onChange={(e) => onParticleTurbulenceChange?.(Number(e.target.value))}
+                  aria-label="Nebula particle curl turbulence intensity from 0 percent to 200 percent"
+                  className="w-full spenta-slider"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Expandable Real-Time Physics Sliders (.spenta-slider) + Compact Camera & Observatory Controls */}
         {dockOpen && (
           <div
             className={`px-3 pb-2.5 pt-2 border-t space-y-2 text-[10px] font-mono ${dividerClass}`}
           >
             {/* Primary Real-Time Adjustment Sliders */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Galaxy Rotation Speed */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2 opacity-85">
@@ -1294,273 +1738,122 @@ export function GalaxyControlPanel({
                   className="w-full spenta-slider"
                 />
               </div>
-
-              {/* Nebula Bloom Intensity (CSS --neural-bloom-intensity) */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2 opacity-85">
-                  <label htmlFor="spenta-galaxy-nebula-bloom" className="whitespace-nowrap">
-                    Nebula Bloom
-                  </label>
-                  <span
-                    className={`tabular-nums font-bold ${
-                      bloomIntensity >= 1.4
-                        ? isLightMode
-                          ? 'text-[#B45309]'
-                          : isNebulaTheme
-                            ? 'text-[var(--nebula-accent-magenta-fg)]'
-                            : 'text-[#6FCB9F]'
-                        : ''
-                    }`}
-                  >
-                    {bloomIntensity <= 0.02
-                      ? '0% (Off)'
-                      : `${Math.round(bloomIntensity * 100)}%`}
-                  </span>
-                </div>
-                <input
-                  id="spenta-galaxy-nebula-bloom"
-                  data-qa="galaxy-nebula-bloom-slider"
-                  type="range"
-                  min={0}
-                  max={2.0}
-                  step={0.05}
-                  value={bloomIntensity}
-                  onChange={(e) => onBloomIntensityChange?.(Number(e.target.value))}
-                  aria-label="Nebula Bloom emissive glow intensity (--neural-bloom-intensity)"
-                  className="w-full spenta-slider"
-                />
-              </div>
             </div>
 
             {/* Compact Camera Angle & Observatory Finish Strip */}
-            <div
-              className={`flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t ${dividerClass}`}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="opacity-70 whitespace-nowrap">Camera</span>
-                <div className="flex items-center gap-1">
-                  {(['overview', 'operations', 'experience', 'ecliptic'] as CameraPreset[]).map(
-                    (preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => onSelectCameraPreset?.(preset)}
-                        className={`px-2 py-0.5 rounded text-[9px] font-semibold capitalize cursor-pointer transition-colors whitespace-nowrap ${
-                          cameraPreset === preset
-                            ? isLightMode
-                              ? 'bg-[#1F3863] text-white'
-                              : 'bg-[#8FA6E8] text-[#0B1020]'
-                            : segInactive
-                        }`}
-                      >
-                        {preset}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <span className="opacity-70 whitespace-nowrap">Finish</span>
-                <div className="flex items-center gap-1">
-                  {(
-                    [
-                      { id: 'cosmos', label: 'Cosmos' },
-                      { id: 'nocturnal', label: 'Navy' },
-                      { id: 'nebula', label: 'Nebula' },
-                      { id: 'stone', label: 'Stone' },
-                    ] as { id: ObservatoryFinish; label: string }[]
-                  ).map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      data-qa={`galaxy-finish-${opt.id}`}
-                      onClick={() => onSelectFinish?.(opt.id)}
-                      className={`px-2 py-0.5 rounded text-[9px] font-semibold cursor-pointer transition-colors whitespace-nowrap ${
-                        finish === opt.id
-                          ? isLightMode
-                            ? 'bg-[#1F3863] text-white'
-                            : opt.id === 'nebula' || isNebulaTheme
-                              ? 'bg-[#E879F9] text-[#070414]'
-                              : 'bg-[#8FA6E8] text-[#0B1020]'
-                          : segInactive
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Dynamic Nebula Mode Controls: Nebula Density & Particle Turbulence (+ Nebula Bloom fallback when Physics collapsed) */}
-        {nebulaMode && (
-          <div
-            data-qa="nebula-mode-sliders"
-            style={
-              !isLightMode
-                ? {
-                    backgroundColor: 'var(--nebula-bg-strip)',
-                    borderColor: 'var(--nebula-border-teal)',
-                  }
-                : undefined
-            }
-            className={`px-3 py-2 border-t space-y-2 text-[10px] font-mono ${
-              isLightMode ? 'bg-[#F0FDFA] border-[#99F6E4]' : ''
-            }`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Sparkles
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-teal)]'
-                  }`}
-                  strokeWidth={1.85}
-                />
-                <span
-                  className={`font-semibold truncate ${
-                    isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-bright)]'
-                  }`}
-                >
-                  Procedural Nebula Clusters
-                </span>
-                <span
-                  className={`hidden sm:inline tabular-nums ${
-                    isLightMode ? 'text-[#0F766E]/80' : 'text-[var(--nebula-fg-violet)]'
-                  }`}
-                >
-                  · {renderedNebulaK}k cluster nodes · {Math.round(bloomIntensity * 100)}% bloom
-                </span>
-              </div>
-
-              {onRegenerateNebulaClusters && (
-                <button
-                  type="button"
-                  onClick={onRegenerateNebulaClusters}
-                  data-qa="nebula-reseed-clusters"
-                  title="Procedurally regenerate nebula particle cluster topology using .nebula-core-scope CSS tokens"
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-mono font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0 ${btnNeutral}`}
-                >
-                  <Shuffle className="w-3 h-3 shrink-0" strokeWidth={1.85} />
-                  <span>Reseed Clusters</span>
-                </button>
-              )}
-            </div>
-
-            <div
-              className={`grid grid-cols-1 gap-3 ${
-                dockOpen ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
-              }`}
-            >
-              {/* Dynamic Nebula Density Slider (20% .. 200%) */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <label
-                    htmlFor="spenta-nebula-density"
-                    className={`whitespace-nowrap ${
-                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-teal)]'
-                    }`}
-                  >
-                    Nebula Density
-                  </label>
-                  <span
-                    className={`tabular-nums font-bold ${
-                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-fg-bright)]'
-                    }`}
-                  >
-                    {Math.round(nebulaDensity * 100)}% ({renderedNebulaK}k)
-                  </span>
-                </div>
-                <input
-                  id="spenta-nebula-density"
-                  data-qa="nebula-density-slider"
-                  type="range"
-                  min={0.2}
-                  max={2.0}
-                  step={0.05}
-                  value={nebulaDensity}
-                  onChange={(e) => onNebulaDensityChange?.(Number(e.target.value))}
-                  aria-label="Nebula cluster particle density from 20 percent to 200 percent"
-                  className="w-full spenta-slider"
-                />
-              </div>
-
-              {/* Dynamic Particle Turbulence Slider (0% .. 200%) */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <label
-                    htmlFor="spenta-nebula-turbulence"
-                    className={`whitespace-nowrap ${
-                      isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-fg-violet)]'
-                    }`}
-                  >
-                    Particle Turbulence
-                  </label>
-                  <span
-                    className={`tabular-nums font-bold ${
-                      isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-accent-magenta-fg)]'
-                    }`}
-                  >
-                    {particleTurbulence <= 0.02
-                      ? '0% (Calm)'
-                      : `${Math.round(particleTurbulence * 100)}% Curl`}
-                  </span>
-                </div>
-                <input
-                  id="spenta-nebula-turbulence"
-                  data-qa="nebula-turbulence-slider"
-                  type="range"
-                  min={0}
-                  max={2.0}
-                  step={0.05}
-                  value={particleTurbulence}
-                  onChange={(e) => onParticleTurbulenceChange?.(Number(e.target.value))}
-                  aria-label="Nebula particle curl turbulence intensity from 0 percent to 200 percent"
-                  className="w-full spenta-slider"
-                />
-              </div>
-
-              {/* Nebula Bloom Slider fallback when Physics drawer is collapsed */}
-              {!dockOpen && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <label
-                      htmlFor="spenta-galaxy-nebula-bloom-compact"
-                      className={`whitespace-nowrap ${
-                        isLightMode ? 'text-[#134E4A]' : 'text-[var(--nebula-accent-magenta-fg)]'
-                      }`}
-                    >
-                      Nebula Bloom
-                    </label>
-                    <span
-                      className={`tabular-nums font-bold ${
-                        isLightMode ? 'text-[#0F766E]' : 'text-[var(--nebula-fg-bright)]'
-                      }`}
-                    >
-                      {bloomIntensity <= 0.02
-                        ? '0% (Off)'
-                        : `${Math.round(bloomIntensity * 100)}%`}
+            {(onSelectCameraPreset || onSelectFinish) && (
+              <div
+                className={`pt-2 border-t flex flex-wrap items-center justify-between gap-2 ${dividerClass}`}
+                data-qa="galaxy-camera-finish-strip"
+              >
+                {onSelectCameraPreset && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="opacity-70 uppercase tracking-[0.06em] text-[9px]">
+                      Camera
                     </span>
+                    <div
+                      role="group"
+                      aria-label="Camera angle presets"
+                      className={`inline-flex items-center rounded-md border overflow-hidden ${
+                        isLightMode
+                          ? 'border-[#D4CEC2]'
+                          : isNebulaTheme
+                            ? 'border-[var(--nebula-border-subtle)]'
+                            : 'border-[#26355E]'
+                      }`}
+                    >
+                      {(
+                        [
+                          { id: 'overview', label: 'Overview' },
+                          { id: 'operations', label: 'Operations' },
+                          { id: 'experience', label: 'Experience' },
+                          { id: 'ecliptic', label: 'Ecliptic' },
+                        ] as const
+                      ).map((cam) => {
+                        const active = cameraPreset === cam.id;
+                        return (
+                          <button
+                            key={cam.id}
+                            type="button"
+                            onClick={() => onSelectCameraPreset(cam.id)}
+                            aria-pressed={active}
+                            className={`px-2 py-1 text-[10px] font-mono font-semibold cursor-pointer transition-colors ${
+                              active
+                                ? isLightMode
+                                  ? 'bg-[#1F3863] text-white'
+                                  : isNebulaTheme
+                                    ? 'bg-[#2DD4BF] text-[#070414]'
+                                    : 'bg-[#6FCB9F] text-[#0B1020]'
+                                : segInactive
+                            }`}
+                          >
+                            {cam.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <input
-                    id="spenta-galaxy-nebula-bloom-compact"
-                    data-qa="galaxy-nebula-bloom-slider"
-                    type="range"
-                    min={0}
-                    max={2.0}
-                    step={0.05}
-                    value={bloomIntensity}
-                    onChange={(e) => onBloomIntensityChange?.(Number(e.target.value))}
-                    aria-label="Nebula Bloom emissive glow intensity (--neural-bloom-intensity)"
-                    className="w-full spenta-slider"
-                  />
-                </div>
-              )}
-            </div>
+                )}
+
+                {onSelectFinish && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="opacity-70 uppercase tracking-[0.06em] text-[9px]">
+                      Finish
+                    </span>
+                    <div
+                      role="group"
+                      aria-label="Observatory finish theme"
+                      className={`inline-flex items-center rounded-md border overflow-hidden ${
+                        isLightMode
+                          ? 'border-[#D4CEC2]'
+                          : isNebulaTheme
+                            ? 'border-[var(--nebula-border-subtle)]'
+                            : 'border-[#26355E]'
+                      }`}
+                    >
+                      {(
+                        [
+                          { id: 'cosmos', label: 'Cosmos' },
+                          { id: 'nocturnal', label: 'Navy' },
+                          { id: 'nebula', label: 'Nebula' },
+                          { id: 'stone', label: 'Stone' },
+                        ] as const
+                      ).map((opt) => {
+                        const active = finish === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => onSelectFinish(opt.id)}
+                            aria-pressed={active}
+                            className={`px-2 py-1 text-[10px] font-mono font-semibold cursor-pointer transition-colors ${
+                              active
+                                ? isLightMode
+                                  ? 'bg-[#1F3863] text-white'
+                                  : isNebulaTheme
+                                    ? 'bg-[#2DD4BF] text-[#070414]'
+                                    : 'bg-[#6FCB9F] text-[#0B1020]'
+                                : segInactive
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
+
+        {/* Collapsible Orbital History Log (Inclination & Velocity State Transitions) */}
+        <OrbitalHistorySection
+          entries={orbitalHistory}
+          onClear={onClearOrbitalHistory}
+          variant={isLightMode ? 'light' : isNebulaTheme ? 'nebula' : 'dark'}
+        />
       </div>
     </div>
   );
